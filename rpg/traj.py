@@ -49,3 +49,21 @@ class Trajectory:
                 if self.traj[j]['done'][i] or j == self.timesteps -1:
                     ind.append(j, i)
         return totensor(ind, device=torch.long)
+
+
+    def summarize_epsidoe_info(self):
+        # average additional infos, for example success, if necessary.
+        n = 0
+        rewards = 0
+        avg_len = 0
+        for i in range(len(self.timesteps)):
+            if 'episode' in i:
+                for j in i:
+                    n += 1
+                    rewards += j['reward']
+                    avg_len += j['step']
+        return {
+            "num_episode": n,
+            "rewards": rewards / n,
+            "avg_len": avg_len / n,
+        }

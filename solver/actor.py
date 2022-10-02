@@ -17,6 +17,7 @@ from nn.distributions import Normal, DistHead
 class Actor(Network):
     # a network module that maps an observation to an action 
     # support different kinds of backbones and distribution heads
+    # the obs_space can be either a space, or a tuple of (obs_space, hidden_space)
 
     def __init__(
         self, obs_space, action_space, cfg=None,

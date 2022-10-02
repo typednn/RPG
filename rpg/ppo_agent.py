@@ -82,10 +82,10 @@ class PolicyOptim(Optim):
 
 
 
-class Critic(Optim):
+class CriticOptim(Optim):
     def __init__(self, critic, cfg=None,
                  lr=5e-4, vfcoef=0.5, mode='step'):
-        super(Critic, self).__init__(critic)
+        super(CriticOptim, self).__init__(critic)
         self.critic = critic
         #self.optim = make_optim(critic.parameters(), lr)
         self.vfcoef = vfcoef
@@ -114,13 +114,13 @@ class PPOAgent(Configurable):
 
         if critic_optim is None:
             critic_optim = dict(lr=actor_optim.lr)
-        self.critic_optim = PolicyOptim(self.critic, cfg=critic_optim)
+        self.critic_optim = CriticOptim(self.critic, cfg=critic_optim)
 
     def __call__(self, obs, hidden, timestep):
-        return self.policy(obs, hidden, timesteps=timestep)
+        return self.policy(obs, hidden, timestep=timestep)
 
     def value(self, obs, hidden, timestep):
-        return self.critic(obs, hidden, timestep)
+        return self.critic(obs, hidden, timestep=timestep)
 
     def stpe(self, obs, hidden, timestep, action, log_p_a, adv, vtarg):
         stop = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
