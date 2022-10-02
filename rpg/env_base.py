@@ -89,7 +89,7 @@ class GymVecEnv(VecEnv):
 
         return {
             'obs': obs, # the current observation of the environment. 
-            'next_obs': next_obs, # ending state of the last transition.
+            'next_obs': next_obs, # ending state of the previous transition.
             'timestep': self.steps.copy(),
             'r': np.array(reward)[:, None],
             'done': done,

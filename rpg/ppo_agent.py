@@ -111,7 +111,7 @@ class PPOAgent(Configurable):
         cfg=None,
         actor_optim=PolicyOptim.get_default_config(),
         critic_optim=None, 
-        learning_epoch=5,
+        learning_epoch=1,
     ):
         super().__init__()
 

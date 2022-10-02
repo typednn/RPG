@@ -79,14 +79,20 @@ class train_ppo(TrainerBase):
                         critic=Critic.get_default_config(),
                         ppo = PPOAgent.get_default_config(),
                         gae = GAE.get_default_config(),
+                        reward_norm=True,
                 ):
         super().__init__()
+
+
+        from tools.utils import RunningMeanStd
+        rew_rms = RunningMeanStd(last_dim=True) if reward_norm else None
+
         obs_space = env.observation_space
         action_space = env.action_space
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
         critic = Critic(obs_space, None, 1, cfg=critic).to(device)
         pi = PPOAgent(actor, critic, ppo)
-        self.ppo = PPO(env, pi, GAE(pi, cfg=gae))
+        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms)
 
         while True:
             self.ppo.run_ppo(env, steps)

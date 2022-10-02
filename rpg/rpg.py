@@ -34,6 +34,8 @@ class RPG:
 
         self.rew_rms = rew_rms
         self.rnd = rnd
+        self.batch_size = batch_size
+
 
     def inference(
         self,
@@ -95,6 +97,7 @@ class RPG:
             data = {traj.get_list(key) for key in ['obs', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z']}
             data.update(adv_targets)
 
-        self.pi_a.learn(data, self._cfg.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
-        self.pi_z.learn(data, self._cfg.batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
+
+        self.pi_a.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
+        self.pi_z.learn(data, self.batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
         self.relbo.learn(data) # maybe training with a seq2seq model way ..
