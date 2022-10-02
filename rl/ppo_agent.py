@@ -270,9 +270,9 @@ class PPOAgent(Agent):
         cfg = merge_inputs(self._cfg, **kwargs)
 
         self.training = True
-
-        raw_data = self.collect_data(envs, **kwargs)
-        traj = self.preprocess(raw_data, **kwargs)
+        with torch.no_grad():
+            raw_data = self.collect_data(envs, **kwargs)
+            traj = self.preprocess(raw_data, **kwargs)
 
         for _ in tqdm.trange(cfg.n_epochs):
             for batch in self.minibatch_gen(traj, self.KEY_LIST):

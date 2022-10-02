@@ -20,6 +20,7 @@ class PPO(Optim):
                  entropy_coef=0.0,
                  max_kl=None,
                  max_grad_norm=0.5,
+                 mode='step',
                  ):
         super(PPO, self).__init__(actor)
 
@@ -81,7 +82,7 @@ class PPO(Optim):
 
 class ValueOptim(Optim):
     def __init__(self, critic, cfg=None,
-                 lr=5e-4, vfcoef=0.5):
+                 lr=5e-4, vfcoef=0.5, mode='step'):
         super(ValueOptim, self).__init__(critic)
         self.critic = critic
         #self.optim = make_optim(critic.parameters(), lr)

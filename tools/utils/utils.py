@@ -210,13 +210,12 @@ def dshape(a):
         raise NotImplementedError
 
 def dstack(a, device):
-    # stack and make then into a tensor dict ..
     if isinstance(a[0], list):
-        return dstack([batch_input(i, device=device) for i in a], device=device)
+        return batch_input(a, device)
     elif isinstance(a[0], dict):
         return {k: dstack([i[k] for i in a], device) for k, v in a[0].items()}
     else:
-        return torch.stack(a).to(device)
+        return a
 
 def dconcat(*args, dim=0):
     if isinstance(args[0], list):

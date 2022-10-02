@@ -36,9 +36,7 @@ def roller(
     if roll_state is None:
         roll_state = RollingState(envs.env_num)
         obs = envs.reset(**reset_kwargs)
-        print(obs)
         roll_state.obs = process_obs(obs)
-        exit(0)
 
 
     traj = []
@@ -63,7 +61,6 @@ def roller(
             actions, logp = action_distr.sample()
             actions = actions.detach().cpu().numpy() 
             entropy = action_distr.entropy().detach().cpu().numpy()
-            logp = logp.sum(axis=-1).detach().cpu().numpy()
         else:
             actions = action_distr
             logp = entropy = None
