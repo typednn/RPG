@@ -2,109 +2,33 @@
 import torch
 from .env_base import VecEnv
 from .model_base import Policy
-from .plugin import Plugin
-from .utils import predict_traj_value, convert_traj_key_to_tensor
-from tools.utils import dstack, totensor
+from .gae import ComputeTargetValues
+from .traj import Trajectory
+from .relbo import Relbo
+from .utils import minibatch_gen
+from tools.utils import totensor
 
 
-
-class Relbo(Plugin):
-    def __init__(self, info_net,
-            cfg=None,
-            ent_z=1.,
-            ent_a=1.,
-            mutual_info=1.,
-            reward=1.,
-            prior=None
-     ) -> None:
-        super().__init__(cfg)
-
-
-class ComputeTargetValues(Plugin):
-    # @ litian, write the unit test code for the target value computation..
-    def __init__(self, critic_a, critic_z, cfg=None, gamma=0.995, lmbda=0.97):
-        super().__init__(cfg)
-        self.critic_a = critic_a
-        self.critic_z = critic_z
-
-
-    @torch.no_grad()
-    def update_data(self, data, locals_):
-        # must determin the batch size..
-        batch_size = locals_['batch_size']
-        rew_rms = locals_.get('rew_rms', None)
-
-        traj = data['traj']
-        nenv = traj['nenv']
-        timesteps = traj['timesteps']
-
-        ind = []
-        for j in range(timesteps):
-            for i in range(nenv):
-                if traj[j]['done'][i] or j == timesteps -1:
-                    ind.append(j, i)
-        ind = totensor(ind, device=torch.long)
-
-        vpredz = predict_traj_value(traj, ('obs', 'old_z', 'timestep'), self.critic_z, batch_size=batch_size)
-        vpreda = predict_traj_value(traj, ('obs', 'z', 'timestep'), self.critic_a, batch_size=batch_size)
-        next_vpredz = predict_traj_value(traj, ('next_obs', 'z', 'timestep'), self.critic_z, batch_size=batch_size)
-        next_vpreda = torch.zeros_like(next_vpredz)
-        next_vpreda[ind] = next_vpredz[ind] # there is no action estimate .. 
-
-        reward = convert_traj_key_to_tensor(traj, 'r') # compute trajectorye
-        done = convert_traj_key_to_tensor(traj, 'done')
-
-        lmbda_sqrt = self._cfg.lmbda**0.5
-
-        vpred = vpredz + vpreda * lmbda_sqrt
-        next_vpred = vpredz * vpreda * lmbda_sqrt
-
-        
-        adv = torch.zeros_like(next_vpred)
-        for t in reversed(len(vpredz)):
-            nextvalue = next_vpred[t]
-            mask = 1. - done[t]
-            assert mask.shape == nextvalue.shape
-            #print(reward.device, next_vpred.device, mask.device, vpred[t].device)
-            delta = reward[t] + self._cfg.gamma * nextvalue * mask - vpred[t]
-            adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * mask
-        vtarg = vpred + adv
-
-        traj['adv_a'] = vtarg - vpreda
-        traj['vtarget_a'] = vtarg
-
-        vtarg_z = vpreda + lmbda_sqrt * vtarg 
-        traj['adv_z'] = vtarg_z - vpredz
-        traj['vtarget_z'] = vtarg_z
-
-
-    def comptue_gae(self, reward, vpred, next_vpred, done):
-        lastgaelam = 0
-        adv = torch.zeros_like(vpred)
-        for t in reversed(len(vpred)):
-            nextvalue = next_vpred[t]
-            mask = 1. - done[t]
-            assert mask.shape == nextvalue.shape
-            #print(reward.device, next_vpred.device, mask.device, vpred[t].device)
-            delta = reward[t] + self._cfg.gamma * nextvalue * mask - vpred[t]
-            adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * mask
-            # nextvalue = vpred[t]
-        vtarg = vpred + adv
-        return adv, vtarg
-
-
-class Roller:
+class Trainer:
 
     def __init__(
         self,
+        env,
+        pi_a,
+        pi_z,
+        critic,
+        relbo: Relbo,
+
+        gae: ComputeTargetValues,
+        rew_rms=None,
     ) -> None:
 
         self.on_policy = False
         self.off_policy = False
 
         self.training = True
-
-        self.plugins = [ComputeTargetValues()]
+        self.gae = gae,
+        self.latent_z = None
 
     def add(self, plugin):
         self.plugins.append(plugin)
@@ -136,27 +60,50 @@ class Roller:
             assert log_p_a.shape == log_p_z.shape
 
             transition.update(env.step(a))
+            transition.update(
+                a=a,
+                z=z,
+                log_p_a = log_p_a,
+                log_p_z = log_p_z,
+            )
             obs = transitions.pop('new_obs')
 
             transitions.append(transition)
 
             timestep = timestep + 1
 
-            dones  = dstack(transition['done'])
+            dones  = totensor(transition['done'])
             if dones.any():
                 z = z.clone()
                 z[dones] = init_z_fn(dones) #reset z
 
-        transitions['timesteps'] = steps
-        transitions['nenv'] = len(obs)
-        return transitions
+        return Trajectory(transitions, len(obs), steps), z
 
 
     def main_loop(self, **kwargs):
-        data = {
-            'traj': self.inference(**kwargs),
-        }
+        batch_size = 128
 
-        # pre-training
-        for i in self.plugins:
-            data = i._update_data(data, locals())
+        with torch.no_grad():
+            traj, z = self.inference(**kwargs)
+
+            # pre-training
+            reward = self.relbo(traj)
+            adv_targets = self.gae(traj, reward, batch_size=batch_size)
+
+            key = ['obs', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z',]
+            data = {traj.get_list(key) for key in key}
+            data.update(adv_targets)
+
+            key += ['adv_a', 'adv_z', 'vtarg_a', 'vtarg_z']
+
+            for i in range(5):
+                # only update one episode ..
+                for batch in minibatch_gen(data, batch_size):
+                    self.pi_a.step(
+                        batch['obs'], batch['z'], batch['a'], batch['log_p_a'], batch['adv_a'])
+                    self.pi_z.step(
+                        batch['obs'], batch['old_z'], batch['z'], batch['log_p_z'], batch['adv_z'])
+                    self.critic.step(
+                        batch['obs'], batch['old_z'], batch['z'], batch['vtarg_a'], batch['vtarg_z']
+                    )
+                self.relbo.step(traj)
