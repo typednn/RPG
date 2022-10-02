@@ -26,7 +26,7 @@ class NormalAction(ActionDistr):
         return action, logp
 
     def entropy(self):
-        return self.dist.entropy()
+        return self.dist.entropy().sum(axis=-1)
 
     def sample(self):
         return self.rsample(detach=True)

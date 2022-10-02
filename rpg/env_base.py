@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from tools.utils import tonumpy
 
 
 class VecEnv(ABC):
@@ -27,7 +28,7 @@ class VecEnv(ABC):
 
 
 class GymVecEnv(VecEnv):
-    def __init__(self, env_name, n) -> None:
+    def __init__(self, env_name, n, ignore_truncated=True) -> None:
         import gym
         from rl.vec_envs import SubprocVectorEnv
         def make_env():
@@ -40,6 +41,7 @@ class GymVecEnv(VecEnv):
         self.obs = None
         self.steps = None
         self.returns = None
+        self.ignore_truncated = ignore_truncated
 
         self.observation_space = self.vec_env.observation_space[0]
         self.action_space = self.vec_env.action_space[0]
@@ -54,10 +56,12 @@ class GymVecEnv(VecEnv):
             self.steps = np.zeros(len(self.obs), dtype=np.long)
             self.returns = np.zeros(len(self.obs), dtype=np.float)
 
-        return self.obs, self.steps
+        return self.obs, self.steps.copy()
 
     def step(self, actions):
         assert self.obs is not None, "must start before running"
+
+        actions = tonumpy(actions)
         next_obs, reward, done, info = self.vec_env.step(actions)
         end_envs = np.where(done)[0]
 
@@ -65,9 +69,15 @@ class GymVecEnv(VecEnv):
         obs = copy.copy(next_obs)
 
         self.steps += 1
+        self.returns += np.array(reward)
 
         episode = []
         if len(end_envs) > 0:
+            if self.ignore_truncated:
+                for j in end_envs:
+                    if 'TimeLimit.truncated' in info[j]:
+                        done[j] = False
+
             for j in end_envs:
                 step, total_reward = self.steps[j], self.returns[j]
                 self.steps[j] = 0
@@ -81,7 +91,7 @@ class GymVecEnv(VecEnv):
             'obs': obs,
             'next_obs': next_obs,
             'timestep': self.steps.copy(),
-            'r': reward,
+            'r': np.array(reward)[:, None],
             'done': done,
             'info': info,
             'total_reward': self.returns.copy(),

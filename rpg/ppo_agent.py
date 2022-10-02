@@ -25,7 +25,13 @@ class PolicyOptim(Optim):
         self.clip_param = clip_param
 
     def _compute_loss(self, obs, hidden, timestep, action, logp, adv, backward=True):
+        device = self.actor.device
         pd: ActionDistr = self.actor(obs, hidden, timestep)
+        action = batch_input(action, device)
+
+        # print(logp.shape, logp.device)
+        # print(adv.shape, adv.device)
+        # exit(0)
 
         newlogp = pd.log_prob(action)
         device = newlogp.device
@@ -48,7 +54,7 @@ class PolicyOptim(Optim):
         else:
             raise NotImplementedError
 
-        entropy = pd.entropy(sum=True)
+        entropy = pd.entropy()
         assert entropy.shape == pg_losses.shape
 
         pg_losses, entropy = pg_losses.mean(), entropy.mean()
@@ -72,13 +78,14 @@ class PolicyOptim(Optim):
             'pi': loss.item(),
             'pg': pg_losses.item(),
             'approx_kl': approx_kl_div,
+            'loss': loss.item()
         }
         if self._cfg.max_kl:
             from tools.dist_utils import get_world_size
             assert get_world_size() == 1
-            #TODO: need to sync across multiple processes
-            return early_stop
-        return False
+            output['early_stop'] = early_stop
+
+        return loss, output
 
 
 
@@ -103,7 +110,8 @@ class PPOAgent(Configurable):
         self, policy, critic,
         cfg=None,
         actor_optim=PolicyOptim.get_default_config(),
-        critic_optim=None
+        critic_optim=None, 
+        learning_epoch=5,
     ):
         super().__init__()
 
@@ -122,16 +130,25 @@ class PPOAgent(Configurable):
     def value(self, obs, hidden, timestep):
         return self.critic(obs, hidden, timestep=timestep)
 
-    def stpe(self, obs, hidden, timestep, action, log_p_a, adv, vtarg):
+    def step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg):
         stop = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
         self.critic_optim.step(obs, hidden, timestep, vtarg)
         return stop
 
     def learn(self, data, batch_size, keys):
         stop = False
-        for i in range(5):
-            for batch in minibatch_gen(data, batch_size):
+
+        timesteps = len(data['obs'])
+        nenvs = len(data['obs'][0])
+
+        import numpy as np
+        index = np.stack(np.meshgrid(np.arange(timesteps), np.arange(nenvs)), axis=-1).reshape(-1, 2)
+        for i in range(self._cfg.learning_epoch):
+            for batch in minibatch_gen(data, index, batch_size):
                 if not stop:
-                    stop = self.step(*[batch[i] for i in keys])
+                    loss, output = self.step(*[batch[i] for i in keys])
+                    if 'early_stop' in output and output['early_stop']:
+                        stop = True
+                        break
             if stop:
                 break

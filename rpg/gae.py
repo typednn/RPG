@@ -2,37 +2,59 @@ import torch
 from tools.utils import totensor
 from tools.utils import dstack, totensor
 from .traj import Trajectory
+from .ppo_agent import PPOAgent
 from tools.config import Configurable
 
 
 class GAE(Configurable):
-    def __init__(self, pi, cfg=None, gamma=0.995, lmbda=0.97):
+    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97):
         super().__init__()
         self.pi = pi
 
     @torch.no_grad()
-    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms):
-        done = traj.get_tensor(traj, 'done')
+    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms, debug=False):
+        done = traj.get_tensor('done')
 
         scale = rew_rms.std if rew_rms is not None else 1.
-        vpred = traj.predict_value(
-            traj, ('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
-        next_vpred = traj.predict_value(
-            traj, ('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
-        next_vpreda = torch.zeros_like(next_vpred)
-        ind = traj.get_temrinal_inds()
-        next_vpred[:-1] = vpred[1:]
-        next_vpreda[ind] = next_vpred[ind] # there is no action estimate .. 
+
+        vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
+        next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
+
+        if debug:
+            # sanity check below
+            assert torch.allclose(
+                traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale,
+                traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
+            )
+            assert torch.allclose(
+                traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale,
+                traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
+            )
+
+        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
+
+        if debug:
+            next_vpred_2 = torch.zeros_like(next_vpred)
+            ind = traj.get_truncated_index()
+            next_vpred_2[:-1] = vpred[1:]
+            next_vpred_2 = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size, index=ind, vpred=next_vpred_2) * scale
+            assert torch.allclose(next_vpred, next_vpred_2)
 
         # compute GAE ..
+        if debug:
+            assert done.sum() == 0
+
         adv = torch.zeros_like(next_vpred)
-        for t in reversed(len(vpred)):
-            nextvalue = next_vpred[t]
-            mask = 1. - done[t]
-            assert mask.shape == nextvalue.shape
-            #print(reward.device, next_vpred.device, mask.device, vpred[t].device)
-            delta = reward[t] + self._cfg.gamma * nextvalue * mask - vpred[t]
-            adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * mask
+
+        mask = (1-done)[..., None]
+        assert mask.shape[:2] == next_vpred.shape[:2]
+
+        lastgaelam = 0.
+        for t in reversed(range(traj.timesteps)):
+            m = mask[t]
+            delta = reward[t] + self._cfg.gamma * next_vpred[t] * m - vpred[t]
+            adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
+
         vtarg = vpred + adv
 
         if rew_rms is not None:

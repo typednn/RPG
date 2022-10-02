@@ -9,6 +9,8 @@ class Policy(BaseNet):
         self.z_space = z_space
         if z_space is not None:
             obs_space = (obs_space, z_space)
+        
+        assert len(action_space.shape) == 1, "We do not support multi-dimensional actions yet. Please flatten them or serialize them first."
         BaseNet.__init__(self, obs_space, action_space)
 
     def forward(self, state, hidden, timestep=None):
@@ -23,10 +25,10 @@ class Critic(BaseNet):
         self.z_space = z_space
         if z_space is not None:
             obs_space = (obs_space, z_space)
-        BaseNet.__init__(obs_space, Box(-1, 1, (dim,)), head=dict(TYPE='Deterministic'))
+        BaseNet.__init__(self, obs_space, Box(-1, 1, (dim,)), head=dict(TYPE='Deterministic'))
 
     def forward(self, state, hidden, timestep=None):
         if self.z_space is None:
-            return super().forward(state, timestep=timestep)
+            return super().forward(state, timestep=timestep).rsample()[0]
         else:
-            return super().forward((state, hidden), timestep=timestep)
+            return super().forward((state, hidden), timestep=timestep).rsample()[0]

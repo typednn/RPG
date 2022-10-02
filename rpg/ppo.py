@@ -14,14 +14,18 @@ class PPO:
         env,
         pi: PPOAgent,
         gae: GAE,
-        batch_size=256
+        batch_size=256,
+        rew_rms=None
     ) -> None:
 
         self.env = env
         self.pi = pi
 
-        self.gae = gae,
+        self.gae = gae
         self.latent_z = None
+        self.batch_size = batch_size
+
+        self.rew_rms = None
 
     def inference(
         self,
@@ -33,19 +37,17 @@ class PPO:
         transitions = []
         obs, timestep = env.start(**kwargs)
         for step in range(steps):
-            transition = dict(obs = obs,  timestep = timestep)
-
+            transition = dict(obs=obs, timestep = timestep)
             p_a = pi(obs, None, timestep=timestep) # no z
             a, log_p_a = p_a.rsample()
-
+            data = env.step(a)
+            obs = data.pop('obs')
             transition.update(
-                **env.step(a),
+                **data,
                 a=a,
                 log_p_a = log_p_a,
-                timestep = timestep.copy(),
                 z=None,
             )
-            obs = transitions.pop('obs')
             timestep = transition['timestep']
             transitions.append(transition)
 
@@ -54,24 +56,37 @@ class PPO:
 
     def run_ppo(self, env, steps):
         with torch.no_grad():
-            traj = self.inference(env, self.latent_z, self.pi, steps=steps)
-            adv_targets = self.gae(traj, traj.get_tensor(['reward']), batch_size=self._cfg.batch_size)
-            key = ['obs', 'a', 'log_p_a']
-            data = {traj.get_list(key) for key in key}
+            traj = self.inference(env, self.pi, steps=steps)
+
+            reward = traj.get_tensor('r'); assert reward.dim() == 3, "rewards must be (nstep, nenv, reward_dim)"
+            adv_targets = self.gae(traj, reward, batch_size=self.batch_size, rew_rms=self.rew_rms, debug=False)
+
+            data = traj.get_list_by_keys( ['obs', 'timestep', 'a', 'log_p_a'])
             data.update(adv_targets)
             data['z'] = None
 
-        self.pi.learn(data, self._cfg.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'])
+        self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'])
+        print(traj.summarize_epsidoe_info())
 
 
 
 class train_ppo(TrainerBase):
-    def __init__(self, env: VecEnv, cfg=None, steps=2048):
+    def __init__(self,
+                        env: VecEnv, cfg=None, steps=2048, device='cuda:0',
+                        actor=Policy.get_default_config(
+                            head=dict(std_mode='fix_learnable', std_scale=0.5)
+                        ),
+                        critic=Critic.get_default_config(),
+                        ppo = PPOAgent.get_default_config(),
+                        gae = GAE.get_default_config(),
+                ):
         super().__init__()
         obs_space = env.observation_space
         action_space = env.action_space
-        actor = Policy(obs_space, None, action_space)
-        critic = Critic(obs_space, None, 1)
-        pi = PPOAgent(actor, critic, GAE())
-        self.ppo = PPO(env, pi, GAE())
-        self.ppo.run_ppo(env, steps)
+        actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
+        critic = Critic(obs_space, None, 1, cfg=critic).to(device)
+        pi = PPOAgent(actor, critic, ppo)
+        self.ppo = PPO(env, pi, GAE(pi, cfg=gae))
+
+        while True:
+            self.ppo.run_ppo(env, steps)

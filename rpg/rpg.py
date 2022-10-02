@@ -67,10 +67,9 @@ class RPG:
                 z=z,
                 log_p_a = log_p_a,
                 log_p_z = log_p_z,
-                timestep = timestep.copy()
             )
 
-            obs = transitions.pop('obs')
+            obs = transition.pop('obs')
             transitions.append(transition)
             timestep = transition['timestep']
 
