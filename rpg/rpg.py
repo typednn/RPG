@@ -6,8 +6,7 @@ from .gae import ComputeTargetValues
 from .traj import Trajectory
 from .relbo import Relbo
 from .utils import minibatch_gen
-from .ppo_actor import PPO
-from .critic import Critic
+from .ppo_agent import PPOAgent
 from tools.utils import totensor
 
 
@@ -16,11 +15,9 @@ class Trainer:
     def __init__(
         self,
         env,
-        pi_a: PPO,
-        pi_z: PPO,
-        critic,
+        pi_a: PPOAgent,
+        pi_z: PPOAgent,
         relbo: Relbo,
-
         gae: ComputeTargetValues,
 
         rew_rms=None,
@@ -31,7 +28,6 @@ class Trainer:
         self.env = env
         self.pi_a = pi_a
         self.pi_z = pi_z
-        self.critic = critic
         self.relbo = relbo
 
         self.gae = gae,
@@ -73,6 +69,7 @@ class Trainer:
                 z=z,
                 log_p_a = log_p_a,
                 log_p_z = log_p_z,
+                timestep = timestep.copy()
             )
             obs = transitions.pop('new_obs')
 
@@ -95,33 +92,14 @@ class Trainer:
             traj, self.latent_z = self.inference(
                 env, self.latent_z, self.pi_z, self.pi_a, steps=steps)
 
-            # pre-training
             reward = self.relbo(traj)
             adv_targets = self.gae(traj, reward, batch_size=batch_size)
-
             key = ['obs', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z']
             data = {traj.get_list(key) for key in key}
             data.update(adv_targets)
 
             key += ['adv_a', 'adv_z', 'vtarg_a', 'vtarg_z']
-            stop_a = False
-            stop_z = False
 
-            for i in range(5):
-                # only update one episode ..
-                for batch in minibatch_gen(data, batch_size):
-                    if not stop_a:
-                        stop_a = self.pi_a.step(
-                            batch['obs'], batch['z'], batch['a'], batch['log_p_a'], batch['adv_a']
-                        )
-
-                    if not stop_z:
-                        stop_z = self.pi_z.step(
-                            batch['obs'], batch['old_z'], batch['z'], batch['log_p_z'], batch['adv_z']
-                        )
-
-                    self.critic.step(
-                        batch['obs'], batch['old_z'], batch['z'], batch['vtarg_a'], batch['vtarg_z']
-                    )
-
-            self.relbo.train(traj) # maybe training with a seq2seq model way ..
+            self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
+            self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
+            self.relbo.learn(data) # maybe training with a seq2seq model way ..

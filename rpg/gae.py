@@ -8,10 +8,10 @@ from tools.config import Configurable
 
 class ComputeTargetValues(Configurable):
     # @ litian, write the unit test code for the target value computation..
-    def __init__(self, critic_a, critic_z, cfg=None, gamma=0.995, lmbda=0.97):
+    def __init__(self, pi_a, pi_z, cfg=None, gamma=0.995, lmbda=0.97):
         super().__init__()
-        self.critic_a = critic_a
-        self.critic_z = critic_z
+        self.pi_a = pi_a
+        self.pi_z = pi_z
 
 
     @torch.no_grad()
@@ -20,11 +20,11 @@ class ComputeTargetValues(Configurable):
 
         scale = rew_rms.std if rew_rms is not None else 1.
         vpredz = traj.predict_value(
-            traj, ('obs', 'old_z', 'timestep'), self.critic.z, batch_size=batch_size) * scale
+            traj, ('obs', 'old_z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
         vpreda = traj.predict_value(
-            traj, ('obs', 'z', 'timestep'), self.critic.a, batch_size=batch_size) * scale
+            traj, ('obs', 'z', 'timestep'), self.pi_a.value, batch_size=batch_size) * scale
         next_vpredz = traj.predict_value(
-            traj, ('next_obs', 'z', 'timestep'), self.critic_z, batch_size=batch_size) * scale
+            traj, ('next_obs', 'z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
 
         next_vpreda = torch.zeros_like(next_vpredz)
         ind = traj.get_temrinal_inds()
@@ -48,7 +48,7 @@ class ComputeTargetValues(Configurable):
 
         if rew_rms is not None:
             # https://github.com/haosulab/pyrl/blob/926d3d07d45f3bf014e7c6ea64e1bba1d4f35f03/pyrl/utils/torch/module_utils.py#L192
-            rew_rms.update(vtarg.reshape(-1))
+            rew_rms.update(vtarg.sum(axis=-1).reshape(-1)) # normalize it based on the final result.
             scale = rew_rms.std
         else:
             scale = 1.
