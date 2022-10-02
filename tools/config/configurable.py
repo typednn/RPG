@@ -18,8 +18,7 @@ def as_builder(cls: T):
     name = cls.get_name()
     import logging
     if name in BUILDERS:
-        logging.warning(f"{cls}'s name {name} has been "
-                        f"registered as class {BUILDERS[name]}")
+        raise Exception(f"Duplicated Builder Name {cls} {BUILDERS[name]}")
     BUILDERS[cls.get_name()] = cls
     cls.FACTORY[name] = cls
     return cls
@@ -139,7 +138,8 @@ def configurable_class(cls):
                     if is_builder_cfg(v):
                         v = purge_builder_cfg(v, level=1)  # only purge for one-level ...
                 kwargs[i] = v
-            init(self, *args, cfg=cfg, **kwargs)
+
+            init(self, *args, cfg=copy.copy(cfg), **kwargs)
             _assert_not_necessary(self._initialized, f"{cls} doesn't initialize its all ancestors... this is very dangerous..")
 
         return wrapper
@@ -267,7 +267,6 @@ class Configurable(object):
 
         _assert_with_logging(type is not None, f"Please input TYPE for the builder {cls} with name {cls.get_name()}.")
         new_type = cls.FACTORY[type]
-        # print('build', new_type, cfg,'\n', args)
         return new_type(*args, cfg=cfg)
 
     #def __str__(self):

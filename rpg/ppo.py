@@ -1,7 +1,7 @@
 # an implementation of PPO to verify the correctness of env_base ..
 import torch
 from .env_base import VecEnv
-from .models import Actor, Critic
+from .models import Policy, Critic
 from .gae import GAE
 from .traj import Trajectory
 from .ppo_agent import PPOAgent
@@ -38,8 +38,8 @@ class PPO:
             p_a = pi(obs, None, timestep=timestep) # no z
             a, log_p_a = p_a.rsample()
 
-            transition.update(env.step(a))
             transition.update(
+                **env.step(a),
                 a=a,
                 log_p_a = log_p_a,
                 timestep = timestep.copy(),
@@ -65,13 +65,13 @@ class PPO:
 
 
 
-class Trainer(TrainerBase):
+class train_ppo(TrainerBase):
     def __init__(self, env: VecEnv, cfg=None, steps=2048):
         super().__init__()
         obs_space = env.observation_space
         action_space = env.action_space
-        actor = Actor(obs_space, action_space)
-        critic = Critic(obs_space, 1)
+        actor = Policy(obs_space, None, action_space)
+        critic = Critic(obs_space, None, 1)
         pi = PPOAgent(actor, critic, GAE())
         self.ppo = PPO(env, pi, GAE())
         self.ppo.run_ppo(env, steps)
