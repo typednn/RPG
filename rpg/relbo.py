@@ -3,6 +3,8 @@ from tools.config import Configurable
 class Relbo(Configurable):
     def __init__(self,
             info_net,
+            prior_z,
+            prior_a,
             cfg=None,
             ent_z=1.,
             ent_a=1.,
