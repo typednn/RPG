@@ -37,7 +37,6 @@ install_requires = [
 setup(
     name='concept',
     version='0.0.1',
-    packages=['mpm'],
     install_requires=install_requires,
     py_modules=['rl', 'tools', 'solver']
 )
