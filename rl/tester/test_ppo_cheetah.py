@@ -1,4 +1,6 @@
 import gym
+import os
+
 from rl.vec_envs import SubprocVectorEnv
 from tools.utils import logger
 

@@ -3,7 +3,9 @@ from setuptools import setup
 install_requires = [
     'scipy',
     'numpy',
+    'wandb',
     'torch',
+    'tensorboardX'
     'opencv-python',
     'tqdm',
     'taichi',

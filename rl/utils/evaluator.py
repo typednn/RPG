@@ -1,6 +1,5 @@
 from operator import mod
 import json
-from sympy import N
 import tqdm
 import cv2
 import numpy as np

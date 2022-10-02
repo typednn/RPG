@@ -1,14 +1,13 @@
 import torch
 from gym.spaces import Box, Discrete
-from .distributions import ActionDistr, CategoricalAction, DistHead, NormalAction, MixtureAction
 from collections import defaultdict
 import numpy as np
 from tools.utils import batch_input
 
-class MixtureSpace:
-    def __init__(self, discrete, continuous) -> None:
-        self.continuous = continuous
-        self.discrete = discrete
+from nn.space import MixtureSpace
+from nn.distributions import NormalAction, MixtureAction, CategoricalAction
+from tools.utils import myround
+
 
 
 def create_z_space(z_dim, z_cont_dim):
@@ -19,11 +18,6 @@ def create_z_space(z_dim, z_cont_dim):
     else:
         z_space = MixtureSpace(Discrete(z_dim), Box(-1, 1, (z_cont_dim,)))
     return z_space
-
-def myround(a):
-    x = torch.round(a).long()
-    assert torch.allclose(x.float(), a), 'the rounding is not correct'
-    return x
 
 
 def group_videos(images, target_size=(128*3, 128)):

@@ -422,3 +422,9 @@ def clamp(tensor, minval=None, maxval=None):
     if maxval is not None:
         tensor = tensor - torch.relu(tensor - maxval).detach()
     return tensor
+
+
+def myround(a):
+    x = torch.round(a).long()
+    assert torch.allclose(x.float(), a), 'the rounding is not correct'
+    return x

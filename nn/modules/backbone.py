@@ -5,7 +5,7 @@ from tools.config import Configurable, as_builder
 from tools.utils import batch_input
 from tools.nn_base import Network
 from gym.spaces import Discrete, Box, Space
-from ..utils import MixtureSpace
+from nn.space import MixtureSpace
 
 
 
@@ -60,7 +60,7 @@ class Backbone(Network):
 
         def onehot(a, space):
             return torch.nn.functional.one_hot(self.batch_input(a), num_classes=space.n)
-        from ..utils import myround
+        from tools.utils import myround
 
 
         space = self.old_action_space

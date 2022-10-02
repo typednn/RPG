@@ -10,8 +10,8 @@ from tools.nn_base import Network, intprod
 from gym.spaces import Discrete
 
 
-from .modules import Backbone, MLP
-from .distributions import Normal, DistHead
+from nn.modules import Backbone, MLP
+from nn.distributions import Normal, DistHead
 
 
 class Actor(Network):

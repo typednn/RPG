@@ -6,7 +6,7 @@ from tools.config import as_builder
 
 from .utils import create_prior
 from .actor import Actor, DistHead
-from .distributions import DeterminisiticAction
+from nn.distributions import DeterminisiticAction
 
 def select_new_z(timestep, K):
     return timestep == 0 or (K and timestep % K == 0)
