@@ -9,7 +9,7 @@ install_requires = [
     'opencv-python',
     'tqdm',
     'taichi',
-    'gym',
+    'gym==0.25.2',
     'tensorboard',
     'yacs>=0.1.8',
     'matplotlib',

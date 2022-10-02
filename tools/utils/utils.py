@@ -112,6 +112,7 @@ class RunningMeanStd(object):
         """Add a batch of item into RMS with the same shape, modify mean/var/count."""
         if self.last_dim and len(x.shape) > 1:
             x = x.reshape(-1, x.shape[-1]) # only keep the last dim, this is used for image and point cloud..
+        
         batch_mean, batch_var = np.mean(x, axis=0), np.var(x, axis=0)
         batch_count = len(x)
 

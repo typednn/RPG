@@ -35,7 +35,10 @@ def roller(
 
     if roll_state is None:
         roll_state = RollingState(envs.env_num)
-        roll_state.obs = process_obs(envs.reset(**reset_kwargs))
+        obs = envs.reset(**reset_kwargs)
+        print(obs)
+        roll_state.obs = process_obs(obs)
+        exit(0)
 
 
     traj = []
