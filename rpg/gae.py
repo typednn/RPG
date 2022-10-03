@@ -19,9 +19,12 @@ class GAE(Configurable):
 
         vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
         next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
+        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
         if debug:
             # sanity check below
+            # compute GAE ..
+
             assert torch.allclose(
                 traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale,
                 traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
@@ -31,17 +34,13 @@ class GAE(Configurable):
                 traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
             )
 
-        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
-        if debug:
             next_vpred_2 = torch.zeros_like(next_vpred)
             ind = traj.get_truncated_index()
             next_vpred_2[:-1] = vpred[1:]
             next_vpred_2 = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size, index=ind, vpred=next_vpred_2) * scale
             assert torch.allclose(next_vpred, next_vpred_2)
 
-        # compute GAE ..
-        if debug:
             assert done.sum() == 0
 
         adv = torch.zeros_like(next_vpred)
@@ -55,6 +54,15 @@ class GAE(Configurable):
             m = mask[t]
             delta = reward[t] + self._cfg.gamma * next_vpred[t] * m - vpred[t]
             adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
+
+        if debug or True:
+            adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='approx')
+            assert adv.shape == adv2.shape
+            assert torch.allclose(adv, adv2)
+            print(adv2[0])
+            print(compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')[-8])
+            print(compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')[-8])
+        exit(0)
 
         vtarg = vpred + adv
 
@@ -76,6 +84,70 @@ class GAE(Configurable):
             adv=adv,
             vtarg = vtarg,
         )
+
+
+def compute_gae_by_hand(reward, value, next_value, done, gamma, lmbda, mode='approx'):
+    reward = reward.to(torch.float64)
+    value = value.to(torch.float64)
+    next_value = next_value.to(torch.float64)
+    # follow https://arxiv.org/pdf/1506.02438.pdf
+    if mode != 'exact':
+        import tqdm
+        gae = []
+        for i in tqdm.trange(len(reward)):
+            adv = 0.
+            # legacy ..
+
+            if mode == 'approx':
+                for j in range(i, len(reward)):
+                    delta = reward[j] + next_value[j] * gamma - value[j]
+                    adv += (gamma * lmbda)**(j-i) * delta * (1. - done[j].float())[..., None]
+            elif mode == 'slow':
+                R = 0
+                discount_gamma = 1.
+                discount_lmbda = 1.
+                for j in range(i, len(reward)):
+                    mask = (1. - done[j].float())[..., None]
+                    discount_gamma = discount_gamma * mask
+
+                    R = R + reward[j] * discount_gamma
+                    A = R + (discount_gamma * gamma) * next_value[j] - value[i]
+
+                    discount_lmbda = discount_lmbda * mask
+                    adv += (A * discount_lmbda) * (1-lmbda)
+
+                    discount_gamma = discount_gamma * gamma
+                    discount_lmbda = discount_lmbda * lmbda
+            else:
+                raise NotImplementedError
+
+            gae.append(adv)
+    else:
+        """
+        1               -V(s_t)  + r_t                                                                                     + gamma * V(s_{t+1})
+        lmabda          -V(s_t)  + r_t + gamma * r_{t+1}                                                                   + gamma^2 * V(s_{t+2})
+        lambda^2        -V(s_t)  + r_t + gamma * r_{t+1} + gamma^2 * r_{t+2}                                               + ...
+        lambda^3        -V(s_t)  + r_t + gamma * r_{t+1} + gamma^2 * r_{t+2} + gamma^3 * r_{t+3}
+        """
+        sum_lambda = 0.
+        sum_reward = 0.
+        sum_end_v = 0.
+        gae = []
+        mask = (1. - done.float())[..., None]
+
+        for i in reversed(range(len(reward))):
+            sum_lambda = sum_lambda * mask[i]
+            sum_reward = sum_reward * mask[i]
+            sum_end_v = sum_end_v * mask[i]
+
+            sum_lambda = 1. + lmbda * sum_lambda
+            sum_reward = lmbda * gamma * sum_reward + sum_lambda * reward[i]
+            sum_end_v = sum_end_v * gamma + next_value[i]  * gamma
+            sumA = sum_reward + sum_end_v - value[i] * sum_lambda
+            gae.append(sumA * (1-lmbda))
+        gae = gae[::-1]
+
+    return torch.stack(gae).float() #* (1-lmbda) 
 
 
 class HierarchicalGAE(Configurable):

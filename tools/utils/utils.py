@@ -107,6 +107,7 @@ class RunningMeanStd(object):
         return x
 
 
+    @torch.no_grad()
     def update(self, x: np.ndarray) -> None:
         assert isinstance(x, list) or isinstance(x, np.ndarray) or isinstance(x, torch.Tensor), f"{x} {type(x)}"
 
