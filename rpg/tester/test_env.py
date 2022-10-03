@@ -1,6 +1,6 @@
 import tqdm
 import numpy as np
-from rpg.env_base import GymVecEnv
+from rpg.env_base import GymVecEnv, TorchEnv
 
 
 def test_gym():
@@ -29,6 +29,18 @@ def test_gym():
             assert len(output['episode']) == 0
 
 
+def test_tripush():
+    from tools.utils import totensor 
+    N = 100
+    env = TorchEnv('TripleMove', N)
+    obs, timestep = env.start()
+    print(obs.shape, timestep.shape, obs.dtype, timestep.dtype)
+    for i in tqdm.trange(1000):
+        action = totensor([env.action_space.sample() for i in range(env.nenv)], 'cuda:0')
+        transition = env.step(action)
+        print(transition['timestep'])
+
 
 if __name__ == '__main__':
-    test_gym()
+    #test_gym()
+    test_tripush()

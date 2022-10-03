@@ -8,7 +8,7 @@ from .utils import minibatch_gen
 class DataBuffer(dict):
     def loop_over(self, batch_size, keys=None):
         # TODO: preserve the trajectories if necessay.
-        if keys is None:
+        if keys is not None:
             return DataBuffer(**{key: self[key] for key in keys}).loop_over(batch_size)
 
         timesteps = len(self['obs'])

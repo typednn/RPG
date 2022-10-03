@@ -23,10 +23,6 @@ class VecEnv(ABC):
         # next obs will not be obs if done.
         pass
 
-    def report(self, steps, returns):
-        if not hasattr(self, 'episode_id'):
-            self.episode_id = 0
-
 
 class GymVecEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated=True) -> None:
@@ -101,3 +97,73 @@ class GymVecEnv(VecEnv):
             'truncated': [('TimeLimit.truncated' in i) for i in info],
             'episode': episode
         }
+        
+
+class TorchEnv(VecEnv):
+    def __init__(self, env_name, n, ignore_truncated=True, **kwargs):
+        super().__init__()
+        from solver.envs import GoalEnv
+        import solver.envs.softbody.triplemove
+        self.nenv = n
+        self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
+
+        self.reset = False
+        self.obs = None
+        self.steps = None
+        self.returns = None
+        self.ignore_truncated = ignore_truncated
+
+        self.observation_space = self.goal_env.observation_space
+        self.action_space = self.goal_env.action_space
+        self.max_time_steps = self.goal_env._cfg.low_steps
+
+    def start(self, **kwargs):
+        import torch
+        self.kwargs = kwargs
+        self.kwargs.update({'batch_size': self.nenv})
+
+        if self.reset:
+            pass
+        else:
+            self.obs = self.goal_env.reset(**kwargs) # reset all
+            self.steps = torch.zeros(len(self.obs), dtype=torch.long, device='cuda:0')
+            self.returns = torch.zeros(len(self.obs), dtype=torch.float32, device='cuda:0')
+        return self.obs, self.steps.clone()
+
+
+    def step(self, actions):
+        import torch
+        assert self.obs is not None, "must start before running"
+        next_obs, reward, done, _ = self.goal_env.step(actions)
+        info = [{} for i in range(self.nenv)]
+        done = self.steps == (self.max_time_steps - 1)
+        end_envs = np.where(done.detach().cpu().numpy())[0]
+
+        import copy
+        obs = next_obs.clone()
+
+        self.steps += 1
+        self.returns += reward
+
+        episode = []
+        if len(end_envs) > 0:
+            assert len(end_envs) == self.nenv
+            for j in end_envs:
+                step, total_reward = int(self.steps[j]), float(self.returns[j])
+                self.steps[j] = 0
+                self.returns[j] = 0
+                episode.append({'step': step, 'reward': total_reward})
+            obs = self.goal_env.reset(**self.kwargs)
+
+        return {
+            'obs': obs, # the current observation of the environment. 
+            'next_obs': next_obs, # ending state of the previous transition.
+            'timestep': self.steps.clone(),
+            'r': reward[:, None], #np.array(reward)[:, None],
+            'done': done,
+            'info': info,
+            'total_reward': self.returns.clone(),
+            'truncated': [False for i in info],
+            'episode': episode
+        }
+        

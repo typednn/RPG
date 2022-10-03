@@ -45,6 +45,7 @@ class GAE(Configurable):
             assert done.sum() == 0
 
         adv = torch.zeros_like(next_vpred)
+        done = done.float()
 
         mask = (1-done)[..., None]
         assert mask.shape[:2] == next_vpred.shape[:2]
