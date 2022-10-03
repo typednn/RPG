@@ -55,14 +55,13 @@ class GAE(Configurable):
             delta = reward[t] + self._cfg.gamma * next_vpred[t] * m - vpred[t]
             adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
 
-        if debug or True:
+        if debug:
             adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='approx')
             assert adv.shape == adv2.shape
             assert torch.allclose(adv, adv2)
             print(adv2[0])
             print(compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')[-8])
             print(compute_gae_by_hand(reward, vpred, next_vpred, done, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')[-8])
-        exit(0)
 
         vtarg = vpred + adv
 
