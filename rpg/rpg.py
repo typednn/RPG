@@ -51,7 +51,7 @@ class RPG:
         transitions = []
         obs, timestep = env.start(**kwargs)
         if z is None:
-            z = self.p_z0.sample(len(obs))
+            z = self.p_z0(len(obs))
 
         for step in range(steps):
             #old_z = z
@@ -76,12 +76,12 @@ class RPG:
             transitions.append(transition)
             timestep = transition['timestep']
 
-            dones  = totensor(transition['done'])
+            dones = transition['done']
             if dones.any():
                 z = z.clone() #TODO: chance to dclone
                 for idx, done in enumerate(dones):
                     if done:
-                        z[idx] = self.p_z0.sample()
+                        z[idx] = self.p_z0()
 
 
         return Trajectory(transitions, len(obs), steps), z
@@ -115,8 +115,8 @@ class train_rpg(TrainerBase):
                         head=dict(TYPE='Normal',
                         std_mode='fix_learnable', std_scale=0.5)
                     ),
-                    hidden=Policy.dc,
-                    critic=Critic.dc,
+                    hidden=None,
+                    critic=None,
                     ppo = PPOAgent.dc,
                     gae = HierarchicalGAE.dc,
                     relbo = Relbo.dc,
@@ -125,6 +125,23 @@ class train_rpg(TrainerBase):
                     initial_latent = 'zero'
                 ):
         super().__init__()
+
+        # set the default config
+        from gym.spaces import Box, Discrete as Categorical
+        if hidden is None:
+            # determine the hidden action space based on the hidden actions
+            if isinstance(hidden_space, Box):
+                hidden_head = dict(TYPE='Normal', linear=True, std_scale=0.2)
+            elif isinstance(hidden_space, Categorical):
+                hidden_head = dict(TYPE='Discrete')
+            else:
+                raise NotImplementedError
+            hidden = dict(head=hidden_head, backbone=actor.backbone)
+        if critic is None:
+            critic = dict(backbone=actor.backbone)
+        if info_net.backbone is None:
+            info_net.defrost()
+            info_net.backbone = actor.backbone # shre te backbone if not specified
 
 
         from tools.utils import RunningMeanStd
@@ -146,19 +163,19 @@ class train_rpg(TrainerBase):
 
 
         info_net = InfoNet.build(obs_space, action_space, hidden_space, cfg=info_net)
-        self.relbo = Relbo(info_net, hidden_space, action_space, relbo=relbo)
+        self.relbo = Relbo(info_net, hidden_space, action_space, cfg=relbo)
 
         #p_z0
         def sample_latent(size=1):
-            #[for i in range(size)]
-            z = self.relbo.prior_z.sample(size)
+            # the second is log p
+            z = torch.tensor([self.relbo.prior_z.sample()[0] for i in range(size)]).to('cuda:0')
             if initial_latent == 'zero':
                 z = z * 0
             return z
 
         hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
 
-        self.ppo = RPG(env, sample_latent, pi_a, pi_z, hgae, self.relbo, rew_rms=rew_rms)
+        self.ppo = RPG(env, sample_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms)
 
         while True:
             self.ppo.run_rpg(env, steps)

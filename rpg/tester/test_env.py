@@ -38,7 +38,6 @@ def test_tripush():
     for i in tqdm.trange(1000):
         action = totensor([env.action_space.sample() for i in range(env.nenv)], 'cuda:0')
         transition = env.step(action)
-        print(transition['timestep'])
 
 
 if __name__ == '__main__':

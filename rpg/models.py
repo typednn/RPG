@@ -1,7 +1,7 @@
 import torch
-from nn.distributions import ActionDistr
+from nn.distributions import ActionDistr, Normal, Discrete as Categorical
 from solver.actor import Actor as BaseNet
-from gym.spaces import Box
+from gym.spaces import Box, Discrete
 from tools.nn_base import Network
 from tools.config import as_builder
 
@@ -11,8 +11,12 @@ class Policy(BaseNet):
         self.z_space = z_space
         if z_space is not None:
             obs_space = (obs_space, z_space)
-        
-        assert len(action_space.shape) == 1, "We do not support multi-dimensional actions yet. Please flatten them or serialize them first."
+
+        if isinstance(action_space, Box):
+            assert len(action_space.shape) == 1, "We do not support multi-dimensional actions yet. Please flatten them or serialize them first."
+        else:
+            assert cfg.head.TYPE == 'Discrete', f"{cfg.head.TYPE} not suitable for {action_space}"
+
         BaseNet.__init__(self, obs_space, action_space)
 
     def forward(self, state, hidden, timestep=None):
@@ -43,19 +47,31 @@ class InfoNet(Network):
         super().__init__()
         discrete = dict(TYPE='Discrete', epsilon=0.0)  # 0.2 epsilon
         continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=1.)
-        from solver.rpg_net import make_zhead
 
-        z_head = make_zhead(hidden_space, continuous, discrete)
+        if isinstance(hidden_space, Discrete):
+            z_head = discrete
+        elif isinstance(hidden_space, Box):
+            z_head = continuous
+        else:
+            z_head = dict(
+                TYPE="Mixture",
+                discrete=discrete,
+                continuous=continuous,
+            )
+        
         self.main = BaseNet((obs_space, action_space), hidden_space, backbone=backbone, head=z_head).cuda()
         self.preprocess = None
 
-    def forward(self, s, a, z, *, timestep=None):
+    def forward(self, s, a, z, timestep):
         #if timestep is None:
         #    timestep = torch.arange(len(s), device=self.device)
         from tools.utils import dmul, dshape
 
         if self.preprocess is not None:
             s = self.preprocess(s)
+        s = self.batch_input(s)
+        a = self.batch_input(a)
+        z = self.batch_input(z)
 
         return self.main(
             (dmul(s, self._cfg.obs_weight),

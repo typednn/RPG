@@ -51,15 +51,17 @@ class Relbo(Configurable):
     def __call__(self, traj: Trajectory, batch_size):
         device = 'cuda:0'
 
-        r = traj.get_tensor('r', device)
+        r = traj.get_tensor('r', device).sum(axis=-1) # TODO: try not to sum up all rewards ..
         ent_z = -traj.get_tensor('log_p_z', device)
         ent_a = -traj.get_tensor('log_p_a', device)
         prior = self.prior_a.log_prob(traj.get_tensor('a', device))
         mutual_info = traj.predict_value(['obs', 'a', 'z', 'timestep'], self.info_net, batch_size = batch_size)
+        #TODO: test by varying batch size
 
         elbo = r * self._cfg.reward + mutual_info * self._cfg.mutual_info + \
             ent_z * self._cfg.ent_z + ent_a * self._cfg.ent_a + prior * self._cfg.prior
-        return elbo
+
+        return elbo[..., None]
 
 
     def learn(self, data: DataBuffer):

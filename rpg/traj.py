@@ -41,6 +41,7 @@ class Trajectory:
             index = self.index
 
         for ind in iter_batch(index, batch_size):
+            # ignore None
             obs = [[self.traj[i][k][j] if self.traj[i][k] is not None else None for i, j in ind] for k in key]
             value = network(*obs)
 

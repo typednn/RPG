@@ -198,11 +198,13 @@ class Configurable(object):
 
     @classmethod
     def gdc(cls, **kwargs) -> CN:
+        # get default config
         return cls.get_default_config(**kwargs)
 
-    @property
     @classmethod
+    @property
     def dc(cls) -> CN:
+        # default config
         return cls.get_default_config()
 
     def get_config(self) -> CN:
