@@ -196,6 +196,15 @@ class Configurable(object):
             cfg = merge_inputs(cfg, **kwargs)
         return cfg
 
+    @classmethod
+    def gdc(cls, **kwargs) -> CN:
+        return cls.get_default_config(**kwargs)
+
+    @property
+    @classmethod
+    def dc(cls) -> CN:
+        return cls.get_default_config()
+
     def get_config(self) -> CN:
         return copy.deepcopy(self._cfg)
 

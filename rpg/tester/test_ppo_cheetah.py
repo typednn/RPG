@@ -6,4 +6,4 @@ from rpg.ppo import train_ppo
 N = 10
 env = GymVecEnv('HalfCheetah-v3', N)
 
-train_ppo(env)
+train_ppo(env, steps=5000)

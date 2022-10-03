@@ -3,6 +3,20 @@ import torch
 from typing import List, Dict, Any
 from .utils import iter_batch
 from tools.utils import totensor
+from .utils import minibatch_gen
+
+class DataBuffer(dict):
+    def loop_over(self, batch_size, keys=None):
+        # TODO: preserve the trajectories if necessay.
+        if keys is None:
+            return DataBuffer(**{key: self[key] for key in keys}).loop_over(batch_size)
+
+        timesteps = len(self['obs'])
+        nenvs = len(self['obs'][0])
+
+        import numpy as np
+        index = np.stack(np.meshgrid(np.arange(timesteps), np.arange(nenvs)), axis=-1).reshape(-1, 2)
+        return minibatch_gen(self, index, batch_size)
 
 
 # dataset 
@@ -42,8 +56,8 @@ class Trajectory:
         from tools.utils import totensor, dstack
         return totensor([i[key] for i in self.traj], device=device)
 
-    def get_list_by_keys(self, keys):
-        return {key: [i[key] for i in self.traj] for key in keys}
+    def get_list_by_keys(self, keys) -> DataBuffer:
+        return DataBuffer(**{key: [i[key] for i in self.traj] for key in keys})
 
     def get_truncated_index(self) -> np.ndarray:
         ind = []

@@ -4,6 +4,7 @@ from tools.utils import batch_input
 from nn.distributions import ActionDistr
 from tools.optim import OptimModule as Optim
 from .utils import minibatch_gen
+from .traj import DataBuffer
 
 
 class PolicyOptim(Optim):
@@ -15,6 +16,7 @@ class PolicyOptim(Optim):
                  clip_param=0.2,
                  entropy_coef=0.0,
                  max_kl=None,
+                 #max_grad_norm=0.5,
                  max_grad_norm=0.5,
                  mode='step',
                  ):
@@ -28,10 +30,6 @@ class PolicyOptim(Optim):
         device = self.actor.device
         pd: ActionDistr = self.actor(obs, hidden, timestep)
         action = batch_input(action, device)
-
-        # print(logp.shape, logp.device)
-        # print(adv.shape, adv.device)
-        # exit(0)
 
         newlogp = pd.log_prob(action)
         device = newlogp.device
@@ -94,7 +92,6 @@ class CriticOptim(Optim):
                  lr=5e-4, vfcoef=0.5, mode='step'):
         super(CriticOptim, self).__init__(critic)
         self.critic = critic
-        #self.optim = make_optim(critic.parameters(), lr)
         self.vfcoef = vfcoef
 
     def compute_loss(self, obs, hidden, timestep, vtarg):
@@ -135,16 +132,11 @@ class PPOAgent(Configurable):
         self.critic_optim.step(obs, hidden, timestep, vtarg)
         return stop
 
-    def learn(self, data, batch_size, keys):
+    def learn(self, data: DataBuffer, batch_size, keys):
         stop = False
 
-        timesteps = len(data['obs'])
-        nenvs = len(data['obs'][0])
-
-        import numpy as np
-        index = np.stack(np.meshgrid(np.arange(timesteps), np.arange(nenvs)), axis=-1).reshape(-1, 2)
         for i in range(self._cfg.learning_epoch):
-            for batch in minibatch_gen(data, index, batch_size):
+            for batch in data.loop_over(batch_size):
                 if not stop:
                     loss, output = self.step(*[batch[i] for i in keys])
                     if 'early_stop' in output and output['early_stop']:

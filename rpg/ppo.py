@@ -92,7 +92,7 @@ class train_ppo(TrainerBase):
         obs_space = env.observation_space
         action_space = env.action_space
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
-        critic = Critic(obs_space, None, 1, cfg=critic).to(device)
+        critic = Critic(obs_space, None, env.reward_dim, cfg=critic).to(device)
         pi = PPOAgent(actor, critic, ppo)
         self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms)
 

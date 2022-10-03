@@ -5,7 +5,7 @@ from .gae import HierarchicalGAE
 from .traj import Trajectory
 from .relbo import Relbo
 from .ppo_agent import PPOAgent, CriticOptim
-from .models import Policy, Critic
+from .models import Policy, Critic, InfoNet
 from tools.utils import totensor
 from tools.optim import TrainerBase
 
@@ -22,12 +22,13 @@ class RPG:
         gae: HierarchicalGAE,
         rew_rms=None,
         rnd=None,
-        batch_size=256
+        batch_size=2000,
     ) -> None:
 
         self.env = env
         self.pi_a = pi_a
         self.pi_z = pi_z
+        self.p_z0 = p_z0
         self.relbo = relbo
 
         self.gae = gae,
@@ -69,10 +70,7 @@ class RPG:
             obs = data.pop('obs')
             transition.update(
                 **data,
-                a=a,
-                z=z,
-                log_p_a = log_p_a,
-                log_p_z = log_p_z,
+                a=a, z=z, log_p_a = log_p_a, log_p_z = log_p_z,
             )
 
             transitions.append(transition)
@@ -89,35 +87,42 @@ class RPG:
         return Trajectory(transitions, len(obs), steps), z
 
 
-    def run_ppo(self, env, steps):
+    def run_rpg(self, env, steps):
+        batch_size = self.batch_size
         with torch.no_grad():
             traj, self.latent_z = self.inference(
                 env, self.latent_z, self.pi_z, self.pi_a, steps=steps)
 
-            reward = self.relbo(traj)
-            adv_targets = self.gae(traj, reward, batch_size=self._cfg.batch_size)
+            reward = self.relbo(traj, batch_size=batch_size)
+            adv_targets = self.gae(traj, reward, batch_size=batch_size)
 
             data = {traj.get_list(key) for key in ['obs', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z']}
             data.update(adv_targets)
 
 
-        self.pi_a.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
-        self.pi_z.learn(data, self.batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
+        self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
+        self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
         self.relbo.learn(data) # maybe training with a seq2seq model way ..
 
 
 
 class train_rpg(TrainerBase):
     def __init__(self,
-                        env: VecEnv, cfg=None, steps=2048, device='cuda:0',
-                        actor=Policy.get_default_config(
-                            head=dict(std_mode='fix_learnable', std_scale=0.5)
-                        ),
-                        critic=Critic.get_default_config(),
-
-                        ppo = PPOAgent.get_default_config(),
-                        gae = HierarchicalGAE.get_default_config(),
-                        reward_norm=True,
+                    env: VecEnv,
+                    hidden_space, # hidden space
+                    cfg=None, steps=2048, device='cuda:0',
+                    actor=Policy.gdc(
+                        head=dict(TYPE='Normal',
+                        std_mode='fix_learnable', std_scale=0.5)
+                    ),
+                    hidden=Policy.dc,
+                    critic=Critic.dc,
+                    ppo = PPOAgent.dc,
+                    gae = HierarchicalGAE.dc,
+                    relbo = Relbo.dc,
+                    info_net=InfoNet.to_build(TYPE='InfoNet'),
+                    reward_norm=True,
+                    initial_latent = 'zero'
                 ):
         super().__init__()
 
@@ -127,10 +132,33 @@ class train_rpg(TrainerBase):
 
         obs_space = env.observation_space
         action_space = env.action_space
-        actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
-        critic = Critic(obs_space, None, 1, cfg=critic).to(device)
-        pi = PPOAgent(actor, critic, ppo)
-        self.ppo = RPG(env, pi, HierarchicalGAE(pi, cfg=gae), rew_rms=rew_rms)
+        
+        # two policies
+
+        actor_a = Policy(obs_space, hidden_space, action_space, cfg=actor).to(device)
+        actor_z = Policy(obs_space, hidden_space, hidden_space, cfg=hidden).to(device)
+
+        critic_a = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
+        critic_z = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
+
+        pi_a = PPOAgent(actor_a, critic_a, cfg=ppo)
+        pi_z = PPOAgent(actor_z, critic_z, cfg=ppo)
+
+
+        info_net = InfoNet.build(obs_space, action_space, hidden_space, cfg=info_net)
+        self.relbo = Relbo(info_net, hidden_space, action_space, relbo=relbo)
+
+        #p_z0
+        def sample_latent(size=1):
+            #[for i in range(size)]
+            z = self.relbo.prior_z.sample(size)
+            if initial_latent == 'zero':
+                z = z * 0
+            return z
+
+        hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
+
+        self.ppo = RPG(env, sample_latent, pi_a, pi_z, hgae, self.relbo, rew_rms=rew_rms)
 
         while True:
-            self.ppo.run_ppo(env, steps)
+            self.ppo.run_rpg(env, steps)

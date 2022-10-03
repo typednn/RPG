@@ -1,6 +1,8 @@
 import tqdm
 import numpy as np
 import torch
+from nn.space import Discrete, Box, MixtureSpace
+
 
 
 def iter_batch(index, batch_size):
@@ -22,3 +24,12 @@ def minibatch_gen(traj, index, batch_size, KEY_LIST=None, verbose=False):
         }
 
 
+
+def create_hidden_space(z_dim, z_cont_dim):
+    if z_cont_dim == 0:
+        z_space = Discrete(z_dim)
+    elif z_dim == 0:
+        z_space = Box(-1, 1, (z_cont_dim,))
+    else:
+        z_space = MixtureSpace(Discrete(z_dim), Box(-1, 1, (z_cont_dim,)))
+    return z_space

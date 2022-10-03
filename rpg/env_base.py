@@ -8,6 +8,7 @@ class VecEnv(ABC):
         self.nenv = None
         self.observation_space = None
         self.action_space = None
+        self.reward_dim = 1
 
     @abstractmethod
     def start(self, **kwargs):
@@ -29,6 +30,8 @@ class VecEnv(ABC):
 
 class GymVecEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated=True) -> None:
+        super().__init__()
+
         import gym
         from rl.vec_envs import SubprocVectorEnv
         def make_env():
