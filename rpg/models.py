@@ -43,24 +43,11 @@ class Critic(BaseNet):
 @as_builder
 class InfoNet(Network):
     # should use a transformer instead ..
-    def __init__(self, obs_space, action_space, hidden_space, cfg=None, backbone=None, action_weight=1., noise=0.0, obs_weight=1.):
+    def __init__(self, obs_space, action_space, hidden_space, cfg=None, backbone=None, action_weight=1., noise=0.0, obs_weight=1., head=None):
         super().__init__()
-        discrete = dict(TYPE='Discrete', epsilon=0.0)  # 0.2 epsilon
-        continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=1.)
-
-        if isinstance(hidden_space, Discrete):
-            z_head = discrete
-        elif isinstance(hidden_space, Box):
-            z_head = continuous
-        else:
-            z_head = dict(
-                TYPE="Mixture",
-                discrete=discrete,
-                continuous=continuous,
-            )
-        
-        self.main = BaseNet((obs_space, action_space), hidden_space, backbone=backbone, head=z_head).cuda()
+        self.main = BaseNet((obs_space, action_space), hidden_space, backbone=backbone, head=self.config_head(hidden_space)).cuda()
         self.preprocess = None
+
 
     def forward(self, s, a, z, timestep):
         #if timestep is None:
@@ -77,3 +64,20 @@ class InfoNet(Network):
             (dmul(s, self._cfg.obs_weight),
              (a + torch.randn_like(a) * self._cfg.noise) * self._cfg.action_weight)
         ).log_prob(z)
+
+
+    def config_head(self, hidden_space):
+        from tools.config import merge_inputs
+        discrete = dict(TYPE='Discrete', epsilon=0.0)  # 0.2 epsilon
+        continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=1.)
+
+        if isinstance(hidden_space, Discrete):
+            head = discrete
+        elif isinstance(hidden_space, Box):
+            head = continuous
+        else:
+            raise NotImplementedError
+        if self._cfg.head is not None:
+            head = merge_inputs(head, **self._cfg.head)
+        return head
+

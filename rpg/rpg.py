@@ -116,7 +116,7 @@ class train_rpg(TrainerBase):
                         head=dict(TYPE='Normal',
                         std_mode='fix_learnable', std_scale=0.5)
                     ),
-                    hidden=None,
+                    hidden_head=None,
                     critic=None,
                     ppo = PPOAgent.dc,
                     gae = HierarchicalGAE.dc,
@@ -127,18 +127,10 @@ class train_rpg(TrainerBase):
                 ):
         super().__init__()
 
+        hidden_head = self.config_hidden(hidden_head, hidden_space)
+
         # set the default config
         # TODO: move it later ..
-        from gym.spaces import Box, Discrete as Categorical
-        if hidden is None:
-            # determine the hidden action space based on the hidden actions
-            if isinstance(hidden_space, Box):
-                hidden_head = dict(TYPE='Normal', linear=True, std_scale=0.2)
-            elif isinstance(hidden_space, Categorical):
-                hidden_head = dict(TYPE='Discrete')
-            else:
-                raise NotImplementedError
-            hidden = dict(head=hidden_head, backbone=actor.backbone)
         if critic is None:
             critic = dict(backbone=actor.backbone)
         if info_net.backbone is None:
@@ -155,7 +147,7 @@ class train_rpg(TrainerBase):
         # two policies
 
         actor_a = Policy(obs_space, hidden_space, action_space, cfg=actor).to(device)
-        actor_z = Policy(obs_space, hidden_space, hidden_space, cfg=hidden).to(device)
+        actor_z = Policy(obs_space, hidden_space, hidden_space, backbone=actor.backbone, head=hidden_head).to(device)
 
         critic_a = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
         critic_z = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
@@ -167,17 +159,34 @@ class train_rpg(TrainerBase):
         info_net = InfoNet.build(obs_space, action_space, hidden_space, cfg=info_net)
         self.relbo = Relbo(info_net, hidden_space, action_space, cfg=relbo)
 
-        #p_z0
-        def sample_latent(size=1):
-            # the second is log p
-            z = torch.tensor([self.relbo.prior_z.sample()[0] for i in range(size)]).to('cuda:0')
-            if initial_latent == 'zero':
-                z = z * 0
-            return z
 
         hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
 
-        self.ppo = RPG(env, sample_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms)
+        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms)
 
         while True:
             self.ppo.run_rpg(env, steps)
+
+
+    def sample_initial_latent(self, size=1):
+        z = torch.tensor([self.relbo.prior_z.sample()[0] for i in range(size)]).to('cuda:0')
+        if self._cfg.initial_latent == 'zero':
+            z = z * 0
+        return z
+
+    def config_hidden(self, hidden, hidden_space):
+        from gym.spaces import Box, Discrete as Categorical
+        from tools.config import merge_inputs, CN
+
+        if isinstance(hidden_space, Box):
+            default_hidden_head = dict(TYPE='Normal', linear=True, std_scale=0.2)
+        elif isinstance(hidden_space, Categorical):
+            default_hidden_head = dict(TYPE='Discrete')
+        else:
+            raise NotImplementedError
+
+        if hidden is not None:
+            hidden_head = merge_inputs(CN(default_hidden_head), **hidden)
+        else:
+            hidden_head = default_hidden_head
+        return hidden_head

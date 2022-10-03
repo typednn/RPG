@@ -98,25 +98,32 @@ class RunningMeanStd(object):
         return self._submodule[k]
 
 
-    def update(self, x: np.ndarray) -> None:
-        if isinstance(x, torch.Tensor):
-            x = x.detach().cpu().numpy()
+    def batch(self, x):
+        if isinstance(x, list):
+            if isinstance(x[0], np.ndarray):
+                x = np.array(x)
+            else:
+                x = torch.stack(x)
+        return x
 
-        assert isinstance(x, list) or isinstance(x, np.ndarray), f"{x} {type(x)}"
+
+    def update(self, x: np.ndarray) -> None:
+        assert isinstance(x, list) or isinstance(x, np.ndarray) or isinstance(x, torch.Tensor), f"{x} {type(x)}"
 
         if isinstance(x[0], dict):
+            # list of dict ..
             for k in x[0]:
                 self.get_submodule(k).update([i[k] for i in x])
             return
 
-        x = np.array(x)
-
+        x = self.batch(x)
 
         """Add a batch of item into RMS with the same shape, modify mean/var/count."""
         if self.last_dim and len(x.shape) > 1:
             x = x.reshape(-1, x.shape[-1]) # only keep the last dim, this is used for image and point cloud..
         
-        batch_mean, batch_var = np.mean(x, axis=0), np.var(x, axis=0)
+        #batch_mean, batch_var = np.mean(x, axis=0), np.var(x, axis=0)
+        batch_mean, batch_var = x.mean(axis=0), x.var(axis=0)
         batch_count = len(x)
 
         delta = batch_mean - self.mean
@@ -134,17 +141,19 @@ class RunningMeanStd(object):
     
     @property
     def std(self):
-        return np.clip(np.sqrt(self.var), a_min=1E-8, a_max=np.inf)
+        if isinstance(self.var, torch.Tensor):
+            return torch.sqrt(self.var).clip(1e-8, np.inf)
+        else:
+            return np.clip(np.sqrt(self.var), a_min=1E-8, a_max=np.inf)
         
     def normalize(self, x):
         if isinstance(x[0], dict):
             return [{k: self.get_submodule(k).normalize([v])[0] for k, v in c.items()} for c in x]
 
-        x = np.array(x)
-
+        x = self.batch(x)
         x = (x - self.mean) / self.std
         if self.clip_max is not None:
-            x = np.clip(x, -self.clip_max, self.clip_max)
+            x = x.clip(-self.clip_max, self.clip_max)
         return x
 
 

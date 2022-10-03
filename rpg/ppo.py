@@ -15,7 +15,8 @@ class PPO:
         pi: PPOAgent,
         gae: GAE,
         batch_size=256,
-        rew_rms=None
+        rew_rms=None,
+        obs_rms=None,
     ) -> None:
 
         self.env = env
@@ -26,6 +27,16 @@ class PPO:
         self.batch_size = batch_size
 
         self.rew_rms = rew_rms
+        self.obs_rms = obs_rms
+
+        self.training=True
+
+    def norm_obs(self, x, update=True):
+        if self.obs_rms:
+            if update:
+                self.obs_rms.update(x) # always update during training...
+            x = self.obs_rms.normalize(x)
+        return x
 
     def inference(
         self,
@@ -36,13 +47,15 @@ class PPO:
     ):
         transitions = []
         obs, timestep = env.start(**kwargs)
+        obs = self.norm_obs(obs, True)
         for step in range(steps):
             transition = dict(obs=obs, timestep = timestep)
             p_a = pi(obs, None, timestep=timestep) # no z
             a, log_p_a = p_a.rsample()
 
             data = env.step(a)
-            obs = data.pop('obs')
+            data['next_obs'] = self.norm_obs(data['next_obs'], False)
+            obs = self.norm_obs(data.pop('obs'), True)
             transition.update(
                 **data,
                 a=a,
@@ -82,19 +95,21 @@ class train_ppo(TrainerBase):
                         ppo = PPOAgent.get_default_config(),
                         gae = GAE.get_default_config(),
                         reward_norm=True,
+                        obs_norm=False,
                 ):
         super().__init__()
 
 
         from tools.utils import RunningMeanStd
         rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
+        obs_rms = RunningMeanStd(clip_max=10.) if obs_norm else None
 
         obs_space = env.observation_space
         action_space = env.action_space
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
         critic = Critic(obs_space, None, env.reward_dim, cfg=critic).to(device)
         pi = PPOAgent(actor, critic, ppo)
-        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms)
+        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms)
 
         while True:
             self.ppo.run_ppo(env, steps)
