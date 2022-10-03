@@ -7,7 +7,7 @@ from tools.config import Configurable
 
 
 class GAE(Configurable):
-    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97):
+    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True):
         super().__init__()
         self.pi = pi
 
@@ -63,9 +63,17 @@ class GAE(Configurable):
             scale = rew_rms.std
         else:
             scale = 1.
+
+        adv = (vtarg-vpred)/scale
+        vtarg = vtarg/scale
+
+        if self._cfg.adv_norm:
+            adv = adv - adv.mean()
+            adv = adv/(adv.std() + 1e-9)
+
         return dict(
-            adv=(vtarg-vpred)/scale,
-            vtarg = vtarg/scale,
+            adv=adv,
+            vtarg = vtarg,
         )
 
 

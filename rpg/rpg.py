@@ -4,9 +4,10 @@ from .env_base import VecEnv
 from .gae import HierarchicalGAE
 from .traj import Trajectory
 from .relbo import Relbo
-from .utils import minibatch_gen
-from .ppo_agent import PPOAgent
+from .ppo_agent import PPOAgent, CriticOptim
+from .models import Policy, Critic
 from tools.utils import totensor
+from tools.optim import TrainerBase
 
 
 class RPG:
@@ -63,15 +64,17 @@ class RPG:
 
             assert log_p_a.shape == log_p_z.shape
 
-            transition.update(env.step(a))
+
+            data = env.step(a)
+            obs = data.pop('obs')
             transition.update(
+                **data,
                 a=a,
                 z=z,
                 log_p_a = log_p_a,
                 log_p_z = log_p_z,
             )
 
-            obs = transition.pop('obs')
             transitions.append(transition)
             timestep = transition['timestep']
 
@@ -80,7 +83,7 @@ class RPG:
                 z = z.clone() #TODO: chance to dclone
                 for idx, done in enumerate(dones):
                     if done:
-                        z[idx] = self.p_z0.sample(len(obs))
+                        z[idx] = self.p_z0.sample()
 
 
         return Trajectory(transitions, len(obs), steps), z
@@ -101,3 +104,33 @@ class RPG:
         self.pi_a.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
         self.pi_z.learn(data, self.batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
         self.relbo.learn(data) # maybe training with a seq2seq model way ..
+
+
+
+class train_rpg(TrainerBase):
+    def __init__(self,
+                        env: VecEnv, cfg=None, steps=2048, device='cuda:0',
+                        actor=Policy.get_default_config(
+                            head=dict(std_mode='fix_learnable', std_scale=0.5)
+                        ),
+                        critic=Critic.get_default_config(),
+
+                        ppo = PPOAgent.get_default_config(),
+                        gae = HierarchicalGAE.get_default_config(),
+                        reward_norm=True,
+                ):
+        super().__init__()
+
+
+        from tools.utils import RunningMeanStd
+        rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
+
+        obs_space = env.observation_space
+        action_space = env.action_space
+        actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
+        critic = Critic(obs_space, None, 1, cfg=critic).to(device)
+        pi = PPOAgent(actor, critic, ppo)
+        self.ppo = RPG(env, pi, HierarchicalGAE(pi, cfg=gae), rew_rms=rew_rms)
+
+        while True:
+            self.ppo.run_ppo(env, steps)

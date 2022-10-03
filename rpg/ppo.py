@@ -40,6 +40,7 @@ class PPO:
             transition = dict(obs=obs, timestep = timestep)
             p_a = pi(obs, None, timestep=timestep) # no z
             a, log_p_a = p_a.rsample()
+
             data = env.step(a)
             obs = data.pop('obs')
             transition.update(
@@ -48,6 +49,7 @@ class PPO:
                 log_p_a = log_p_a,
                 z=None,
             )
+
             timestep = transition['timestep']
             transitions.append(transition)
 
@@ -85,7 +87,7 @@ class train_ppo(TrainerBase):
 
 
         from tools.utils import RunningMeanStd
-        rew_rms = RunningMeanStd(last_dim=True) if reward_norm else None
+        rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
 
         obs_space = env.observation_space
         action_space = env.action_space
