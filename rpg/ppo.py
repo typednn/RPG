@@ -25,7 +25,7 @@ class PPO:
         self.latent_z = None
         self.batch_size = batch_size
 
-        self.rew_rms = None
+        self.rew_rms = rew_rms
 
     def inference(
         self,

@@ -31,7 +31,7 @@ class RPG:
         self.p_z0 = p_z0
         self.relbo = relbo
 
-        self.gae = gae,
+        self.gae = gae
         self.latent_z = None
 
         self.rew_rms = rew_rms
@@ -94,15 +94,16 @@ class RPG:
                 env, self.latent_z, self.pi_z, self.pi_a, steps=steps)
 
             reward = self.relbo(traj, batch_size=batch_size)
-            adv_targets = self.gae(traj, reward, batch_size=batch_size)
+            adv_targets = self.gae(traj, reward, batch_size=batch_size, rew_rms=self.rew_rms)
 
-            data = {traj.get_list(key) for key in ['obs', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z']}
+            data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z'])
             data.update(adv_targets)
 
 
         self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
         self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
-        self.relbo.learn(data) # maybe training with a seq2seq model way ..
+        self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
+        print(traj.summarize_epsidoe_info())
 
 
 
@@ -127,6 +128,7 @@ class train_rpg(TrainerBase):
         super().__init__()
 
         # set the default config
+        # TODO: move it later ..
         from gym.spaces import Box, Discrete as Categorical
         if hidden is None:
             # determine the hidden action space based on the hidden actions

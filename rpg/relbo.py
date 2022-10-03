@@ -64,10 +64,10 @@ class Relbo(Configurable):
         return elbo[..., None]
 
 
-    def learn(self, data: DataBuffer):
+    def learn(self, data: DataBuffer, batch_size):
         # raise NotImplementedError
         for i in range(self._cfg.learning_epoch):
-            for batch in data.loop_over('obs', 'a', 'z'):
-                loss = -self.info_net(batch['obs'], batch['a'], batch['z'])
+            for batch in data.loop_over(batch_size, ['obs', 'a', 'z', 'timestep']):
+                loss = -self.info_net(batch['obs'], batch['a'], batch['z'], batch['timestep'])
                 loss = loss.mean()
                 self.info_net_optim.optimize(loss)

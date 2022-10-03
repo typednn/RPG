@@ -99,6 +99,9 @@ class RunningMeanStd(object):
 
 
     def update(self, x: np.ndarray) -> None:
+        if isinstance(x, torch.Tensor):
+            x = x.detach().cpu().numpy()
+
         assert isinstance(x, list) or isinstance(x, np.ndarray), f"{x} {type(x)}"
 
         if isinstance(x[0], dict):
