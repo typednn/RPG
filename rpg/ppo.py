@@ -30,6 +30,7 @@ class PPO:
         self.obs_rms = obs_rms
 
         self.training=True
+        self.total = 0
 
     def norm_obs(self, x, update=True):
         if self.obs_rms:
@@ -81,7 +82,9 @@ class PPO:
             data['z'] = None
 
         self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'])
-        print(traj.summarize_epsidoe_info())
+
+        self.total += traj.n
+        print(self.total, traj.summarize_epsidoe_info())
 
 
 
@@ -96,6 +99,7 @@ class train_ppo(TrainerBase):
                         gae = GAE.get_default_config(),
                         reward_norm=True,
                         obs_norm=False,
+                        batch_size=256,
                 ):
         super().__init__()
 
@@ -109,7 +113,7 @@ class train_ppo(TrainerBase):
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
         critic = Critic(obs_space, None, env.reward_dim, cfg=critic).to(device)
         pi = PPOAgent(actor, critic, ppo)
-        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms)
+        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms, batch_size=batch_size)
 
         while True:
             self.ppo.run_ppo(env, steps)

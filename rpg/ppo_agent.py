@@ -15,7 +15,7 @@ class PolicyOptim(Optim):
                  lr=5e-4,
                  clip_param=0.2,
                  entropy_coef=0.0,
-                 max_kl=None,
+                 max_kl=0.1,
                  #max_grad_norm=0.5,
                  max_grad_norm=0.5,
                  mode='step',

@@ -99,3 +99,7 @@ class Trajectory:
             }
         else:
             return {"num_episode": n}
+        
+    @property
+    def n(self):
+        return self.timesteps * self.nenv

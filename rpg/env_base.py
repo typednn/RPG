@@ -32,7 +32,7 @@ class GymVecEnv(VecEnv):
         import gym
         from rl.vec_envs import SubprocVectorEnv
         def make_env():
-            return gym.make('HalfCheetah-v3')
+            return gym.make(env_name)
 
         self.nenv = n
         self.vec_env = SubprocVectorEnv([make_env for i in range(n)])

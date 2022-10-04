@@ -12,3 +12,7 @@ Model-free and model-based learning with Reparameterized Policy Learning (RPG).
     - `nn/modules`: backbones, supports both MLP, CNN, PointNet and Transformers
 - `rl`: RL baselines and common RL utilities
 - `envs`: environments
+- `generative`: generative models for reinforcement leraning, including 
+    - dynamic learning like model-based RL
+    - diffusion model for trajectory modeling
+    - RND for density estimation for exploration

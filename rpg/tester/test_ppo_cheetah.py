@@ -7,4 +7,4 @@ from rpg.ppo import train_ppo
 N = 10
 env = GymVecEnv('HalfCheetah-v3', N)
 
-train_ppo.parse(env, steps=5000, obs_norm=True)
+train_ppo.parse(env, steps=5000, obs_norm=True, actor=dict(head=dict(linear=False)), batch_size=2000) # use tanh
