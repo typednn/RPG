@@ -108,7 +108,7 @@ class PPOAgent(Configurable):
         cfg=None,
         actor_optim=PolicyOptim.get_default_config(),
         critic_optim=None, 
-        learning_epoch=1,
+        learning_epoch=10,
     ):
         super().__init__()
 
@@ -136,7 +136,9 @@ class PPOAgent(Configurable):
         stop = False
 
         for i in range(self._cfg.learning_epoch):
+            n_batches = 0
             for batch in data.loop_over(batch_size):
+                n_batches += 1
                 if not stop:
                     loss, output = self.step(*[batch[i] for i in keys])
                     if 'early_stop' in output and output['early_stop']:
