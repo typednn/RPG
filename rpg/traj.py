@@ -57,18 +57,27 @@ class Trajectory:
         from tools.utils import totensor, dstack
         return totensor([i[key] for i in self.traj], device=device)
 
+    def get_truncated_done(self, device='cuda:0'):
+        # done means that we should ignore the next_value in the end
+        # truncated means that we should even ignore rewards in the end
+
+
+        done = self.get_tensor('done', device)
+        truncated = torch.zeros_like(done)
+        ind = self.get_truncated_index(include_done=True)
+        truncated[ind[:, 0], ind[:, 1]] = True
+        return done, truncated
+
     def get_list_by_keys(self, keys) -> DataBuffer:
         return DataBuffer(**{key: [i[key] for i in self.traj] for key in keys})
 
-    def get_truncated_index(self) -> np.ndarray:
+    def get_truncated_index(self, include_done=False) -> np.ndarray:
         ind = []
         for j in range(self.timesteps):
             for i in range(self.nenv):
-                if self.traj[j]['truncated'][i] or j == self.timesteps -1:
+                if self.traj[j]['truncated'][i] or j == self.timesteps -1 or (include_done and self.traj[j]['done'][i]):
                     ind.append((j, i))
         return np.array(ind)
-        #return totensor(ind, dtype=torch.long, device=device)
-
 
     def summarize_epsidoe_info(self):
         # average additional infos, for example success, if necessary.
@@ -81,8 +90,11 @@ class Trajectory:
                     n += 1
                     rewards += j['reward']
                     avg_len += j['step']
-        return {
-            "num_episode": n,
-            "rewards": rewards / n,
-            "avg_len": avg_len / n,
-        }
+        if n > 0:
+            return {
+                "num_episode": n,
+                "rewards": rewards / n,
+                "avg_len": avg_len / n,
+            }
+        else:
+            return {"num_episode": n}

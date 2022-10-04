@@ -8,4 +8,4 @@ N = 10
 env = TorchEnv('TripleMove', N)
 hidden_space  = Discrete(4)
 
-train_rpg(env, hidden_space, steps=env.max_time_steps, hidden_head=dict(epsilon=0.))
+train_rpg.parse(env, hidden_space, steps=env.max_time_steps * 4, hidden_head=dict(epsilon=0.), reward_norm=False, relbo=dict(ent_z=0., ent_a=0., mutual_info=0., prior=0.))

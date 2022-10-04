@@ -133,7 +133,7 @@ class train_rpg(TrainerBase):
         # TODO: move it later ..
         if critic is None:
             critic = dict(backbone=actor.backbone)
-        if info_net.backbone is None:
+        if not hasattr(info_net, 'backbone') or info_net.backbone is None:
             info_net.defrost()
             info_net.backbone = actor.backbone # shre te backbone if not specified
 

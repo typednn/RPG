@@ -26,6 +26,7 @@ class VecEnv(ABC):
 
 class GymVecEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated=True) -> None:
+        # by default, the mujoco's gym env do not have a truncated reward. 
         super().__init__()
 
         import gym
@@ -100,7 +101,8 @@ class GymVecEnv(VecEnv):
         
 
 class TorchEnv(VecEnv):
-    def __init__(self, env_name, n, ignore_truncated=True, **kwargs):
+    def __init__(self, env_name, n, ignore_truncated=False, **kwargs):
+        # by default we do not have a truncated reward. 
         super().__init__()
         from solver.envs import GoalEnv
         import solver.envs.softbody.triplemove
