@@ -37,7 +37,7 @@ class GymVecEnv(VecEnv):
         self.nenv = n
         self.vec_env = SubprocVectorEnv([make_env for i in range(n)])
 
-        self.reset = False
+        self._reset = False
         self.obs = None
         self.steps = None
         self.returns = None
@@ -49,9 +49,10 @@ class GymVecEnv(VecEnv):
     def start(self, **kwargs):
         self.kwargs = kwargs
 
-        if self.reset:
+        if self._reset:
             pass
         else:
+            self._reset = True
             self.obs = self.vec_env.reset(**kwargs) # reset all
             self.steps = np.zeros(len(self.obs), dtype=np.long)
             self.returns = np.zeros(len(self.obs), dtype=np.float)
@@ -109,7 +110,7 @@ class TorchEnv(VecEnv):
         self.nenv = n
         self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
 
-        self.reset = False
+        self._reset = False
         self.obs = None
         self.steps = None
         self.returns = None
@@ -124,9 +125,10 @@ class TorchEnv(VecEnv):
         self.kwargs = kwargs
         self.kwargs.update({'batch_size': self.nenv})
 
-        if self.reset:
+        if self._reset:
             pass
         else:
+            self._reset = True
             self.obs = self.goal_env.reset(**kwargs) # reset all
             self.steps = torch.zeros(len(self.obs), dtype=torch.long, device='cuda:0')
             self.returns = torch.zeros(len(self.obs), dtype=torch.float32, device='cuda:0')
