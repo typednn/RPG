@@ -57,11 +57,11 @@ class GAE(Configurable):
                 m = mask[t]
                 delta = reward[t] + self._cfg.gamma * next_vpred[t] * (1-done[t].float())[..., None] - vpred[t] #TODO: modify it to truncated later.
                 adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
-            #else:
+        else:
             #TODO: test the corrected GAE later.
             #print(adv[-1], 'done', mask[-1], done[-1], 'truncated', truncated[-1], 'reward', reward[-1], 'v', next_vpred[-1], 'vpred', vpred[-1])
-            #adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
             #print(adv[-1])
+            adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
 
         if debug:
             adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='approx')
