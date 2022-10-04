@@ -96,7 +96,8 @@ class GAE(Configurable):
 def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda, mode='approx', return_sum_weight_value=False):
 
     reward = reward.to(torch.float64)
-    value = value.to(torch.float64)
+    if value is not None:
+        value = value.to(torch.float64)
     next_value = next_value.to(torch.float64)
     # follow https://arxiv.org/pdf/1506.02438.pdf
     if mode != 'exact':
@@ -172,11 +173,11 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
             if return_sum_weight_value:
                 sum_weights.append(sum_lambda)
-            gae.append(sumA / sum_lambda - value[i])
+            gae.append(sumA / sum_lambda - (value[i] if value is not None else 0))
 
         if return_sum_weight_value:
             sum_weights = torch.stack(sum_weights[::-1])
-            return torch.stack(gae[::-1]) + value, sum_weights
+            return torch.stack(gae[::-1]) + (value if value is not None else 0), sum_weights
         gae = gae[::-1]
 
     return torch.stack(gae).float() #* (1-lmbda) 
@@ -233,9 +234,8 @@ class HierarchicalGAE(Configurable):
         done = done.float()
         truncated = truncated.float()
 
-        vpred = (vpredz + vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
         next_vpred = (next_vpredz + next_vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
-        vtarg, sum_weights = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
+        vtarg, sum_weights = compute_gae_by_hand(reward, None, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
 
         # vtarg2 = compute_expected_value_by_hand(reward, done, truncated, next_vpredz, next_vpreda, self._cfg.gamma, self._cfg.lmbda)
         # print(vtarg[-1])
