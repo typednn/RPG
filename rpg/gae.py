@@ -165,7 +165,7 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
             sum_lambda = 1. + lmbda * sum_lambda
             sum_reward = lmbda * gamma * sum_reward + sum_lambda * reward[i]
-            sum_end_v = sum_end_v * gamma + next_value[i]  * gamma * mask_done[i]
+            sum_end_v =  lmbda * sum_end_v * gamma + next_value[i]  * gamma * mask_done[i]
             # if i == len(reward) - 1:
             #     print('during the last', sum_reward, gamma, next_value[i], mask_done[i], value[i])
             sumA = sum_reward + sum_end_v
