@@ -22,7 +22,7 @@ class RPG:
         gae: HierarchicalGAE,
         rew_rms=None,
         rnd=None,
-        batch_size=2000,
+        batch_size=256,
     ) -> None:
 
         self.env = env
@@ -84,7 +84,7 @@ class RPG:
                         z[idx] = self.p_z0()
 
 
-        return Trajectory(transitions, len(obs), steps), z
+        return Trajectory(transitions, len(obs), steps), z.detach()
 
 
     def run_rpg(self, env, steps):

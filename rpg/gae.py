@@ -165,7 +165,7 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
             sum_lambda = 1. + lmbda * sum_lambda
             sum_reward = lmbda * gamma * sum_reward + sum_lambda * reward[i]
-            sum_end_v =  lmbda * sum_end_v * gamma + next_value[i]  * gamma * mask_done[i]
+            sum_end_v =  lmbda * gamma * sum_end_v  + gamma * next_value[i]  * mask_done[i]
             # if i == len(reward) - 1:
             #     print('during the last', sum_reward, gamma, next_value[i], mask_done[i], value[i])
             sumA = sum_reward + sum_end_v
@@ -218,6 +218,7 @@ class HierarchicalGAE(Configurable):
         ind = traj.get_truncated_index(include_done=True) # because for the done, we still do not have next z to get the next_a prediction.
         next_vpreda[:-1] = vpreda[1:]
         next_vpreda[ind[:, 0], ind[:, 1]] = next_vpredz[ind[:, 0], ind[:, 1]] 
+        assert len(ind) == truncated.sum()
 
         # # test if the next_vpreda is correct.
         # for idx in range(traj.timesteps):
@@ -232,8 +233,8 @@ class HierarchicalGAE(Configurable):
         done = done.float()
         truncated = truncated.float()
 
-        vpred = vpredz + vpreda * lmbda_sqrt
-        next_vpred = next_vpredz + next_vpreda * lmbda_sqrt
+        vpred = (vpredz + vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
+        next_vpred = (next_vpredz + next_vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
         vtarg, sum_weights = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
 
         # vtarg2 = compute_expected_value_by_hand(reward, done, truncated, next_vpredz, next_vpreda, self._cfg.gamma, self._cfg.lmbda)
@@ -249,6 +250,7 @@ class HierarchicalGAE(Configurable):
             scale = 1.
 
         vtarg_z = (vpreda + lmbda_sqrt * vtarg * sum_weights)/(1 + lmbda_sqrt * sum_weights)
+        # vtarg_z = vtarg
 
         adv_a = (vtarg - vpreda) / scale
         vtarg_a = vtarg / scale

@@ -60,10 +60,11 @@ class Trajectory:
     def get_truncated_done(self, device='cuda:0'):
         # done means that we should ignore the next_value in the end
         # truncated means that we should even ignore rewards in the end
+        # truncated must be done ..
 
 
         done = self.get_tensor('done', device)
-        truncated = torch.zeros_like(done)
+        truncated = done.clone() # done must be truncated ..
         ind = self.get_truncated_index(include_done=True)
         truncated[ind[:, 0], ind[:, 1]] = True
         return done, truncated
