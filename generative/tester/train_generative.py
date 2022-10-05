@@ -1,4 +1,4 @@
-from tqdm.auto import tqdm
+import tqdm
 from torchvision import datasets, transforms
 
 dataset = datasets.MNIST('../data', train=True, transform=
@@ -120,16 +120,17 @@ optim = AdamW(vae.parameters(), lr=0.0001)
 
 weights = {'kl': 0.1}
 
-import tqdm
-for i in train_loader:
-    j = i
-    break
-for epoch in tqdm.trange(1000):
+# import tqdm
+# for i in train_loader:
+#     j = i
+#     break
+for epoch in range(1000):
+    print('epoch', epoch)
     losses_all = {}
     total = 0
-    for _ in tqdm.tqdm(range(100)):
-        i = j # fit single ..
-
+    #for _ in tqdm.tqdm(range(100)):
+    for i in tqdm.tqdm(train_loader, total=len(train_loader)):
+        # i = j # fit single ..
         optim.zero_grad()
         i = i[0]
         i = i.cuda()
@@ -146,15 +147,15 @@ for epoch in tqdm.trange(1000):
 
 
     import matplotlib.pyplot as plt
-    inp = i[:10].reshape(-1, 28, 28).reshape(-1, 28)
-    out = out[:10].reshape(-1, 28, 28).reshape(-1, 28)
+    inp = i[:10].reshape(-1, 32, 32).reshape(-1, 32)
+    out = out[:10].reshape(-1, 32, 32).reshape(-1, 32)
     c = torch.cat([inp, out], axis=1)
     plt.imshow(c.detach().cpu().numpy().clip(0., 1.))
     plt.savefig('test.png')
     plt.clf()
 
     with torch.no_grad():
-        s = vae.sample(100, None).view(10, 10, 28, 28).permute(0, 2, 1, 3).reshape(280, 280)
+        s = vae.sample(100, None).view(10, 10, 32, 32).permute(0, 2, 1, 3).reshape(320, 320)
     print(s.min(), s.max())
     plt.imshow(s.detach().cpu().numpy().clip(0., 1.))
     plt.savefig('cur.png')

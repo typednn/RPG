@@ -53,7 +53,7 @@ class HiddenDDIM(Network):
         latents = init_latents
 
         for t in self.scheduler.timesteps: # TODO: add progress bar
-            noise_pred = self.unet(latents, context, t) # follow the 
+            noise_pred = self.unet(latents, context, torch.ones(latents.shape[0], device=latents.device) * t) # follow the 
             latents = self.scheduler.step(noise_pred, t, latents, **kwargs).prev_sample # build latents
         return latents
 
