@@ -1,11 +1,13 @@
 # we now provide a modularized implementation of the RL training  
 import torch
+from typing import List
 from .env_base import VecEnv
 from .gae import HierarchicalGAE
 from .traj import Trajectory
 from .relbo import Relbo
 from .ppo_agent import PPOAgent, CriticOptim
 from .models import Policy, Critic, InfoNet
+from .common_hooks import HookBase
 from tools.utils import totensor
 from tools.optim import TrainerBase
 
@@ -23,6 +25,7 @@ class RPG:
         rew_rms=None,
         rnd=None,
         batch_size=256,
+        hooks: List[HookBase] = []
     ) -> None:
 
         self.env = env
@@ -37,6 +40,13 @@ class RPG:
         self.rew_rms = rew_rms
         self.rnd = rnd
         self.batch_size = batch_size
+
+        self.total = 0
+        self.epoch_id = 0
+
+        self.hooks = hooks
+        for i in hooks:
+            i.init(self)
 
 
     def inference(
@@ -103,7 +113,15 @@ class RPG:
         self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
         self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
         self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
-        print(traj.summarize_epsidoe_info())
+
+        self.total += traj.n
+        self.epoch_id += 1
+
+        print(self.total, traj.summarize_epsidoe_info())
+
+        locals_ = locals()
+        for i in self.hooks:
+            i.on_epoch(self, **locals_)
 
 
 

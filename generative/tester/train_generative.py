@@ -63,33 +63,33 @@ class Decoder(Network):
         return x
 
 
-class Unet(Network):
-    def __init__(self, cfg=None):
-        super().__init__()
-        self.embed = SinusoidalPositionEmbeddings(16)
-        self.encoder = Encoder(128)
-        self.decoder = Decoder(128 + 16)
-        #self.conv0 = nn.Conv2d(1, 64, 3, 1, padding=1)
+# class Unet(Network):
+#     def __init__(self, cfg=None):
+#         super().__init__()
+#         self.embed = SinusoidalPositionEmbeddings(16)
+#         self.encoder = Encoder(128)
+#         self.decoder = Decoder(128 + 16)
+#         #self.conv0 = nn.Conv2d(1, 64, 3, 1, padding=1)
 
-        #self.conv1 = nn.Conv2d(64 + 128 + 16, 64, 3, 1, padding=1)
-        #self.conv2 = nn.Conv2d(64, 32, 3, 1, padding=1)
-        self.conv3 = nn.Conv2d(32, 1, 3, 1, padding=1)
+#         #self.conv1 = nn.Conv2d(64 + 128 + 16, 64, 3, 1, padding=1)
+#         #self.conv2 = nn.Conv2d(64, 32, 3, 1, padding=1)
+#         self.conv3 = nn.Conv2d(32, 1, 3, 1, padding=1)
 
-        #self.embedder = nn.Sequential(
+#         #self.embedder = nn.Sequential(
 
-    def forward(self, x, context, t):
-        if len(t.shape) == 0:
-            t = torch.ones(x.shape[0], device=x.device) * t
+#     def forward(self, x, context, t):
+#         if len(t.shape) == 0:
+#             t = torch.ones(x.shape[0], device=x.device) * t
 
-        #feature = self.encoder(x, None)[:, :, None, None].repeat(1, 1, 28, 28) # input a global feature ..
-        #embed = self.embed(t)[:, :, None, None].expand(-1, -1, 28, 28)
-        #x = torch.relu(self.conv1(torch.cat((self.conv0(x), feature, embed), 1)))
-        #x = torch.relu(self.conv2(x))
-        #x = self.conv3(x)
-        feature = self.encoder(x, context)
-        embed = self.embed(t)
-        f = torch.cat((feature, embed), 1)
-        return self.decoder(f, context)
+#         #feature = self.encoder(x, None)[:, :, None, None].repeat(1, 1, 28, 28) # input a global feature ..
+#         #embed = self.embed(t)[:, :, None, None].expand(-1, -1, 28, 28)
+#         #x = torch.relu(self.conv1(torch.cat((self.conv0(x), feature, embed), 1)))
+#         #x = torch.relu(self.conv2(x))
+#         #x = self.conv3(x)
+#         feature = self.encoder(x, context)
+#         embed = self.embed(t)
+#         f = torch.cat((feature, embed), 1)
+#         return self.decoder(f, context)
 
 
 from generative.diffusion_models import Denoiser

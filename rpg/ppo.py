@@ -6,6 +6,8 @@ from .gae import GAE
 from .traj import Trajectory
 from .ppo_agent import PPOAgent
 from tools.optim import TrainerBase
+from typing import List
+from .common_hooks import HookBase
 
 
 class PPO:
@@ -17,6 +19,7 @@ class PPO:
         batch_size=256,
         rew_rms=None,
         obs_rms=None,
+        hooks: List[HookBase] = []
     ) -> None:
 
         self.env = env
@@ -31,6 +34,12 @@ class PPO:
 
         self.training=True
         self.total = 0
+
+        self.epoch_id = 0
+
+        self.hooks = hooks
+        for i in hooks:
+            i.init(self)
 
     def norm_obs(self, x, update=True):
         if self.obs_rms:
@@ -84,7 +93,13 @@ class PPO:
         self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'])
 
         self.total += traj.n
+        self.epoch_id += 1
+
         print(self.total, traj.summarize_epsidoe_info())
+
+        locals_ = locals()
+        for i in self.hooks:
+            i.on_epoch(self, **locals_)
 
 
 
