@@ -118,7 +118,7 @@ class train_rpg(TrainerBase):
                     ),
                     hidden_head=None,
                     critic=None,
-                    ppo = PPOAgent.dc,
+                    ppo = PPOAgent.dc, #TODO: add adamW
                     gae = HierarchicalGAE.dc,
                     relbo = Relbo.dc,
                     info_net=InfoNet.to_build(TYPE='InfoNet'),

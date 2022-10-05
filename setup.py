@@ -28,9 +28,10 @@ install_requires = [
     'open3d',
     'pydprint',
     'pyro-ppl',
-    'moviepy>=1.0.3'
+    'moviepy>=1.0.3',
     'gitpython',
     'ninja',
+    'diffusers"[training]"',
     #'pyvista', # maybe not needed
     #'pythreejs', # maybe not needed
 ]

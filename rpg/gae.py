@@ -7,7 +7,7 @@ from tools.config import Configurable
 
 
 class GAE(Configurable):
-    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True, correct_gae=False, use_env_done=True):
+    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True, correct_gae=False):
         super().__init__()
         self.pi = pi
 
@@ -43,9 +43,6 @@ class GAE(Configurable):
             assert torch.allclose(next_vpred, next_vpred_2)
 
             assert done.sum() == 0
-
-        if not self._cfg.use_env_done:
-            done = truncated # ignore the environment done..
 
         #done = done.float()
         if not self._cfg.correct_gae:

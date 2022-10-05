@@ -25,7 +25,7 @@ class VecEnv(ABC):
 
 
 class GymVecEnv(VecEnv):
-    def __init__(self, env_name, n, ignore_truncated=True) -> None:
+    def __init__(self, env_name, n, ignore_truncated_done=True) -> None:
         # by default, the mujoco's gym env do not have a truncated reward. 
         super().__init__()
 
@@ -41,7 +41,7 @@ class GymVecEnv(VecEnv):
         self.obs = None
         self.steps = None
         self.returns = None
-        self.ignore_truncated = ignore_truncated
+        self.ignore_truncated_done = ignore_truncated_done
 
         self.observation_space = self.vec_env.observation_space[0]
         self.action_space = self.vec_env.action_space[0]
@@ -74,9 +74,9 @@ class GymVecEnv(VecEnv):
 
         episode = []
         if len(end_envs) > 0:
-            if self.ignore_truncated:
+            if self.ignore_truncated_done:
                 for j in end_envs:
-                    if 'TimeLimit.truncated' in info[j]:
+                    if 'TimeLimit.truncated' in info[j]: 
                         done[j] = False
 
             for j in end_envs:
