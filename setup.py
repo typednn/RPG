@@ -5,7 +5,7 @@ install_requires = [
     'numpy',
     'wandb',
     'torch',
-    'tensorboardX'
+    'tensorboardX',
     'opencv-python',
     'tqdm',
     'taichi',
