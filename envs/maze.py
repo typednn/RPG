@@ -1,17 +1,19 @@
 import torch
 import numpy as np
 import gym
+import cv2
 from gym import spaces
+from tools.config import Configurable
 
 
-def get_intersect(A, B, C, D, back_eps=0.):
+def get_intersect(A, B, C, D):
     assert A.shape == B.shape == C.shape == D.shape
     assert A.shape[1] == 2
 
-    A = A.permute(0, 1)
-    B = B.permute(0, 1)
-    C = C.permute(0, 1)
-    D = D.permute(0, 1)
+    A = A.permute(1, 0)
+    B = B.permute(1, 0)
+    C = C.permute(1, 0)
+    D = D.permute(1, 0)
 
     det = (B[0] - A[0]) * (C[1] - D[1]) - (C[0] - D[0]) * (B[1] - A[1])
 
@@ -24,14 +26,11 @@ def get_intersect(A, B, C, D, back_eps=0.):
 
     no_intersect = torch.logical_or(no_intersect, (t1 > 1) | (t1 < 0) | (t2 > 1) | (t2 < 0))
 
-    t1 = torch.relu(t1 - back_eps)
+    #xi = A[0] + t1 * (B[0] - A[0])
+    #yi = A[1] + t1 * (B[1] - A[1])
+    return no_intersect, t1
 
-    xi = A[0] + t1 * (B[0] - A[0])
-    yi = A[1] + t1 * (B[1] - A[1])
-    return no_intersect, torch.stack((xi, yi), axis=1)
-
-
-class ContinuousMaze(gym.Env):
+class ContinuousMaze(Configurable):
     """Continuous maze environment."""
 
     action_space = spaces.Box(-1, 1, (2,))
@@ -116,7 +115,8 @@ class ContinuousMaze(gym.Env):
     ))
 
 
-    def __init__(self, batch_size=128, device='cuda:0') -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200) -> None:
+        super().__init__()
         self.screen = None
         self.isopen = True
         self.device = device
@@ -125,23 +125,36 @@ class ContinuousMaze(gym.Env):
         self.render_wall()
 
 
-
     def step(self, action):
         assert self.pos.shape == action.shape
 
-        new_pos = self.pos + action
+        new_pos = self.pos + action * 0.3
+
+        collide, t = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device), torch.ones(self.batch_size, device=self.device)
 
         for wall in self.walls:
-            left = wall[0][None, :].expand(self.batch_size, -1, -1)
-            right = wall[1][None, :].expand(self.batch_size, -1, -1)
-            collide, intersection = get_intersect(self.pos, new_pos, left, right, back_eps=1e-3)
-            new_pos = torch.where(collide[:, None], intersection, new_pos)
+            left = wall[0][None, :].expand(self.batch_size, -1)
+            right = wall[1][None, :].expand(self.batch_size, -1)
+            no_collide, new_t = get_intersect(self.pos, new_pos, left, right)
+            new_collide = torch.logical_not(no_collide)
+
+            if t is None:
+                t = new_t
+                collide = new_collide
+            else:
+                t = torch.where(new_collide, torch.min(t, new_t), t)
+                collide = torch.logical_or(collide, new_collide)
+
+        intersection = self.pos + (t[:, None] - 1e-5) * (new_pos - self.pos)
+        new_pos = torch.where(collide[:, None], intersection, new_pos)
 
         self.pos = new_pos
-        return self.pos.copy(), 0.0, False, {}
+        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device), False, {}
         
-    def reset(self):
-        #self.pos = np.zeros(2)
+    def reset(self, batch_size=None):
+        if batch_size is not None:
+            self.batch_size = batch_size
+
         self.pos = torch.zeros(self.batch_size, 2, device=self.device)
         return self.pos.clone()
 
@@ -157,14 +170,14 @@ class ContinuousMaze(gym.Env):
             cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
         return self.screen
 
-    def render(self):
-        import cv2
-        self.map = self.screen.copy()
+    def render(self, mode):
+        assert mode == 'rgb_array'
+
+        img = self.screen.copy()
         pos = ((self.pos.detach().cpu().numpy() + 12) / 24 * 512).astype(np.int32)
         for i in range(pos.shape[0]):
-            cv2.circle(self.map, tuple(pos[i]), 3, (0, 255, 0), 1)
-        return self.map
-
+            cv2.circle(img, tuple(pos[i]), 3, (0, 255, 0), 1)
+        return img
 
         
 if __name__ == '__main__':

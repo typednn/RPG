@@ -23,6 +23,10 @@ class VecEnv(ABC):
         # next obs will not be obs if done.
         pass
 
+    @abstractmethod
+    def render(self, mode):
+        pass
+
 
 class GymVecEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated_done=True) -> None:
@@ -58,6 +62,9 @@ class GymVecEnv(VecEnv):
             self.returns = np.zeros(len(self.obs), dtype=np.float64)
 
         return self.obs, self.steps.copy()
+
+    def render(self):
+        pass
 
     def step(self, actions):
         assert self.obs is not None, "must start before running"
@@ -106,9 +113,16 @@ class TorchEnv(VecEnv):
         # by default we do not have a truncated reward. 
         super().__init__()
         from solver.envs import GoalEnv
-        import solver.envs.softbody.triplemove
         self.nenv = n
-        self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
+
+        if env_name == 'TripleMove':
+            import solver.envs.softbody.triplemove
+            self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
+        elif env_name == 'Maze':
+            from envs.maze import ContinuousMaze
+            self.goal_env = ContinuousMaze()
+        else:
+            raise NotImplementedError
 
         self._reset = False
         self.obs = None
@@ -134,6 +148,8 @@ class TorchEnv(VecEnv):
             self.returns = torch.zeros(len(self.obs), dtype=torch.float32, device='cuda:0')
         return self.obs, self.steps.clone()
 
+    def render(self, mode):
+        return self.goal_env.render(mode)
         
     def render_traj(self, traj, **kwargs):
         from .traj import Trajectory

@@ -132,7 +132,15 @@ class train_ppo(TrainerBase):
 
         if rnd is not None:
             rnd = RNDOptim(obs_space, cfg=rnd).to(device)
-        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms, batch_size=batch_size, hooks=build_hooks(hooks), rnd=rnd)
+        self.ppo = PPO(
+            env, pi,
+            GAE(pi, cfg=gae),
+            rew_rms=rew_rms,
+            obs_rms=obs_rms,
+            batch_size=batch_size,
+            hooks=build_hooks(hooks),
+            rnd=rnd
+        )
 
         while True:
             self.ppo.run_ppo(env, steps)
