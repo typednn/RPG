@@ -161,7 +161,7 @@ def animate(clip, filename='animation.mp4', _return=True, fps=10, embed=False):
     if filename.endswith('.gif'):
         import imageio
         import matplotlib.image as mpimg
-        imageio.mimsave(filename, imgs)
+        imageio.mimsave(filename, clip)
         if _return:
             from IPython.display import display
             import ipywidgets as widgets

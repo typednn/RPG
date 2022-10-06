@@ -137,10 +137,14 @@ class save_traj(HookBase):
         self.kwargs = kwargs
         self.save_gif_epochs = save_gif_epochs
 
-        assert save_gif_epochs == 0 #TODO: add save gif in the end as RPG.
+        self.imgs = []
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
         if trainer.epoch_id % self.n_epoch == 0:
             traj = trainer.evaluate(env, steps)
             img = env.render_traj(traj) 
-            logger.savefig('traj.png', img)
+            logger.savefig(self.traj_name + '.png', img)
+            if self.save_gif_epochs > 0:
+                self.imgs.append(img)
+                if len(self.imgs) % self.save_gif_epochs == 0:
+                    logger.animate(self.imgs, self.traj_name + '.gif')

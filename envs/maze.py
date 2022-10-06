@@ -157,6 +157,14 @@ class ContinuousMaze(gym.Env):
             cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
         return self.screen
 
+    def render(self):
+        import cv2
+        self.map = self.screen.copy()
+        pos = ((self.pos.detach().cpu().numpy() + 12) / 24 * 512).astype(np.int32)
+        for i in range(pos.shape[0]):
+            cv2.circle(self.map, tuple(pos[i]), 3, (0, 255, 0), 1)
+        return self.map
+
 
         
 if __name__ == '__main__':

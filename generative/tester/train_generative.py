@@ -11,7 +11,7 @@ dataset = datasets.MNIST('../data', train=True, transform=
 import torch
 from torch import nn
 from tools.nn_base import Network
-from generative.diffusion_utils import SinusoidalPositionEmbeddings
+
 
 class Encoder(Network):
     def __init__(self, latent_dim, cfg=None):
