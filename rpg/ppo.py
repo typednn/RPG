@@ -45,16 +45,15 @@ class PPO(RLAlgo):
         **kwargs,
     ):
         transitions = []
-        obs, timestep = env.start(**kwargs)
-        obs = self.norm_obs(obs, True)
+        obs, timestep = self.start(env, **kwargs)
+
         for step in range(steps):
             transition = dict(obs=obs, timestep = timestep)
             p_a = pi(obs, None, timestep=timestep) # no z
-            a, log_p_a = p_a.rsample()
+            a, log_p_a = self.sample(p_a)
 
-            data = env.step(a)
-            data['next_obs'] = self.norm_obs(data['next_obs'], False)
-            obs = self.norm_obs(data.pop('obs'), True)
+            data, obs = self.step(env, a)
+
             transition.update(
                 **data,
                 a=a,

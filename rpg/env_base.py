@@ -135,11 +135,14 @@ class TorchEnv(VecEnv):
         return self.obs, self.steps.clone()
 
         
-    def render_traj(self, traj):
+    def render_traj(self, traj, **kwargs):
         from .traj import Trajectory
         traj: Trajectory
         obs = traj.get_tensor('obs')
-        return self.goal_env._render_traj_rgb(obs)
+        if traj.traj[0]['z'] is not None:
+            assert 'z' not in kwargs
+            kwargs['z'] = traj.get_tensor('z')[1:]
+        return self.goal_env._render_traj_rgb(obs, **kwargs)
 
 
     def step(self, actions):

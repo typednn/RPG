@@ -7,9 +7,7 @@ from .traj import Trajectory
 from .relbo import Relbo
 from .ppo_agent import PPOAgent, CriticOptim
 from .models import Policy, Critic, InfoNet
-from .common_hooks import HookBase
-from .utils import RLAlgo
-from tools.utils import totensor
+from .common_hooks import HookBase, RLAlgo, build_hooks
 from tools.optim import TrainerBase
 
 
@@ -23,10 +21,11 @@ class RPG(RLAlgo):
         pi_z: PPOAgent,
         relbo: Relbo,
         gae: HierarchicalGAE,
-        rew_rms=None,
-        obs_rms=None,
         rnd=None,
         batch_size=256,
+
+        rew_rms = None,
+        obs_rms = None,
         hooks: List[HookBase] = []
     ) -> None:
 
@@ -39,17 +38,13 @@ class RPG(RLAlgo):
         self.gae = gae
         self.latent_z = None
 
-        self.rew_rms = rew_rms
-        self.obs_rms = obs_rms
 
         self.rnd = rnd
         assert self.rnd is None
         self.batch_size = batch_size
 
-        self.total = 0
-        self.epoch_id = 0
+        super().__init__(rew_rms, obs_rms, hooks)
 
-        super().__init__(hooks)
 
     def modules(self):
         return [self.pi_a, self.pi_z, self.relbo, self.rew_rms, self.obs_rms]
@@ -64,7 +59,8 @@ class RPG(RLAlgo):
         **kwargs,
     ):
         transitions = []
-        obs, timestep = env.start(**kwargs)
+
+        obs, timestep = self.start(env, **kwargs)
         if z is None:
             z = self.p_z0(len(obs))
 
@@ -73,16 +69,16 @@ class RPG(RLAlgo):
             transition = dict(obs = obs, old_z = z, timestep = timestep)
 
             p_z = pi_z(obs, z, timestep=timestep)
-            z, log_p_z = p_z.sample() # sample low-level z
+            z, log_p_z = self.sample(p_z) # sample low-level z
 
             p_a = pi_a(obs, z, timestep=timestep)
-            a, log_p_a = p_a.rsample()
+            a, log_p_a = self.sample(p_a)
 
             assert log_p_a.shape == log_p_z.shape
 
+            data, obs = self.step(env, a)
 
-            data = env.step(a)
-            obs = data.pop('obs')
+
             transition.update(
                 **data,
                 a=a, z=z, log_p_a = log_p_a, log_p_z = log_p_z,
@@ -102,6 +98,12 @@ class RPG(RLAlgo):
         return Trajectory(transitions, len(obs), steps), z.detach()
 
 
+    def evaluate(self, env, steps):
+        with torch.no_grad():
+            traj, _ = self.inference(env, None, self.pi_z, self.pi_a, steps=steps, reset=True)
+            env.start(reset=True) # reset the force brutely
+            return traj
+
     def run_rpg(self, env, steps):
         batch_size = self.batch_size
         with torch.no_grad():
@@ -119,8 +121,6 @@ class RPG(RLAlgo):
         self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'], logger_scope='pi_z')
         self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
 
-        self.total += traj.n
-        print(self.total, traj.summarize_epsidoe_info())
         self.call_hooks(locals())
 
 
@@ -141,7 +141,10 @@ class train_rpg(TrainerBase):
                     relbo = Relbo.dc,
                     info_net=InfoNet.to_build(TYPE='InfoNet'),
                     reward_norm=True,
-                    initial_latent = 'zero'
+                    initial_latent = 'zero',
+
+                    obs_norm=False,
+                    hooks = None,
                 ):
         super().__init__()
 
@@ -158,6 +161,7 @@ class train_rpg(TrainerBase):
 
         from tools.utils import RunningMeanStd
         rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
+        obs_rms = RunningMeanStd(clip_max=10.) if obs_norm else None
 
         obs_space = env.observation_space
         action_space = env.action_space
@@ -180,7 +184,7 @@ class train_rpg(TrainerBase):
 
         hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
 
-        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms)
+        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms, obs_rms=obs_rms, hooks=build_hooks(hooks))
 
         while True:
             self.ppo.run_rpg(env, steps)
