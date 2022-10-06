@@ -31,7 +31,7 @@ install_requires = [
     'moviepy>=1.0.3',
     'gitpython',
     'ninja',
-    'diffusers"[training]"',
+    'diffusers',
     #'pyvista', # maybe not needed
     #'pythreejs', # maybe not needed
 ]

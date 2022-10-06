@@ -8,11 +8,12 @@ from .relbo import Relbo
 from .ppo_agent import PPOAgent, CriticOptim
 from .models import Policy, Critic, InfoNet
 from .common_hooks import HookBase
+from .utils import RLAlgo
 from tools.utils import totensor
 from tools.optim import TrainerBase
 
 
-class RPG:
+class RPG(RLAlgo):
 
     def __init__(
         self,
@@ -23,6 +24,7 @@ class RPG:
         relbo: Relbo,
         gae: HierarchicalGAE,
         rew_rms=None,
+        obs_rms=None,
         rnd=None,
         batch_size=256,
         hooks: List[HookBase] = []
@@ -38,16 +40,19 @@ class RPG:
         self.latent_z = None
 
         self.rew_rms = rew_rms
+        self.obs_rms = obs_rms
+
         self.rnd = rnd
+        assert self.rnd is None
         self.batch_size = batch_size
 
         self.total = 0
         self.epoch_id = 0
 
-        self.hooks = hooks
-        for i in hooks:
-            i.init(self)
+        super().__init__(hooks)
 
+    def modules(self):
+        return [self.pi_a, self.pi_z, self.relbo, self.rew_rms, self.obs_rms]
 
     def inference(
         self,
@@ -110,18 +115,13 @@ class RPG:
             data.update(adv_targets)
 
 
-        self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'])
-        self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'])
+        self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'], logger_scope='pi_a')
+        self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'], logger_scope='pi_z')
         self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
 
         self.total += traj.n
-        self.epoch_id += 1
-
         print(self.total, traj.summarize_epsidoe_info())
-
-        locals_ = locals()
-        for i in self.hooks:
-            i.on_epoch(self, **locals_)
+        self.call_hooks(locals())
 
 
 

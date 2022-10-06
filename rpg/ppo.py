@@ -7,10 +7,10 @@ from .traj import Trajectory
 from .ppo_agent import PPOAgent
 from tools.optim import TrainerBase
 from typing import List
-from .common_hooks import HookBase
+from .common_hooks import HookBase, build_hooks, RLAlgo
 
 
-class PPO:
+class PPO(RLAlgo):
     def __init__(
         self,
         env,
@@ -35,11 +35,12 @@ class PPO:
         self.training=True
         self.total = 0
 
-        self.epoch_id = 0
+        super().__init__(hooks)
 
-        self.hooks = hooks
-        for i in hooks:
-            i.init(self)
+
+
+    def modules(self):
+        return [self.pi, self.rew_rms, self.obs_rms]
 
     def norm_obs(self, x, update=True):
         if self.obs_rms:
@@ -78,6 +79,11 @@ class PPO:
 
         return Trajectory(transitions, len(obs), steps)
 
+    def evaluate(self, env, steps):
+        with torch.no_grad():
+            traj = self.inference(env, self.pi, steps=steps, reset=True)
+            env.start(reset=True) # reset the force brutely
+            return traj
 
     def run_ppo(self, env, steps):
         with torch.no_grad():
@@ -90,16 +96,11 @@ class PPO:
             data.update(adv_targets)
             data['z'] = None
 
-        self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'])
+        self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'], logger_scope='')
 
         self.total += traj.n
-        self.epoch_id += 1
-
         print(self.total, traj.summarize_epsidoe_info())
-
-        locals_ = locals()
-        for i in self.hooks:
-            i.on_epoch(self, **locals_)
+        self.call_hooks(locals())
 
 
 
@@ -115,8 +116,10 @@ class train_ppo(TrainerBase):
                         reward_norm=True,
                         obs_norm=False,
                         batch_size=256,
+                        hooks = None,
                 ):
-        super().__init__()
+        #super().__init__()
+        TrainerBase.__init__(self)
 
 
         from tools.utils import RunningMeanStd
@@ -128,7 +131,7 @@ class train_ppo(TrainerBase):
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
         critic = Critic(obs_space, None, env.reward_dim, cfg=critic).to(device)
         pi = PPOAgent(actor, critic, ppo)
-        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms, batch_size=batch_size)
+        self.ppo = PPO(env, pi, GAE(pi, cfg=gae), rew_rms=rew_rms, obs_rms=obs_rms, batch_size=batch_size, hooks=build_hooks(hooks))
 
         while True:
             self.ppo.run_ppo(env, steps)

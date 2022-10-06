@@ -73,7 +73,6 @@ class PolicyOptim(Optim):
         output = {
             'entropy': entropy.item(),
             'negent': negent.item(),
-            'pi': loss.item(),
             'pg': pg_losses.item(),
             'approx_kl': approx_kl_div,
             'loss': loss.item()
@@ -127,22 +126,33 @@ class PPOAgent(Configurable):
     def value(self, obs, hidden, timestep):
         return self.critic(obs, hidden, timestep=timestep)
 
-    def step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg):
-        stop = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
-        self.critic_optim.step(obs, hidden, timestep, vtarg)
-        return stop
+    def step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
+        actor_loss, actor_output = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
+        critic_loss, _ = self.critic_optim.step(obs, hidden, timestep, vtarg)
 
-    def learn(self, data: DataBuffer, batch_size, keys):
+        if logger_scope is not None:
+            from tools.utils import logger
+            output = {logger_scope + k: v for k, v in actor_output.items()}
+            output[logger_scope + 'critic_loss'] = critic_loss.item()
+            output[logger_scope + 'actor_loss'] = actor_loss.item()
+            logger.logkvs_mean(output)
+
+        return 'early_stop' in actor_output and actor_output['early_stop']
+
+    def learn(self, data: DataBuffer, batch_size, keys, logger_scope=None):
         stop = False
+
+        if logger_scope is not None:
+            if len(logger_scope)>0:
+                logger_scope = logger_scope + '/'
 
         for i in range(self._cfg.learning_epoch):
             n_batches = 0
             for batch in data.loop_over(batch_size):
                 n_batches += 1
                 if not stop:
-                    loss, output = self.step(*[batch[i] for i in keys])
-                    if 'early_stop' in output and output['early_stop']:
-                        stop = True
+                    stop = self.step(*[batch[i] for i in keys], logger_scope=logger_scope)
+                    if stop:
                         break
             if stop:
                 break

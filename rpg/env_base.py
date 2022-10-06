@@ -46,16 +46,16 @@ class GymVecEnv(VecEnv):
         self.observation_space = self.vec_env.observation_space[0]
         self.action_space = self.vec_env.action_space[0]
 
-    def start(self, **kwargs):
+    def start(self, reset=False, **kwargs):
         self.kwargs = kwargs
 
-        if self._reset:
+        if self._reset and not reset:
             pass
         else:
             self._reset = True
             self.obs = self.vec_env.reset(**kwargs) # reset all
-            self.steps = np.zeros(len(self.obs), dtype=np.long)
-            self.returns = np.zeros(len(self.obs), dtype=np.float)
+            self.steps = np.zeros(len(self.obs), dtype=np.int64)
+            self.returns = np.zeros(len(self.obs), dtype=np.float64)
 
         return self.obs, self.steps.copy()
 
@@ -120,12 +120,12 @@ class TorchEnv(VecEnv):
         self.action_space = self.goal_env.action_space
         self.max_time_steps = self.goal_env._cfg.low_steps
 
-    def start(self, **kwargs):
+    def start(self, reset=False, **kwargs):
         import torch
         self.kwargs = kwargs
         self.kwargs.update({'batch_size': self.nenv})
 
-        if self._reset:
+        if self._reset and not reset:
             pass
         else:
             self._reset = True
@@ -133,6 +133,13 @@ class TorchEnv(VecEnv):
             self.steps = torch.zeros(len(self.obs), dtype=torch.long, device='cuda:0')
             self.returns = torch.zeros(len(self.obs), dtype=torch.float32, device='cuda:0')
         return self.obs, self.steps.clone()
+
+        
+    def render_traj(self, traj):
+        from .traj import Trajectory
+        traj: Trajectory
+        obs = traj.get_tensor('obs')
+        return self.goal_env._render_traj_rgb(obs)
 
 
     def step(self, actions):

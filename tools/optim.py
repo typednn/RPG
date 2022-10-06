@@ -193,7 +193,7 @@ class LossOptimizer(OptimModule):
 class TrainerBase(Configurable):
     def __init__(self, cfg=None,
         path=None,
-        format_strs='csv+tensorboard',
+        format_strs='stdout+csv',
         seed=None,
         MODEL_PATH=None,
         log_date=False,

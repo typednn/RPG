@@ -132,15 +132,18 @@ class PointEnv(StateEnv):
 
         states = states * 128 + 64 
 
-        traj = kwargs['traj']
+        if 'traj' in kwargs:
+            traj = kwargs['traj']
 
-        if self._cfg.save_traj:
-            from tools.utils import logger
-            logger.torch_save([traj], 'latest_traj.th')
+            if self._cfg.save_traj:
+                from tools.utils import logger
+                logger.torch_save([traj], 'latest_traj.th')
+        else:
+            traj = kwargs
 
         from ..draw_utils import plot_colored_embedding
         plt.clf()
-        if traj['z'].max() < 100 or traj['z'].dtype != torch.int64:
+        if 'z' in traj and (traj['z'].max() < 100 or traj['z'].dtype != torch.int64):
             plt.imshow(np.uint8(img[...,::-1]*255))
             plot_colored_embedding(traj['z'], states[1:, :, :2], s=2)
         else:
@@ -149,10 +152,9 @@ class PointEnv(StateEnv):
             plt.scatter(states[:, 0], states[:, 1], s=2)
         plt.xlim([0, 256])
         plt.ylim([0, 256])
-
         img2 = plt_save_fig_array()[:, :, :3]
 
-        if traj['a'].shape[-1] == 2:
+        if 'a' in traj and traj['a'].shape[-1] == 2:
             plt.clf()
             plot_colored_embedding(traj['z'], traj['a'])
             from tools.utils import logger

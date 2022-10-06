@@ -139,7 +139,7 @@ def configurable_class(cls):
                         v = purge_builder_cfg(v, level=1)  # only purge for one-level ...
                 kwargs[i] = v
 
-            init(self, *args, cfg=copy.copy(cfg), **kwargs)
+            init(self, *args, cfg=cfg, **kwargs)
             _assert_not_necessary(self._initialized, f"{cls} doesn't initialize its all ancestors... this is very dangerous..")
 
         return wrapper
