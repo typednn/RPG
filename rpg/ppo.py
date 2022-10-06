@@ -17,6 +17,7 @@ class PPO(RLAlgo):
         pi: PPOAgent,
         gae: GAE,
         batch_size=256,
+
         rew_rms=None,
         obs_rms=None,
         hooks: List[HookBase] = []
@@ -29,25 +30,12 @@ class PPO(RLAlgo):
         self.latent_z = None
         self.batch_size = batch_size
 
-        self.rew_rms = rew_rms
-        self.obs_rms = obs_rms
-
-        self.training=True
-        self.total = 0
-
-        super().__init__(hooks)
+        super().__init__(rew_rms, obs_rms, hooks)
 
 
 
     def modules(self):
         return [self.pi, self.rew_rms, self.obs_rms]
-
-    def norm_obs(self, x, update=True):
-        if self.obs_rms:
-            if update:
-                self.obs_rms.update(x) # always update during training...
-            x = self.obs_rms.normalize(x)
-        return x
 
     def inference(
         self,
@@ -98,8 +86,6 @@ class PPO(RLAlgo):
 
         self.pi.learn(data, self.batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'], logger_scope='')
 
-        self.total += traj.n
-        print(self.total, traj.summarize_epsidoe_info())
         self.call_hooks(locals())
 
 
