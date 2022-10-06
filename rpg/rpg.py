@@ -134,6 +134,7 @@ class train_rpg(TrainerBase):
                         head=dict(TYPE='Normal',
                         std_mode='fix_learnable', std_scale=0.5)
                     ),
+                    K = 0,
                     hidden_head=None,
                     critic=None,
                     ppo = PPOAgent.dc, #TODO: add adamW
@@ -169,7 +170,7 @@ class train_rpg(TrainerBase):
         # two policies
 
         actor_a = Policy(obs_space, hidden_space, action_space, cfg=actor).to(device)
-        actor_z = Policy(obs_space, hidden_space, hidden_space, backbone=actor.backbone, head=hidden_head).to(device)
+        actor_z = Policy(obs_space, hidden_space, hidden_space, backbone=actor.backbone, head=hidden_head, K=K).to(device)
 
         critic_a = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
         critic_z = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)

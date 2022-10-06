@@ -28,8 +28,11 @@ class PolicyOptim(Optim):
 
     def _compute_loss(self, obs, hidden, timestep, action, logp, adv, backward=True):
         device = self.actor.device
-        pd: ActionDistr = self.actor(obs, hidden, timestep)
         action = batch_input(action, device)
+        if hidden is not None: hidden = batch_input(hidden, device, dtype=hidden[0].dtype)
+        timestep = batch_input(timestep, device, dtype=timestep[0].dtype)
+
+        pd: ActionDistr = self.actor(obs, hidden, timestep)
 
         newlogp = pd.log_prob(action)
         device = newlogp.device

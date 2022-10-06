@@ -4,10 +4,11 @@ from solver.actor import Actor as BaseNet
 from gym.spaces import Box, Discrete
 from tools.nn_base import Network
 from tools.config import as_builder
+from nn.distributions import DeterminisiticAction
 
 
 class Policy(BaseNet):
-    def __init__(self, obs_space, z_space, action_space, cfg=None):
+    def __init__(self, obs_space, z_space, action_space, cfg=None, K=1):
         self.z_space = z_space
         if z_space is not None:
             obs_space = (obs_space, z_space)
@@ -19,11 +20,26 @@ class Policy(BaseNet):
 
         BaseNet.__init__(self, obs_space, action_space)
 
-    def forward(self, state, hidden, timestep=None):
+    def forward(self, state, hidden, timestep):
+        if self._cfg.K != 1:
+            assert timestep is not None
+            timestep = self.batch_input(timestep)
+            select_new = (timestep == 0)
+            if self._cfg.K > 0:
+                p = (timestep // self._cfg.K * self._cfg.K) == timestep
+                select_new = torch.logical_or(select_new, p)
+
+            from nn.distributions.compositional import Compose
+            new = super().forward((state, hidden), timestep=timestep)
+            old = DeterminisiticAction(hidden, allow_not_equal=True) # continue previous z
+            return Compose(new, old, select_new)
+
+        # otherwise select new z ..
         if self.z_space is None:
             return super().forward(state, timestep=timestep)
         else:
             return super().forward((state, hidden), timestep=timestep)
+
 
 
 class Critic(BaseNet):
