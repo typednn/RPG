@@ -141,10 +141,21 @@ class save_traj(HookBase):
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
         if trainer.epoch_id % self.n_epoch == 0:
+            assert trainer.mode == 'sample'
             traj = trainer.evaluate(env, steps)
+            old_obs = traj.get_tensor('obs')
+            if trainer.obs_rms:
+                old_obs = trainer.obs_rms.unormalize(old_obs)
+            traj.old_obs = old_obs
             img = env.render_traj(traj) 
             logger.savefig(self.traj_name + '.png', img)
             if self.save_gif_epochs > 0:
                 self.imgs.append(img)
                 if len(self.imgs) % self.save_gif_epochs == 0:
                     logger.animate(self.imgs, self.traj_name + '.gif')
+
+                    
+                    
+@as_hook
+class plot_maze_env_rnd(HookBase):
+    pass

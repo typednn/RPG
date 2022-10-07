@@ -7,7 +7,7 @@ from tools.config import Configurable
 
 
 class GAE(Configurable):
-    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True, correct_gae=False):
+    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True, correct_gae=False, ignore_done=True):
         super().__init__()
         self.pi = pi
 
@@ -15,6 +15,8 @@ class GAE(Configurable):
     def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms, debug=False):
         done, truncated = traj.get_truncated_done()
         #done = traj.get_tensor('done')
+        if self._cfg.ignore_done:
+            done = done * 0
 
         scale = rew_rms.std if rew_rms is not None else 1.
 
@@ -60,7 +62,13 @@ class GAE(Configurable):
             #TODO: test the corrected GAE later.
             #print(adv[-1], 'done', mask[-1], done[-1], 'truncated', truncated[-1], 'reward', reward[-1], 'v', next_vpred[-1], 'vpred', vpred[-1])
             #print(adv[-1])
-            adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+            # adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')
+            #adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')
+            adv_exact = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+            #print(adv[:10, 0, 0])
+            #print(adv_exact[:10, 0, 0])
+            adv = adv_exact
+
 
         if debug:
             adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='approx')
@@ -117,6 +125,8 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
                 discount_lmbda = 1.
 
                 lmbda_sum = 0.
+                not_truncated = 1.0
+                lastA = 0.
                 for j in range(i, len(reward)):
 
                     R = R + reward[j] * discount_gamma
@@ -125,17 +135,23 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
                     A = R + (discount_gamma * gamma) * next_value[j] * mask_done - value[i] # done only stop future rewards ..
 
                     lmbda_sum += discount_lmbda
-                    adv += (A * discount_lmbda)
+
+                    lastA = A * not_truncated + (1-not_truncated) * lastA
+                    adv += (A * discount_lmbda) 
 
                     mask_truncated = (1. - truncated[j].float())[..., None] # mask truncated will stop future computation.
+
                     discount_gamma = discount_gamma * mask_truncated
                     discount_lmbda = discount_lmbda * mask_truncated
+                    not_truncated = not_truncated * mask_truncated
 
                     # note that we will count done; always ...
 
                     discount_gamma = discount_gamma * gamma
                     discount_lmbda = discount_lmbda * lmbda
-                adv = adv/ lmbda_sum # normalize it based on the final result.
+
+                #adv = adv/ lmbda_sum # normalize it based on the final result.
+                adv = (adv + lastA  * (1./ (1.-lmbda) - lmbda_sum)) * (1-lmbda)
             else:
                 raise NotImplementedError
 
@@ -152,6 +168,7 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
         sum_lambda = 0.
         sum_reward = 0.
         sum_end_v = 0.
+        last_value = 0.
         gae = []
         mask_done = (1. - done.float())[..., None]
         mask_truncated = (1 - truncated.float())[..., None]
@@ -165,14 +182,22 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
             sum_lambda = 1. + lmbda * sum_lambda
             sum_reward = lmbda * gamma * sum_reward + sum_lambda * reward[i]
-            sum_end_v =  lmbda * gamma * sum_end_v  + gamma * next_value[i]  * mask_done[i]
+
+            next_v = next_value[i] * mask_done[i]
+            sum_end_v =  lmbda * gamma * sum_end_v  + gamma * next_v
+
+            last_value = last_value * mask_truncated[i] + next_v * (1-mask_truncated[i]) # if truncated.. use the next_value; other wise..
+            last_value = last_value * gamma + reward[i]
             # if i == len(reward) - 1:
             #     print('during the last', sum_reward, gamma, next_value[i], mask_done[i], value[i])
             sumA = sum_reward + sum_end_v
 
             if return_sum_weight_value:
                 sum_weights.append(sum_lambda)
-            gae.append(sumA / sum_lambda - (value[i] if value is not None else 0))
+
+            gg = (sumA + last_value  * (1./ (1.-lmbda) - sum_lambda)) * (1-lmbda)
+            # gg = sumA / sum_lambda 
+            gae.append(gg - (value[i] if value is not None else 0))
 
         if return_sum_weight_value:
             sum_weights = torch.stack(sum_weights[::-1])

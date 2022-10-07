@@ -86,6 +86,7 @@ class PPO(RLAlgo):
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
+                raise NotImplementedError
 
             adv_targets = self.gae(traj, reward, batch_size=self.batch_size, rew_rms=self.rew_rms, debug=False)
 

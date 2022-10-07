@@ -22,7 +22,7 @@ install_requires = [
     'transforms3d',
     'h5py',
     #'bezier',
-    'pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git',
+    # 'pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git',
     'chamferdist',
     #'geomloss',
     'open3d',

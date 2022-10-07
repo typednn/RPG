@@ -43,12 +43,12 @@ def test_tripush():
 def test_maze():
     from tools.utils import totensor, animate
     N = 100
-    env = TorchEnv('Maze', N)
+    env = TorchEnv('SmallMaze', N)
     obs, timestep = env.start()
 
     images = []
 
-    for i in tqdm.trange(200):
+    for i in tqdm.trange(env.goal_env._cfg.low_steps):
         action = totensor([env.action_space.sample() for i in range(env.nenv)], 'cuda:0')
         env.step(action)
         images.append(env.render('rgb_array'))

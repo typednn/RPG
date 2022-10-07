@@ -134,6 +134,13 @@ class RunningMeanStd(object):
             x = x.clip(-self.clip_max, self.clip_max)
         return x
 
+    def unormalize(self, x):
+        if isinstance(x[0], dict):
+            return [{k: self.get_submodule(k).unormalize([v])[0] for k, v in c.items()} for c in x]
+        x = self.batch(x)
+        x = x * self.std + self.mean
+        return x
+
 
 def lookat(center, theta, phi, radius):
     R = transforms3d.euler.euler2mat(theta, phi, 0., 'sxyz')

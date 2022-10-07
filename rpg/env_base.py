@@ -118,9 +118,15 @@ class TorchEnv(VecEnv):
         if env_name == 'TripleMove':
             import solver.envs.softbody.triplemove
             self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
+
         elif env_name == 'Maze':
-            from envs.maze import ContinuousMaze
-            self.goal_env = ContinuousMaze()
+            from envs.maze import LargeMaze
+            self.goal_env = LargeMaze()
+
+        elif env_name == 'SmallMaze':
+            from envs.maze import SmallMaze
+            self.goal_env = SmallMaze()
+
         else:
             raise NotImplementedError
 
@@ -154,7 +160,7 @@ class TorchEnv(VecEnv):
     def render_traj(self, traj, **kwargs):
         from .traj import Trajectory
         traj: Trajectory
-        obs = traj.get_tensor('obs')
+        obs = traj.old_obs
         if traj.traj[0]['z'] is not None:
             assert 'z' not in kwargs
             kwargs['z'] = traj.get_tensor('z')[1:]
@@ -185,6 +191,7 @@ class TorchEnv(VecEnv):
                 episode.append({'step': step, 'reward': total_reward})
             obs = self.goal_env.reset(**self.kwargs)
 
+        
         return {
             'obs': obs, # the current observation of the environment. 
             'next_obs': next_obs, # ending state of the previous transition.

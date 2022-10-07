@@ -30,11 +30,10 @@ def get_intersect(A, B, C, D):
     #yi = A[1] + t1 * (B[1] - A[1])
     return no_intersect, t1
 
-class ContinuousMaze(Configurable):
+class LargeMaze(Configurable):
     """Continuous maze environment."""
-
-    action_space = spaces.Box(-1, 1, (2,))
-    observation_space = spaces.Box(-12, 12, (2,))
+    SIZE = 12
+    ACTION_SCALE=0.3
 
     walls = torch.tensor(np.array(
         [
@@ -121,16 +120,21 @@ class ContinuousMaze(Configurable):
         self.isopen = True
         self.device = device
         self.batch_size = batch_size
-        self.walls = self.walls.to(device)
+
+
+        self.action_space = spaces.Box(-1, 1, (2,))
+        self.observation_space = spaces.Box(-12, 12, (2,))
+        self.walls = self.walls.to(device).float()
         self.render_wall()
 
 
     def step(self, action):
         assert self.pos.shape == action.shape
 
-        new_pos = self.pos + action * 0.3
+        new_pos = self.pos + action.clip(-1., 1.) * self.ACTION_SCALE
 
-        collide, t = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device), torch.ones(self.batch_size, device=self.device)
+        collide = torch.zeros(self.batch_size, dtype=torch.bool, device=self.device)
+        t = torch.ones(self.batch_size, device=self.device, dtype=self.pos.dtype)
 
         for wall in self.walls:
             left = wall[0][None, :].expand(self.batch_size, -1)
@@ -149,13 +153,16 @@ class ContinuousMaze(Configurable):
         new_pos = torch.where(collide[:, None], intersection, new_pos)
 
         self.pos = new_pos
-        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device), False, {}
+
+        reward = self.pos.sum(axis=-1)
+        # reward = 0
+        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device) + reward, False, {}
         
     def reset(self, batch_size=None):
         if batch_size is not None:
             self.batch_size = batch_size
 
-        self.pos = torch.zeros(self.batch_size, 2, device=self.device)
+        self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float32)
         return self.pos.clone()
 
     def render_wall(self):
@@ -165,8 +172,8 @@ class ContinuousMaze(Configurable):
         for wall in self.walls:
             left = wall[0].detach().cpu().numpy()
             right = wall[1].detach().cpu().numpy()
-            left = ((left + 12) / 24 * resolution).astype(np.int32)
-            right = ((right + 12) / 24 * resolution).astype(np.int32)
+            left = ((left + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
+            right = ((right + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
             cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
         return self.screen
 
@@ -174,13 +181,49 @@ class ContinuousMaze(Configurable):
         assert mode == 'rgb_array'
 
         img = self.screen.copy()
-        pos = ((self.pos.detach().cpu().numpy() + 12) / 24 * 512).astype(np.int32)
+        pos = ((self.pos.detach().cpu().numpy() + self.SIZE) / (self.SIZE * 2) * 512).astype(np.int32)
         for i in range(pos.shape[0]):
             cv2.circle(img, tuple(pos[i]), 3, (0, 255, 0), 1)
         return img
 
-        
-if __name__ == '__main__':
-    env = ContinuousMaze()
-    import cv2
-    cv2.imwrite('tmp.png', env.screen)
+    def  _render_traj_rgb(self, obs, z=None, **kwargs):
+        assert z is None
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+
+        plt.clf()
+        img = self.screen.copy()/255.
+        #obs = ((obs  + self.SIZE)/ (self.SIZE * 2)).detach().cpu().numpy()
+        obs = obs / self.SIZE / 2 + 0.5
+        obs = obs.detach().cpu().numpy() * 256
+
+
+        from solver.draw_utils import plot_colored_embedding
+        plt.clf()
+        if z is not None and (z.max() < 100 or z.dtype != torch.int64):
+            plt.imshow(np.uint8(img[...,::-1]*255))
+            plot_colored_embedding(z, obs[1:, :, :2], s=3)
+        else:
+            plt.imshow(img[...,::-1])
+            obs = obs.reshape(-1, 2)
+            plt.scatter(obs[:, 0], obs[:, 1], s=3)
+
+        plt.xlim([0, 256])
+        plt.ylim([0, 256])
+        img2 = plt_save_fig_array()[:, :, :3]
+        return img2
+
+
+class SmallMaze(LargeMaze):
+    SIZE = 5
+
+    walls = torch.tensor(np.array(
+        [
+            [[-5, -5], [-5., 5.0]],
+            [[-5, 5], [5., 5.0]],
+            [[5, 5], [5., -5.0]],
+            [[5, -5], [-5., -5.0]],
+        ]))
+
+    def __init__(self, cfg=None, low_steps=10) -> None:
+        super().__init__(cfg)
