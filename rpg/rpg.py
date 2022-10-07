@@ -2,6 +2,7 @@
 import torch
 from typing import List
 from .env_base import VecEnv
+from .rnd import RNDOptim
 from .gae import HierarchicalGAE
 from .traj import Trajectory
 from .relbo import Relbo
@@ -40,7 +41,6 @@ class RPG(RLAlgo):
 
 
         self.rnd = rnd
-        assert self.rnd is None
         self.batch_size = batch_size
 
         super().__init__(rew_rms, obs_rms, hooks)
@@ -111,6 +111,12 @@ class RPG(RLAlgo):
                 env, self.latent_z, self.pi_z, self.pi_a, steps=steps)
 
             reward = self.relbo(traj, batch_size=batch_size)
+
+            if self.rnd is not None:
+                rnd_reward = self.rnd(traj, batch_size=self.batch_size)
+                reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
+
+
             adv_targets = self.gae(traj, reward, batch_size=batch_size, rew_rms=self.rew_rms)
 
             data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z'])
@@ -145,7 +151,9 @@ class train_rpg(TrainerBase):
                     initial_latent = 'zero',
 
                     obs_norm=False,
+                    rnd = None,
                     hooks = None,
+                    batch_size=2000,
                 ):
         super().__init__()
 
@@ -172,8 +180,10 @@ class train_rpg(TrainerBase):
         actor_a = Policy(obs_space, hidden_space, action_space, cfg=actor).to(device)
         actor_z = Policy(obs_space, hidden_space, hidden_space, backbone=actor.backbone, head=hidden_head, K=K).to(device)
 
-        critic_a = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
-        critic_z = Critic(obs_space, hidden_space, env.reward_dim, cfg=critic).to(device)
+        reward_dim = env.reward_dim + (rnd is not None)
+
+        critic_a = Critic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
+        critic_z = Critic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
 
         pi_a = PPOAgent(actor_a, critic_a, cfg=ppo)
         pi_z = PPOAgent(actor_z, critic_z, cfg=ppo)
@@ -185,7 +195,11 @@ class train_rpg(TrainerBase):
 
         hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
 
-        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, rew_rms=rew_rms, obs_rms=obs_rms, hooks=build_hooks(hooks))
+        if rnd is not None:
+            rnd = RNDOptim(obs_space, cfg=rnd).to(device)
+
+        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, batch_size=batch_size,
+                        rew_rms=rew_rms, obs_rms=obs_rms, rnd=rnd, hooks=build_hooks(hooks))
 
         while True:
             self.ppo.run_rpg(env, steps)

@@ -115,7 +115,7 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200) -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False) -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
@@ -158,7 +158,10 @@ class LargeMaze(Configurable):
         return self.pos.clone(), torch.zeros(self.batch_size, device=self.device) + self.get_reward(), False, {}
 
     def get_reward(self):
-        return 0
+        if self._cfg.reward:
+            return self.pos.sum(axis=-1)
+        else:
+            return 0
         
     def reset(self, batch_size=None):
         if batch_size is not None:
@@ -189,7 +192,7 @@ class LargeMaze(Configurable):
         return img
 
     def  _render_traj_rgb(self, obs, z=None, **kwargs):
-        assert z is None
+        # assert z is None
         from tools.utils import plt_save_fig_array
         import matplotlib.pyplot as plt
 

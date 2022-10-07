@@ -121,11 +121,11 @@ class TorchEnv(VecEnv):
 
         elif env_name == 'Maze':
             from envs.maze import LargeMaze
-            self.goal_env = LargeMaze()
+            self.goal_env = LargeMaze(**kwargs)
 
         elif env_name == 'SmallMaze':
             from envs.maze import SmallMaze
-            self.goal_env = SmallMaze()
+            self.goal_env = SmallMaze(**kwargs)
 
         else:
             raise NotImplementedError
