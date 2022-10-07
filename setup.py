@@ -38,7 +38,7 @@ install_requires = [
 
 
 setup(
-    name='concept',
+    name='rpg',
     version='0.0.1',
     install_requires=install_requires,
     py_modules=['rl', 'tools', 'solver']
