@@ -248,6 +248,44 @@ class SmallMaze(LargeMaze):
         super().__init__(cfg)
         self.reset()
 
+
+
+
+from rpg.common_hooks import as_hook, HookBase
+                    
+
+@as_hook
+class plot_maze_env_rnd(HookBase):
+    def __init__(self, n_epoch=10, resolution=64) -> None:
+        super().__init__()
+        self.n_epoch = n_epoch
+        self.resolution = resolution
+
+    # def render_rnd(self):
+
+    def init(self, trainer):
+        # this hook will hack the env to render the rnd value ..
+        #return super().init(trainer)
+        trainer.env.render_traj = self.render_rnd
+
+
+    def on_epoch(self, trainer, **locals_):
+        import numpy as np
+
+        if trainer.epoch_id % self.n_epoch == 0:
+            env: LargeMaze = locals_['env']
+            rnd = trainer.rnd
+            # images = []
+            # for i in range(self.resolution):
+            #    coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
+            #    out = rnd(coords, update_norm=False)
+            #    images.append(out.detach().cpu().numpy())
+
+            x, y = np.meshgrid(np.arange(self.resolution), np.arange(self.resolution))
+            obs = np.stack([x, y], axis=2).reshape(-1, 2) / self.resolution
+
+        return np.array(images)
+
     
 if __name__ == '__main__':
     env = SmallMaze()

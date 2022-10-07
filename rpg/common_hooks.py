@@ -180,25 +180,3 @@ class monitor_action_std(HookBase):
 
             if self.std_decay is not None:
                 self.head.std_scale = self.scheduler.step(epoch=trainer.total)
-
-
-                    
-@as_hook
-class plot_maze_env_rnd(HookBase):
-    def __init__(self, n_epoch) -> None:
-        super().__init__()
-
-
-    def on_epoch(self, trainer, **locals_):
-        import numpy as np
-
-        if trainer.epoch_id % self.n_epoch == 0:
-            env = locals_['env']
-            rnd = trainer.rnd
-            images = []
-            for i in range(32):
-                coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
-                out = rnd(coords, update_norm=False)
-                images.append(out.detach().cpu().numpy())
-
-        return np.array(images)

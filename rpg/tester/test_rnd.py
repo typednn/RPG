@@ -21,7 +21,8 @@ train_ppo.parse(
     hooks=dict(
         #save_model=dict(n_epoch=10),
         log_info=dict(n_epoch=1),
-        save_traj=dict(n_epoch=1, save_gif_epochs=100),
+        # save_traj=dict(n_epoch=1, save_gif_epochs=100),
+        plot_maze_env_rnd=dict(n_epoch=1),
     ),
     rnd=dict(learning_epoch=2), # no rnd
     path='tmp/rnd',
