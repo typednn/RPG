@@ -57,5 +57,5 @@ class MultiStepScheduler(Scheduler):
         value = self.init_value
         for i in self.milestones:
             if cur_epoch >= i:
-                value *= self.gamma
+                value = value * self.gamma
         return value

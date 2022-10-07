@@ -397,14 +397,14 @@ def seed(s, env=None):
     random.seed(s)
 
 
-def plt_save_fig_array(fig=None):
+def plt_save_fig_array(fig=None, **kwargs):
     import matplotlib.pyplot as plt
     import io
     if fig is None:
         fig = plt.gcf()
 
     io_buf = io.BytesIO()
-    fig.savefig(io_buf, format='raw')#, dpi=DPI)
+    out = fig.savefig(io_buf, format='raw', **kwargs)#, dpi=DPI) , bbox_inches='tight'
     io_buf.seek(0)
     img_arr = np.frombuffer(io_buf.getvalue(), dtype=np.uint8)
     img_arr = np.reshape(img_arr, newshape=(int(fig.bbox.bounds[3]), int(fig.bbox.bounds[2]), -1))

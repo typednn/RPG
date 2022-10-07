@@ -168,6 +168,8 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
         mask_truncated = (1 - truncated.float())[..., None]
         if return_sum_weight_value:
             sum_weights = []
+            last_values = []
+            total = []
 
         for i in reversed(range(len(reward))):
             sum_lambda = sum_lambda * mask_truncated[i]
@@ -188,6 +190,8 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
             if return_sum_weight_value:
                 sum_weights.append(sum_lambda)
+                last_values.append(last_value)
+                total.append(sumA)
 
             expected_value = (sumA + last_value  * (1./ (1.-lmbda) - sum_lambda)) * (1-lmbda)
             # gg = sumA / sum_lambda 
@@ -195,7 +199,10 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
         if return_sum_weight_value:
             sum_weights = torch.stack(sum_weights[::-1])
-            return torch.stack(gae[::-1]) + (value if value is not None else 0), sum_weights
+            last_values = torch.stack(last_values[::-1])
+            total = torch.stack(total[::-1])
+            return total, sum_weights, last_values
+
         gae = gae[::-1]
 
     return torch.stack(gae).float() #* (1-lmbda) 
@@ -253,12 +260,26 @@ class HierarchicalGAE(Configurable):
         truncated = truncated.float()
 
         next_vpred = (next_vpredz + next_vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
-        vtarg, sum_weights = compute_gae_by_hand(reward, None, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
+        total, sum_weights, last_values = compute_gae_by_hand(reward, None, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
 
-        # vtarg2 = compute_expected_value_by_hand(reward, done, truncated, next_vpredz, next_vpreda, self._cfg.gamma, self._cfg.lmbda)
-        # print(vtarg[-1])
-        # print(vtarg2[-1])
-        # exit(0)
+        def weighted_sum(values, last, weights, total_weight):
+            total = 0
+            weight = 0
+            for a, b in zip(values, weights):
+                total = total + a
+                weight = weight + b
+            total = total + (total_weight - weight) * last
+            return total/total_weight
+        vtarg = weighted_sum((total,), last_values, (sum_weights,), 1./ (1.-self._cfg.lmbda)).float()
+
+        # vv = compute_gae_by_hand(reward, None, next_vpred, done, truncated,
+        #                          gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact').float()
+                                
+        # vv3 = (total + last_values  * (1./ (1.-self._cfg.lmbda) - sum_weights)) * (1-self._cfg.lmbda)
+        # print(vtarg[:10, 0, 0], vv[:10, 0, 0], vv3[:10, 0,0])
+        # assert torch.allclose(vtarg, vv)
+        vtarg_z = weighted_sum((vpreda, total * lmbda_sqrt), last_values, (1., sum_weights * lmbda_sqrt), 1./ (1.-lmbda_sqrt))
+
 
         if rew_rms is not None:
             # https://github.com/haosulab/pyrl/blob/926d3d07d45f3bf014e7c6ea64e1bba1d4f35f03/pyrl/utils/torch/module_utils.py#L192
@@ -267,7 +288,6 @@ class HierarchicalGAE(Configurable):
         else:
             scale = 1.
 
-        vtarg_z = (vpreda + lmbda_sqrt * vtarg * sum_weights)/(1 + lmbda_sqrt * sum_weights)
         # vtarg_z = vtarg
 
         adv_a = (vtarg - vpreda) / scale

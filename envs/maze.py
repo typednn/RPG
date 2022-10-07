@@ -212,6 +212,8 @@ class LargeMaze(Configurable):
 
         plt.xlim([0, self.RESOLUTION])
         plt.ylim([0, self.RESOLUTION])
+        plt.axis('off')
+        plt.tight_layout(rect=[0.,0.,1., 1.])
         img2 = plt_save_fig_array()[:, :, :3]
         return img2
 
@@ -256,35 +258,46 @@ from rpg.common_hooks import as_hook, HookBase
 
 @as_hook
 class plot_maze_env_rnd(HookBase):
-    def __init__(self, n_epoch=10, resolution=64) -> None:
+    def __init__(self, resolution=64) -> None:
         super().__init__()
-        self.n_epoch = n_epoch
         self.resolution = resolution
 
-    # def render_rnd(self):
-
     def init(self, trainer):
-        # this hook will hack the env to render the rnd value ..
-        #return super().init(trainer)
-        trainer.env.render_traj = self.render_rnd
+        # patch
+        self.trainer = trainer
+        self.env = trainer.env.goal_env
+        self.old_render = trainer.env.goal_env._render_traj_rgb
+        trainer.env.goal_env._render_traj_rgb = self._render_traj_rgb
+
+    def  _render_traj_rgb(self, obs, z=None, **kwargs):
+        import matplotlib.pyplot as plt
+        from tools.utils import plt_save_fig_array
+        plt.clf()
+        plt.imshow(self.render_rnd())
+        plt.tight_layout(rect=[0., 0., 1., 1.])
+        plt.axis('off')
+        img2 = plt_save_fig_array()[:, :, :3]
+        img = self.old_render(obs, z)
+        return np.concatenate((img, img2), axis=1)
 
 
-    def on_epoch(self, trainer, **locals_):
+    def render_rnd(self):
         import numpy as np
+        from rpg.rnd import RNDOptim
 
-        if trainer.epoch_id % self.n_epoch == 0:
-            env: LargeMaze = locals_['env']
-            rnd = trainer.rnd
-            # images = []
-            # for i in range(self.resolution):
-            #    coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
-            #    out = rnd(coords, update_norm=False)
-            #    images.append(out.detach().cpu().numpy())
+        env: LargeMaze = self.env
+        rnd: RNDOptim = self.trainer.rnd
 
-            x, y = np.meshgrid(np.arange(self.resolution), np.arange(self.resolution))
-            obs = np.stack([x, y], axis=2).reshape(-1, 2) / self.resolution
+        x, y = np.meshgrid(np.arange(self.resolution), np.arange(self.resolution))
+        obs = np.stack([x, y], axis=2).reshape(-1, 2) / self.resolution
+        obs = obs  * env.SIZE * 2 - env.SIZE
 
-        return np.array(images)
+        out = rnd.compute_loss(obs, None, None, reduce=False)
+        out = out - out.min()
+        out = out / (out.max() + 1e-9)
+
+        images = out.reshape(self.resolution, self.resolution).detach().cpu().numpy()
+        return images
 
     
 if __name__ == '__main__':
