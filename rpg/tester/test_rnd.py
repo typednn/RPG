@@ -25,5 +25,5 @@ train_ppo.parse(
         save_traj=dict(n_epoch=1, save_gif_epochs=10),
     ),
     rnd=dict(learning_epoch=2), # no rnd
-    path='tmp/rnd',
+    path='tmp/rnd/ppo',
 ) # use tanh

@@ -84,7 +84,7 @@ class PPO(RLAlgo):
             reward = traj.get_tensor('r'); assert reward.dim() == 3, "rewards must be (nstep, nenv, reward_dim)"
 
             if self.rnd is not None:
-                rnd_reward = self.rnd(traj, batch_size=self.batch_size)
+                rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
                 # raise NotImplementedError
 

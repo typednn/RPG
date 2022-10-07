@@ -1,5 +1,6 @@
 # we now provide a modularized implementation of the RL training  
 import torch
+from tools.utils import logger
 from typing import List
 from .env_base import VecEnv
 from .rnd import RNDOptim
@@ -113,7 +114,7 @@ class RPG(RLAlgo):
             reward = self.relbo(traj, batch_size=batch_size)
 
             if self.rnd is not None:
-                rnd_reward = self.rnd(traj, batch_size=self.batch_size)
+                rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
 
 
@@ -126,6 +127,9 @@ class RPG(RLAlgo):
         self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'], logger_scope='pi_a')
         self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'], logger_scope='pi_z')
         self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
+
+        if self.rnd is not None:
+            self.rnd.learn(data, batch_size=self.batch_size, logger_scope='rnd')
 
         self.call_hooks(locals())
 

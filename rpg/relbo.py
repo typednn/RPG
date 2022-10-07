@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from tools.utils import logger
 from tools.utils import batch_input
 from nn.distributions import CategoricalAction, MixtureAction, NormalAction
 from nn.space import  Box, Discrete, MixtureSpace
@@ -57,6 +58,14 @@ class Relbo(Configurable):
         prior = self.prior_a.log_prob(traj.get_tensor('a', device))
         mutual_info = traj.predict_value(['obs', 'a', 'z', 'timestep'], self.info_net, batch_size = batch_size)
         #TODO: test by varying batch size
+
+        logger.logkvs_mean({
+            'relbo/r': r.mean().item(),
+            'relbo/ent_z': ent_z.mean().item(),
+            'relbo/ent_a': ent_a.mean().item(),
+            'relbo/prior': prior.mean().item(),
+            'relbo/mutual_info': mutual_info.mean().item(),
+        })
 
         elbo = r * self._cfg.reward + mutual_info * self._cfg.mutual_info + \
             ent_z * self._cfg.ent_z + ent_a * self._cfg.ent_a + prior * self._cfg.prior

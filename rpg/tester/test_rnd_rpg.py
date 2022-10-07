@@ -22,7 +22,7 @@ train_rpg.parse(
     actor=dict(
         head=dict(linear=False, std_scale=0.6, std_mode='statewise')
     ),
-    relbo=dict(prior=0.01, mutual_info=0.05, ent_a=0.02, ent_z=0.1),
+    relbo=dict(prior=0.01, mutual_info=1., ent_a=1., ent_z=1.),
 
     gae=dict(lmbda=0.97),
     batch_size=2000,

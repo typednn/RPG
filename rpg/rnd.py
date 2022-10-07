@@ -82,7 +82,7 @@ class RNDOptim(OptimModule):
     KEYS = ['obs']
     name = 'rnd'
 
-    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step'):
+    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=False):
         from .rnd import RNDNet
         inp_dim = obs_space.shape[0] # TODO support other observation ..
 
@@ -94,15 +94,25 @@ class RNDOptim(OptimModule):
 
         network = RNDNet(self.inp_dim)
 
+        self.normalizer = RunningMeanStd(last_dim=False) if normalizer else None
+
         super().__init__(network, cfg)
         self.target = RNDNet(network.inp_dim, cfg=network._cfg)
         for param in self.target.parameters():
             param.requires_grad = False
 
 
-    def __call__(self, traj: Trajectory, batch_size):
-        return traj.predict_value(('obs', 'z', 'timestep'),
+    def __call__(self, traj: Trajectory, batch_size, update_normalizer=True):
+        out = traj.predict_value(('obs', 'z', 'timestep'),
                                   lambda x, y, z: self.compute_loss(x, y, z, reduce=False), batch_size=batch_size) 
+
+        if self.normalizer is not None:
+            if update_normalizer:
+                self.normalizer.update(out)
+            out = self.normalizer.normalize(out)
+
+        logger.logkvs_mean({'rnd/reward': out.mean().item()})
+        return out
 
 
     def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):

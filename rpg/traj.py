@@ -53,7 +53,7 @@ class Trajectory:
             vpred[ind[:, 0], ind[:, 1]] = value
         return vpred
 
-    def get_tensor(self, key, device='cuda:0'):
+    def get_tensor(self, key, device='cuda:0') -> torch.Tensor:
         from tools.utils import totensor, dstack
         return totensor([i[key] for i in self.traj], device=device)
 
