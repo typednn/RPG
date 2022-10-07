@@ -11,7 +11,7 @@ train_ppo.parse(
     env, steps=40, obs_norm=False, reward_norm=True,
 
     actor=dict(
-        head=dict(linear=False, std_scale=0.6, std_mode='fix_learnable')
+        head=dict(linear=False, std_scale=0.6, std_mode='statewise')
     ),
 
     gae=dict(correct_gae=True, ignore_done=False, lmbda=0.97),
@@ -21,8 +21,8 @@ train_ppo.parse(
     hooks=dict(
         #save_model=dict(n_epoch=10),
         log_info=dict(n_epoch=1),
-        save_traj=dict(n_epoch=1),
+        save_traj=dict(n_epoch=1, save_gif_epochs=100),
     ),
-    # rnd=dict(learning_epoch=0), # no rnd
+    rnd=dict(learning_epoch=2), # no rnd
     path='tmp/rnd',
 ) # use tanh

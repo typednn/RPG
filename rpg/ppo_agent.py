@@ -50,8 +50,12 @@ class PolicyOptim(Optim):
 
         if self.clip_param > 0:
             pg_losses = -adv * ratio
-            pg_losses2 = -adv * \
-                th.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+
+            clipped_ratio = th.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+            pg_losses2 = -adv * clipped_ratio
+
+            how_many_clipped = (clipped_ratio != ratio).float().mean()
+                
             pg_losses = th.max(pg_losses, pg_losses2)
         else:
             raise NotImplementedError
@@ -79,7 +83,8 @@ class PolicyOptim(Optim):
             'negent': negent.item(),
             'pg': pg_losses.item(),
             'approx_kl': approx_kl_div,
-            'loss': loss.item()
+            'loss': loss.item(),
+            'clip_frac': how_many_clipped.item(),
         }
         if self._cfg.max_kl:
             from tools.dist_utils import get_world_size

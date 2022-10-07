@@ -61,15 +61,7 @@ class GAE(Configurable):
             # adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
             # print(adv[:10, 0, 0] - adv2[:10, 0, 0])
         else:
-            #TODO: test the corrected GAE later.
-            #print(adv[-1], 'done', mask[-1], done[-1], 'truncated', truncated[-1], 'reward', reward[-1], 'v', next_vpred[-1], 'vpred', vpred[-1])
-            #print(adv[-1])
-            # adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')
-            #adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')
-            adv_exact = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
-            #print(adv[:10, 0, 0])
-            #print(adv_exact[:10, 0, 0])
-            adv = adv_exact
+            adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
 
 
         if debug:

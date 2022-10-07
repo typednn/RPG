@@ -34,6 +34,7 @@ class LargeMaze(Configurable):
     """Continuous maze environment."""
     SIZE = 12
     ACTION_SCALE=0.3
+    RESOLUTION = 512
 
     walls = torch.tensor(np.array(
         [
@@ -149,14 +150,15 @@ class LargeMaze(Configurable):
                 t = torch.where(new_collide, torch.min(t, new_t), t)
                 collide = torch.logical_or(collide, new_collide)
 
-        intersection = self.pos + (t[:, None] - 1e-5) * (new_pos - self.pos)
+        intersection = self.pos + torch.relu(t[:, None] - 1e-5) * (new_pos - self.pos)
         new_pos = torch.where(collide[:, None], intersection, new_pos)
 
         self.pos = new_pos
 
-        reward = self.pos.sum(axis=-1)
-        # reward = 0
-        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device) + reward, False, {}
+        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device) + self.get_reward(), False, {}
+
+    def get_reward(self):
+        return 0
         
     def reset(self, batch_size=None):
         if batch_size is not None:
@@ -167,7 +169,7 @@ class LargeMaze(Configurable):
 
     def render_wall(self):
         import cv2
-        resolution = 512
+        resolution = self.RESOLUTION
         self.screen = np.zeros((resolution, resolution, 3), dtype=np.uint8)
         for wall in self.walls:
             left = wall[0].detach().cpu().numpy()
@@ -195,7 +197,7 @@ class LargeMaze(Configurable):
         img = self.screen.copy()/255.
         #obs = ((obs  + self.SIZE)/ (self.SIZE * 2)).detach().cpu().numpy()
         obs = obs / self.SIZE / 2 + 0.5
-        obs = obs.detach().cpu().numpy() * 256
+        obs = obs.detach().cpu().numpy() * self.RESOLUTION
 
 
         from solver.draw_utils import plot_colored_embedding
@@ -208,8 +210,8 @@ class LargeMaze(Configurable):
             obs = obs.reshape(-1, 2)
             plt.scatter(obs[:, 0], obs[:, 1], s=3)
 
-        plt.xlim([0, 256])
-        plt.ylim([0, 256])
+        plt.xlim([0, self.RESOLUTION])
+        plt.ylim([0, self.RESOLUTION])
         img2 = plt_save_fig_array()[:, :, :3]
         return img2
 
@@ -223,7 +225,32 @@ class SmallMaze(LargeMaze):
             [[-5, 5], [5., 5.0]],
             [[5, 5], [5., -5.0]],
             [[5, -5], [-5., -5.0]],
+
+            [[-1., 1.], [1., 1.]],
+            [[-1., 1.], [-1., 5.]],
+            [[1., 1.], [1., 5.]],
+
+            [[-1., -1.], [1., -1.]],
+            [[-1., -1.], [-1., -5.]],
+            [[1., -1.], [1., -5.]],
+
+            [[-1.5, -1.], [-1.5, 1.]],
+            [[-1.5, -1.], [-5., -1.]],
+            [[-1.5, 1.], [-5., 1.]],
+
+            [[1.5, -1.], [1.5, 1.]],
+            [[1.5, -1.], [5., -1.]],
+            [[1.5, 1.], [5., 1.]],
+
         ]))
 
-    def __init__(self, cfg=None, low_steps=10) -> None:
+    def __init__(self, cfg=None, low_steps=20) -> None:
         super().__init__(cfg)
+        self.reset()
+
+    
+if __name__ == '__main__':
+    env = SmallMaze()
+    import matplotlib.pyplot as plt
+    plt.imshow(env.render('rgb_array'))
+    plt.savefig('xx.png')

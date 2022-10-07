@@ -155,7 +155,50 @@ class save_traj(HookBase):
                     logger.animate(self.imgs, self.traj_name + '.gif')
 
                     
+
+
+@as_hook
+class monitor_action_std(HookBase):
+    def __init__(self, n_epoch=1, std_decay=None) -> None:
+        super().__init__()
+        self.n_epoch = n_epoch
+        self.std_decay = std_decay
+
+    def init(self, trainer):
+        self.head = trainer.pi.actor_optim.actor.head
+        assert self.head.std_mode.startswith('fix')
+
+        if self.std_decay is not None:
+            from tools.utils import scheduler
+            self.scheduler = scheduler.Scheduler.build(
+                cfg=self.std_decay, init_value=self.head.std_scale)
+
+    def on_epoch(self, trainer, **locals_):
+        if trainer.epoch_id % self.n_epoch == 0:
+            import torch
+            print('action_std', (torch.exp(self.head.log_std) * self.head.std_scale).detach().cpu().numpy().reshape(-1))
+
+            if self.std_decay is not None:
+                self.head.std_scale = self.scheduler.step(epoch=trainer.total)
+
+
                     
 @as_hook
 class plot_maze_env_rnd(HookBase):
-    pass
+    def __init__(self, n_epoch) -> None:
+        super().__init__()
+
+
+    def on_epoch(self, trainer, **locals_):
+        import numpy as np
+
+        if trainer.epoch_id % self.n_epoch == 0:
+            env = locals_['env']
+            rnd = trainer.rnd
+            images = []
+            for i in range(32):
+                coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
+                out = rnd(coords, update_norm=False)
+                images.append(out.detach().cpu().numpy())
+
+        return np.array(images)
