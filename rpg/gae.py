@@ -58,6 +58,8 @@ class GAE(Configurable):
                 m = mask[t]
                 delta = reward[t] + self._cfg.gamma * next_vpred[t] * (1-done[t].float())[..., None] - vpred[t] #TODO: modify it to truncated later.
                 adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
+            # adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+            # print(adv[:10, 0, 0] - adv2[:10, 0, 0])
         else:
             #TODO: test the corrected GAE later.
             #print(adv[-1], 'done', mask[-1], done[-1], 'truncated', truncated[-1], 'reward', reward[-1], 'v', next_vpred[-1], 'vpred', vpred[-1])
@@ -195,9 +197,9 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
             if return_sum_weight_value:
                 sum_weights.append(sum_lambda)
 
-            gg = (sumA + last_value  * (1./ (1.-lmbda) - sum_lambda)) * (1-lmbda)
+            expected_value = (sumA + last_value  * (1./ (1.-lmbda) - sum_lambda)) * (1-lmbda)
             # gg = sumA / sum_lambda 
-            gae.append(gg - (value[i] if value is not None else 0))
+            gae.append(expected_value - (value[i] if value is not None else 0))
 
         if return_sum_weight_value:
             sum_weights = torch.stack(sum_weights[::-1])

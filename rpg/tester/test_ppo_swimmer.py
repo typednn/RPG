@@ -8,4 +8,4 @@ N = 10
 env = GymVecEnv('Swimmer-v2', N, ignore_truncated_done=False)
 
 # swimmer must clip the done in the end.
-train_ppo.parse(env, steps=2000, obs_norm=True, actor=dict(head=dict(linear=False, std_scale=0.6, std_mode='fix_no_grad')), gae=dict(correct_gae=True, gamma=0.999), batch_size=2000, ppo=dict(learning_epoch=10)) # use tanh
+train_ppo.parse(env, steps=2000, obs_norm=True, actor=dict(head=dict(linear=False, std_scale=0.6, std_mode='fix_learnable')), gae=dict(correct_gae=True, gamma=0.999), batch_size=2000, ppo=dict(learning_epoch=10, actor_optim=dict(entropy_coef=0.001))) # use tanh
