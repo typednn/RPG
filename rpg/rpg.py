@@ -148,6 +148,7 @@ class train_rpg(TrainerBase):
                     hidden_head=None,
                     critic=None,
                     ppo = PPOAgent.dc, #TODO: add adamW
+                    ppo_higher=None,
                     gae = HierarchicalGAE.dc,
                     relbo = Relbo.dc,
                     info_net=InfoNet.to_build(TYPE='InfoNet'),
@@ -190,7 +191,9 @@ class train_rpg(TrainerBase):
         critic_z = Critic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
 
         pi_a = PPOAgent(actor_a, critic_a, cfg=ppo)
-        pi_z = PPOAgent(actor_z, critic_z, cfg=ppo)
+        if ppo_higher is None:
+            ppo_higher = ppo
+        pi_z = PPOAgent(actor_z, critic_z, cfg=ppo_higher)
 
 
         info_net = InfoNet.build(obs_space, action_space, hidden_space, cfg=info_net)

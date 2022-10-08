@@ -9,7 +9,7 @@ from nn.space import Discrete
 N = 256
 env = TorchEnv('SmallMaze', N, reward=False)
 
-hidden_space  = Discrete(6)
+hidden_space  = Discrete(4)
 
 train_rpg.parse(
     env, 
@@ -20,13 +20,14 @@ train_rpg.parse(
     hidden_head=dict(epsilon=0.),
 
     actor=dict(
-        head=dict(linear=False, std_scale=0.6, std_mode='statewise')
+        head=dict(linear=False, std_scale=0.2, std_mode='fix_no_grad')
     ),
-    relbo=dict(prior=0.01, mutual_info=1., ent_a=1., ent_z=1.),
+    relbo=dict(prior=0.0, mutual_info=0.01, ent_a=0.0, ent_z=0.),
 
     gae=dict(lmbda=0.97),
     batch_size=2000,
     ppo=dict(learning_epoch=5),
+    ppo_higher=dict(learning_epoch=0),
 
     hooks=dict(
         #save_model=dict(n_epoch=10),

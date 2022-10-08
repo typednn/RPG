@@ -11,7 +11,7 @@ train_ppo.parse(
     env, steps=40, obs_norm=False, reward_norm=True,
 
     actor=dict(
-        head=dict(linear=False, std_scale=0.6, std_mode='statewise')
+        head=dict(linear=False, std_scale=0.2, std_mode='fix_no_grad')
     ),
 
     gae=dict(correct_gae=True, ignore_done=False, lmbda=0.97),
