@@ -24,28 +24,6 @@ class GAE(Configurable):
         next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
-        if debug:
-            # sanity check below
-            # compute GAE ..
-
-            assert torch.allclose(
-                traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale,
-                traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
-            )
-            assert torch.allclose(
-                traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale,
-                traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=traj.nenv * traj.timesteps) * scale,
-            )
-
-
-            next_vpred_2 = torch.zeros_like(next_vpred)
-            ind = traj.get_truncated_index()
-            next_vpred_2[:-1] = vpred[1:]
-            next_vpred_2 = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size, index=ind, vpred=next_vpred_2) * scale
-            assert torch.allclose(next_vpred, next_vpred_2)
-
-            assert done.sum() == 0
-
         #done = done.float()
         if not self._cfg.correct_gae:
             adv = torch.zeros_like(next_vpred)
@@ -58,19 +36,8 @@ class GAE(Configurable):
                 m = mask[t]
                 delta = reward[t] + self._cfg.gamma * next_vpred[t] * (1-done[t].float())[..., None] - vpred[t] #TODO: modify it to truncated later.
                 adv[t] = lastgaelam = delta + self._cfg.gamma * self._cfg.lmbda * lastgaelam * m
-            # adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
-            # print(adv[:10, 0, 0] - adv2[:10, 0, 0])
         else:
             adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
-
-
-        if debug:
-            adv2 = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='approx')
-            assert adv.shape == adv2.shape
-            assert torch.allclose(adv, adv2), f"{adv} {adv2}"
-            print(adv2[0])
-            print(compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='slow')[0])
-            print(compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')[0])
 
         vtarg = vpred + adv
 
@@ -91,6 +58,81 @@ class GAE(Configurable):
         return dict(
             adv=adv,
             vtarg = vtarg,
+        )
+
+
+class HierarchicalGAE(Configurable):
+    # @ litian, write the unit test code for the target value computation..
+    def __init__(self, pi_a, pi_z, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True):
+        super().__init__()
+        self.pi_a = pi_a
+        self.pi_z = pi_z
+
+
+    @torch.no_grad()
+    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms):
+        done, truncated = traj.get_truncated_done()
+
+        scale = rew_rms.std if rew_rms is not None else 1.
+        vpredz = traj.predict_value(
+            ('obs', 'old_z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
+        vpreda = traj.predict_value(
+            ('obs', 'z', 'timestep'), self.pi_a.value, batch_size=batch_size) * scale
+        next_vpredz = traj.predict_value(
+            ('next_obs', 'z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
+
+        next_vpreda = torch.zeros_like(next_vpredz)
+        ind = traj.get_truncated_index(include_done=True) # because for the done, we still do not have next z to get the next_a prediction.
+        next_vpreda[:-1] = vpreda[1:]
+        next_vpreda[ind[:, 0], ind[:, 1]] = next_vpredz[ind[:, 0], ind[:, 1]] 
+        assert len(ind) == truncated.sum()
+
+        # compute GAE ..
+        lmbda_sqrt = self._cfg.lmbda**0.5
+        done = done.float()
+        truncated = truncated.float()
+
+        next_vpred = (next_vpredz + next_vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
+        total, sum_weights, last_values = compute_gae_by_hand(reward, None, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
+
+        def weighted_sum(values, last, weights, total_weight):
+            total = 0
+            weight = 0
+            for a, b in zip(values, weights):
+                total = total + a
+                weight = weight + b
+            total = total + (total_weight - weight) * last
+            return total/total_weight
+
+        vtarg = weighted_sum((total,), last_values, (sum_weights,), 1./ (1.-self._cfg.lmbda)).float()
+        vtarg_z = weighted_sum((vpreda, total * lmbda_sqrt), last_values, (1., sum_weights * lmbda_sqrt), 1./ (1.-self._cfg.lmbda))
+
+
+        if rew_rms is not None:
+            # https://github.com/haosulab/pyrl/blob/926d3d07d45f3bf014e7c6ea64e1bba1d4f35f03/pyrl/utils/torch/module_utils.py#L192
+            rew_rms.update(vtarg.sum(axis=-1).reshape(-1)) # normalize it based on the final result.
+            scale = rew_rms.std
+        else:
+            scale = 1.
+
+        adv_a = (vtarg - vpreda) / scale
+        vtarg_a = vtarg / scale
+        adv_z = (vtarg_z - vpredz) / scale
+        vtarg_z = vtarg_z / scale
+
+        if self._cfg.adv_norm:
+            adv_a = adv_a - adv_a.mean()
+            adv_a = adv_a/(adv_a.std() + 1e-9)
+
+            adv_z = adv_z - adv_z.mean()
+            adv_z = adv_z/(adv_z.std() + 1e-9)
+
+
+        return dict(
+            adv_a=adv_a,
+            adv_z=adv_z,
+            vtarg_a=vtarg_a,
+            vtarg_z=vtarg_z,
         )
 
 
@@ -207,108 +249,6 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
 
     return torch.stack(gae).float() #* (1-lmbda) 
 
-
-class HierarchicalGAE(Configurable):
-    # @ litian, write the unit test code for the target value computation..
-    def __init__(self, pi_a, pi_z, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True):
-        super().__init__()
-        self.pi_a = pi_a
-        self.pi_z = pi_z
-
-
-    @torch.no_grad()
-    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms):
-        done, truncated = traj.get_truncated_done()
-
-        scale = rew_rms.std if rew_rms is not None else 1.
-        vpredz = traj.predict_value(
-            ('obs', 'old_z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
-        vpreda = traj.predict_value(
-            ('obs', 'z', 'timestep'), self.pi_a.value, batch_size=batch_size) * scale
-        next_vpredz = traj.predict_value(
-            ('next_obs', 'z', 'timestep'), self.pi_z.value, batch_size=batch_size) * scale
-
-        
-
-        # assert torch.allclose(
-        #     vpredz,
-        #     traj.predict_value(('obs', 'old_z', 'timestep'), self.pi_z.value, batch_size=traj.nenv * traj.timesteps) * scale,
-        # )
-        # assert torch.allclose(
-        #     vpreda,
-        #     traj.predict_value(('obs', 'z', 'timestep'), self.pi_a.value, batch_size=batch_size) * scale
-        # )
-
-
-        next_vpreda = torch.zeros_like(next_vpredz)
-        ind = traj.get_truncated_index(include_done=True) # because for the done, we still do not have next z to get the next_a prediction.
-        next_vpreda[:-1] = vpreda[1:]
-        next_vpreda[ind[:, 0], ind[:, 1]] = next_vpredz[ind[:, 0], ind[:, 1]] 
-        assert len(ind) == truncated.sum()
-
-        # # test if the next_vpreda is correct.
-        # for idx in range(traj.timesteps):
-        #     traj.traj[idx]['newz'] = traj.traj[idx + 1]['z'] if idx  < traj.timesteps - 1 else traj.traj[idx]['z']
-        # v = traj.predict_value(
-        #     ('next_obs', 'newz', 'timestep'), self.pi_a.value, batch_size=traj.nenv * traj.timesteps) * scale
-        # v[ind[:, 0], ind[:, 1]] = next_vpreda[ind[:, 0], ind[:, 1]]
-        # assert torch.allclose(next_vpreda, v)
-
-        # compute GAE ..
-        lmbda_sqrt = self._cfg.lmbda**0.5
-        done = done.float()
-        truncated = truncated.float()
-
-        next_vpred = (next_vpredz + next_vpreda * lmbda_sqrt)/(1 + lmbda_sqrt)
-        total, sum_weights, last_values = compute_gae_by_hand(reward, None, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact', return_sum_weight_value=True)
-
-        def weighted_sum(values, last, weights, total_weight):
-            total = 0
-            weight = 0
-            for a, b in zip(values, weights):
-                total = total + a
-                weight = weight + b
-            total = total + (total_weight - weight) * last
-            return total/total_weight
-        vtarg = weighted_sum((total,), last_values, (sum_weights,), 1./ (1.-self._cfg.lmbda)).float()
-
-        # vv = compute_gae_by_hand(reward, None, next_vpred, done, truncated,
-        #                          gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact').float()
-                                
-        # vv3 = (total + last_values  * (1./ (1.-self._cfg.lmbda) - sum_weights)) * (1-self._cfg.lmbda)
-        # print(vtarg[:10, 0, 0], vv[:10, 0, 0], vv3[:10, 0,0])
-        # assert torch.allclose(vtarg, vv)
-        vtarg_z = weighted_sum((vpreda, total * lmbda_sqrt), last_values, (1., sum_weights * lmbda_sqrt), 1./ (1.-lmbda_sqrt))
-
-
-        if rew_rms is not None:
-            # https://github.com/haosulab/pyrl/blob/926d3d07d45f3bf014e7c6ea64e1bba1d4f35f03/pyrl/utils/torch/module_utils.py#L192
-            rew_rms.update(vtarg.sum(axis=-1).reshape(-1)) # normalize it based on the final result.
-            scale = rew_rms.std
-        else:
-            scale = 1.
-
-        # vtarg_z = vtarg
-
-        adv_a = (vtarg - vpreda) / scale
-        vtarg_a = vtarg / scale
-        adv_z = (vtarg_z - vpredz) / scale
-        vtarg_z = vtarg_z / scale
-
-        if self._cfg.adv_norm:
-            adv_a = adv_a - adv_a.mean()
-            adv_a = adv_a/(adv_a.std() + 1e-9)
-
-            adv_z = adv_z - adv_z.mean()
-            adv_z = adv_z/(adv_z.std() + 1e-9)
-
-
-        return dict(
-            adv_a=adv_a,
-            adv_z=adv_z,
-            vtarg_a=vtarg_a,
-            vtarg_z=vtarg_z,
-        )
 
 def compute_expected_value_by_hand(reward, done, truncated, next_z, next_a, gamma, lmbda):
     import tqdm

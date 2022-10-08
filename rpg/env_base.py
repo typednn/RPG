@@ -119,7 +119,7 @@ class TorchEnv(VecEnv):
             import solver.envs.softbody.triplemove
             self.goal_env: GoalEnv = GoalEnv.build(TYPE=env_name, **kwargs)
 
-        elif env_name == 'Maze':
+        elif env_name == 'LargeMaze':
             from envs.maze import LargeMaze
             self.goal_env = LargeMaze(**kwargs)
 

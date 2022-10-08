@@ -30,6 +30,9 @@ def get_intersect(A, B, C, D):
     #yi = A[1] + t1 * (B[1] - A[1])
     return no_intersect, t1
 
+
+
+
 class LargeMaze(Configurable):
     """Continuous maze environment."""
     SIZE = 12

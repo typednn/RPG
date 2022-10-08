@@ -12,6 +12,6 @@ train_ppo.parse(
 
     hooks=dict(
         save_model=dict(n_epoch=10), log_info=dict(n_epoch=1),
-        monitor_action_std=dict(n_epoch=1, std_decay=dict(TYPE='MultiStepScheduler', milestones=[1e7, 2e7, 3e7, 4e7, 5e7, 6e7,7e7], gamma=0.8)),
+        monitor_action_std=dict(n_epoch=1, std_decay=dict(TYPE='MultiStepScheduler', milestones=[1e7, 1e7, 3e7, 4e7, 5e7, 6e7,7e7], gamma=0.6)),
     )
 ) # use tanh

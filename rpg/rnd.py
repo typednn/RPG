@@ -82,7 +82,7 @@ class RNDOptim(OptimModule):
     KEYS = ['obs']
     name = 'rnd'
 
-    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=False):
+    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True):
         from .rnd import RNDNet
         inp_dim = obs_space.shape[0] # TODO support other observation ..
 
