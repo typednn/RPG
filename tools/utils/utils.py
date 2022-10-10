@@ -212,7 +212,7 @@ def dstack(a, device):
     elif isinstance(a[0], dict):
         return {k: dstack([i[k] for i in a], device) for k, v in a[0].items()}
     else:
-        return a
+        return torch.stack(a, dim=0).to(device)
 
 def dconcat(*args, dim=0):
     if isinstance(args[0], list):
@@ -276,6 +276,7 @@ def batch_input(x, device, dtype=torch.float32):
         x = x.to(device)
     else:
         raise NotImplementedError("Can't batch type {}".format(type(x)))
+
     return x
 
 #totensor = batch_input

@@ -37,6 +37,7 @@ class PointEnv(StateEnv):
         self.observation_space = gym.spaces.Box(-1, 1, (3,))
         self.action_space = gym.spaces.Box(-1, 1, (2,))
         self.state = torch.zeros(3, dtype=torch.float32, device='cuda:0')
+        self.traj_idx = 0
 
     def sample_state_goal(self, batch_size=1):
         state = np.zeros((batch_size, 3))
@@ -137,7 +138,8 @@ class PointEnv(StateEnv):
 
             if self._cfg.save_traj:
                 from tools.utils import logger
-                logger.torch_save([traj], 'latest_traj.th')
+                logger.torch_save([traj], f'traj{self.traj_idx}.th')
+                self.traj_idx += 1
         else:
             traj = kwargs
 
