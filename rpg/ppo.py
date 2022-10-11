@@ -3,7 +3,6 @@ import torch
 from typing import Optional
 from .env_base import VecEnv
 from .models import Policy, Critic
-from .gae import GAE
 from .rnd import RNDOptim
 from .traj import Trajectory
 from .ppo_agent import PPOAgent
@@ -18,7 +17,6 @@ class PPO(RLAlgo):
         self,
         env,
         pi: PPOAgent,
-        gae: GAE,
         batch_size=256,
 
         rnd: Optional[RNDOptim] = None,
@@ -30,7 +28,6 @@ class PPO(RLAlgo):
         self.env = env
         self.pi = pi
 
-        self.gae = gae
         self.latent_z = None
         self.batch_size = batch_size
 
@@ -57,16 +54,13 @@ class PPO(RLAlgo):
             transition = dict(obs=obs, timestep = timestep)
             p_a = pi(obs, None, timestep=timestep) # no z
             a, log_p_a = self.sample(p_a)
-
             data, obs = self.step(env, a)
-
             transition.update(
                 **data,
                 a=a,
                 log_p_a = log_p_a,
                 z=None,
             )
-
             timestep = transition['timestep']
             transitions.append(transition)
 
@@ -82,19 +76,14 @@ class PPO(RLAlgo):
         with torch.no_grad():
             traj = self.inference(env, self.pi, steps=steps)
 
-            reward = traj.get_tensor('r'); assert reward.dim() == 3, "rewards must be (nstep, nenv, reward_dim)"
-
-            #if self.ent_coef > 0:
-            #    reward = torch.cat((reward, self.ent_coef * traj.get_tensor('log_p_a')), dim=-1)
-            ent_coef = self.pi.actor_optim.get_entropy_coef()
-            if ent_coef > 0.:
-                reward = torch.cat((reward,  -ent_coef * traj.get_tensor('log_p_a')), dim=-1)
-
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
 
-            adv_targets = self.gae(traj, reward, batch_size=self.batch_size, debug=False)
+
+            vpred = traj.predict_value(('obs', 'z', 'timestep'), self.value, batch_size=batch_size)
+            next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.value, batch_size=batch_size)
+            adv_targets = self.pi.gae(vpred, next_vpred, reward, batch_size=self.batch_size, debug=False)
 
             data = traj.get_list_by_keys( ['obs', 'timestep', 'a', 'log_p_a'])
             data.update(adv_targets)
@@ -117,7 +106,6 @@ class train_ppo(TrainerBase):
                 ),
                 critic=Critic.dc,
                 ppo = PPOAgent.dc,
-                gae = GAE.dc,
                 obs_norm=True,
                 batch_size=256,
                 hooks = None,
@@ -139,7 +127,6 @@ class train_ppo(TrainerBase):
             rnd = RNDOptim(obs_space, cfg=rnd).to(device)
         self.ppo = PPO(
             env, pi,
-            GAE(pi, cfg=gae),
             obs_rms=obs_rms,
             batch_size=batch_size,
             hooks=build_hooks(hooks),

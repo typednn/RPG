@@ -3,7 +3,8 @@ from tools.config import Configurable
 from tools.utils import batch_input
 from nn.distributions import ActionDistr
 from tools.optim import OptimModule as Optim
-from .utils import minibatch_gen
+from .gae import GAE
+from .utils import compute_gae_by_hand
 from .traj import DataBuffer
 from tools.utils import RunningMeanStd
 from tools import dist_utils
@@ -17,58 +18,20 @@ class PolicyOptim(Optim):
         cfg=None,
         lr=5e-4,
         clip_param=0.2,
-        entropy_coef=0.0,
         max_kl=0.1,
         #max_grad_norm=0.5,
         max_grad_norm=0.5,
         mode='step',
 
-        entropy_target=None,
     ):
         super(PolicyOptim, self).__init__(actor)
 
         self.actor = actor
         self.clip_param = clip_param
 
-        self.entropy_coef = entropy_coef
-        self.entropy_target = entropy_target
 
-        if self.entropy_coef > 0.:
-            self.log_alpha = th.nn.Parameter(th.zeros(1, requires_grad=(self.entropy_target is not None)))
 
-            if self.entropy_target is not None:
-                self.entropy_target = entropy_target
-                dist_utils.sync_networks(self.log_alpha)
-                self.alpha_optim = th.optim.Adam([self.log_alpha], lr=lr, eps=self._cfg.eps)
-
-    def optim_step(self):
-        super().optim_step()
-
-        if self.entropy_target is not None:
-
-            dist_utils.sync_grads(self.log_alpha)
-            if self._cfg.max_grad_norm is not None:
-                th.nn.utils.clip_grad_norm_(self.params, self._cfg.max_grad_norm)
-            self.alpha_optim.step()
-
-    def step(self, *args, backward=True, **data):
-        assert self._cfg.mode == 'step', "please set the mode to be step to use this mode.. as we do not support accumulate_grad in this mode"
-        # one step optimization
-        if backward:
-            self.optimizer.zero_grad()
-            if self.entropy_target is not None:
-                self.alpha_optim.zero_grad()
-        loss, info = self._compute_loss(*args, backward=backward, **data)
-        if backward:
-            self.optim_step()
-        return loss, info
-
-    def get_entropy_coef(self):
-        if self.entropy_coef > 0.:
-            return self.log_alpha.exp().item() * self.entropy_coef
-        return 0.
-
-    def _compute_loss(self, obs, hidden, timestep, action, logp, adv, backward=True):
+    def _compute_loss(self, obs, hidden, timestep, action, logp, adv, entropy_coef, backward=True):
         device = self.actor.device
         action = batch_input(action, device)
         if hidden is not None:
@@ -102,29 +65,22 @@ class PolicyOptim(Optim):
         else:
             raise NotImplementedError
 
-        # ---------------------------------------------------------------
-        if self.entropy_coef > 0.:
-            entropy = -newlogp.mean() * (self.log_alpha.exp()).detach()
-            negent  = -entropy * self.entropy_coef
-        else:
-            negent = th.zeros(0., device=device)
-        # -----------------------------------------------------------
-
-        pg_losses = pg_losses.mean()
-
-        loss = negent + pg_losses
 
         approx_kl_div = (ratio - 1 - logratio).mean().item()
 
         early_stop = self._cfg.max_kl is not None and (
             approx_kl_div > self._cfg.max_kl * 1.5)
 
-        if self.entropy_target > 0.:
-            # decrease, when entropy > self.entropy_target, positive
-            # newlogp = - entropy_term
-            alpha_loss = - (self.log_alpha.exp() * (self.entropy_target + newlogp).detach()).mean()
-            if not early_stop and backward:
-                alpha_loss.backward()
+        # ---------------------------------------------------------------
+        if entropy_coef > 0.:
+            entropy = -newlogp.mean() * entropy_coef
+            negent  = -entropy
+        else:
+            negent = th.zeros(0., device=device)
+        # -----------------------------------------------------------
+
+        pg_losses = pg_losses.mean()
+        loss = negent + pg_losses
 
         if not early_stop and backward:
             loss.backward()
@@ -138,6 +94,8 @@ class PolicyOptim(Optim):
             'approx_kl': approx_kl_div,
             'loss': loss.item(),
             'clip_frac': how_many_clipped.item(),
+            'entropy_coef': float(entropy_coef),
+            'newlogp': newlogp,
         }
         if self._cfg.max_kl:
             from tools.dist_utils import get_world_size
@@ -161,28 +119,55 @@ class CriticOptim(Optim):
         vf = self.vfcoef * ((vpred - vtarg) ** 2).mean()
         return vf
 
+class EntropyOptim(Optim):
+    def __init__(self, cfg=None, entropy_coef=0.0, entropy_target=None):
+        self.log_alpha = th.nn.Parameter(th.zeros(1, requires_grad=(entropy_target is not None)))
+        super().__init__(self.log_alpha)
+
+    def __call__(self):
+        return self._cfg.entropy_coef * self.log_alpha.exp().detach()
+
+    def compute_loss(self, newlog):
+        alpha_loss = - (self.log_alpha.exp() * (self.entropy_target + newlogp).detach()).mean()
+        return alpha_loss
+
+    def step(self, newlogp):
+        if self._cfg.entropy_target is not None:
+            return super().step(newlogp)
+        return None
+        
+
 
 class PPOAgent(Configurable):
     def __init__(
         self, policy, critic,
         cfg=None,
-        actor_optim=PolicyOptim.get_default_config(),
+        actor_optim=PolicyOptim.dc,
         critic_optim=None, 
+        entropy=EntropyOptim.dc,
         learning_epoch=10,
 
         rew_norm=True,
         adv_norm=True,
+
+        # gae config
+        gamma=0.995, lmbda=0.97, correct_gae=False, ignore_done=True
+
     ):
         super().__init__()
 
         self.policy = policy
         self.critic = critic
+        self.gae = GAE(self, **gae)
 
         self.actor_optim = PolicyOptim(self.policy, cfg=actor_optim)
 
         if critic_optim is None:
             critic_optim = dict(lr=actor_optim.lr)
         self.critic_optim = CriticOptim(self.critic, cfg=critic_optim)
+
+        self.ent_optim = EntropyOptim(cfg=entropy)
+
 
         if rew_norm:
             self.rew_norm = RunningMeanStd(clip_max=10., last_dim=True)
@@ -198,22 +183,27 @@ class PPOAgent(Configurable):
             value = value * self.rew_norm.std # denormalize it.
         return value
 
-    def step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
-        actor_loss, actor_output = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
-        critic_loss, _ = self.critic_optim.step(obs, hidden, timestep, vtarg)
+    def ent_coef(self):
+        return self.ent_optim()
 
-        if logger_scope is not None:
-            from tools.utils import logger
-            output = {logger_scope + k: v for k, v in actor_output.items()}
-            output[logger_scope + 'critic_loss'] = critic_loss.item()
-            output[logger_scope + 'actor_loss'] = actor_loss.item()
-            logger.logkvs_mean(output)
 
-        return 'early_stop' in actor_output and actor_output['early_stop']
+    @torch.no_grad()
+    def gae(
+        self, vpred, next_vpred, done_truncated, reward,  done, truncated, 
+    ):
+        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
+        if self._cfg.ignore_done:
+            done = done * 0
 
-    def learn(self, data: DataBuffer, batch_size, keys, logger_scope=None):
-        stop = False
+        if self.actor_optim.entropy_coef > 0.:
+            alpha = self.actor_optim.entropy_coef * self.actor_optim.log_alpha().exp().detach()
 
+        adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+        vtarg = vpred + adv
+        return dict(adv=adv, vtarg = vtarg)
+
+
+    def normalize(self, data):
         if self.rew_norm is not None:
             vtarg = data['vtarg']
             self.rew_norm.update(vtarg)
@@ -225,6 +215,27 @@ class PPOAgent(Configurable):
             adv = data['adv'].sum(axis=-1, keepdims=True)
             data['adv'] = (adv - adv.mean()) / (adv.std() + 1e-8)
 
+
+    def learn_step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
+        actor_loss, actor_output = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv, entropy_coef=self.ent_coef())
+        critic_loss, _ = self.critic_optim.step(obs, hidden, timestep, vtarg)
+        self.ent_optim.step(actor_output.pop('newlogp'))
+
+
+        if logger_scope is not None:
+            from tools.utils import logger
+            output = {logger_scope + k: v for k, v in actor_output.items()}
+            output[logger_scope + 'critic_loss'] = critic_loss.item()
+            output[logger_scope + 'actor_loss'] = actor_loss.item()
+            logger.logkvs_mean(output)
+
+        return 'early_stop' in actor_output and actor_output['early_stop']
+
+
+    def learn(self, data: DataBuffer, batch_size, keys, logger_scope=None):
+        self.normalize(data)
+
+        stop = False
         if logger_scope is not None:
             if len(logger_scope)>0:
                 logger_scope = logger_scope + '/'
@@ -234,7 +245,7 @@ class PPOAgent(Configurable):
             for batch in data.loop_over(batch_size):
                 n_batches += 1
                 if not stop:
-                    stop = self.step(*[batch[i] for i in keys], logger_scope=logger_scope)
+                    stop = self.learn_step(*[batch[i] for i in keys], logger_scope=logger_scope)
                     if stop:
                         break
             if stop:
