@@ -74,17 +74,17 @@ class PPO(RLAlgo):
             traj = self.inference(env, self.pi, steps=steps)
 
             reward = traj.get_tensor('r', device='cuda:0')
+            logp = traj.get_tensor('log_p_a', device='cuda:0')
 
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
-
                 
             done, truncated = traj.get_truncated_done()
             vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
             #TODO: timestep to the next timestep
             next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
-            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated)
+            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated, logp=logp)
 
 
             data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'log_p_a'])
@@ -121,7 +121,12 @@ class train_ppo(TrainerBase):
         obs_space = env.observation_space
         action_space = env.action_space
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
-        critic = Critic(obs_space, None, env.reward_dim + (rnd is not None), cfg=critic).to(device)
+        critic = Critic(
+            obs_space, None,
+            env.reward_dim + (rnd is not None) + (ppo.entropy.coef > 0.),
+            cfg=critic
+        ).to(device)
+
         pi = PPOAgent(actor, critic, ppo)
 
         if rnd is not None:

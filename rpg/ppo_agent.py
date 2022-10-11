@@ -120,22 +120,20 @@ class CriticOptim(Optim):
 
 class EntropyOptim(Optim):
     def __init__(self, cfg=None, coef=0.0, target=None, lr=5e-4, mode='step'):
-        super().__init__(th.nn.Parameter(th.zeros(1, requires_grad=(target is not None))))
+        super().__init__(th.nn.Parameter(th.zeros(1, requires_grad=(target is not None), device='cuda:0')))
         self.log_alpha = self.network
 
     def __call__(self):
         return self._cfg.coef * self.log_alpha.exp().detach()
 
-    def compute_loss(self, newlog):
-        alpha_loss = - (self.log_alpha.exp() * (self._cfg.target + newlogp).detach()).mean()
-        return alpha_loss
+    def compute_loss(self, newlogp):
+        return - (self.log_alpha.exp() * self._cfg.coef * (self._cfg.target + newlogp).detach()).mean()
 
     def step(self, newlogp):
         if self._cfg.target is not None:
             return super().step(newlogp)
         return None
         
-
 
 class PPOAgent(Configurable):
     def __init__(
@@ -185,27 +183,36 @@ class PPOAgent(Configurable):
     def ent_coef(self):
         return self.ent_optim()
 
-
     def gae(
-        self, vpred, next_vpred, reward,  done, truncated, 
+        self, vpred, next_vpred, reward, done, truncated, logp,
     ):
-        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
         if self._cfg.ignore_done:
             done = done * 0
 
-        assert self.ent_optim() == 0.
+        if self.ent_coef() > 0.:
+            ent = -logp[..., None] * self.ent_coef() # entropy reward..
+            assert ent.shape[:-1] == reward.shape[:-1]
+            reward = th.cat((reward, ent), dim=-1)
 
-        adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
+
+        adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated,
+                                  gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+
+        if self.ent_coef() > 0.:
+            adv[..., -1:] -= ent # do not include entropy reward in adv.
+
         vtarg = vpred + adv
+
         return dict(adv=adv, vtarg = vtarg)
 
 
     def normalize(self, data):
         if self.rew_norm is not None:
             vtarg = data['vtarg']
-            assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
-
             self.rew_norm.update(vtarg)
+
+            assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
             data['vtarg'] = vtarg / self.rew_norm.std
             data['adv'] = data['adv'] / self.rew_norm.std
 
