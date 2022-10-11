@@ -218,7 +218,7 @@ class PPOAgent(Configurable):
             assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
             data['vtarg'] = vtarg / self.rew_norm.std
             data['adv'] = data['adv'] / self.rew_norm.std
-            print(self.rew_norm.std)
+            # print(self.rew_norm.std)
 
         if self._cfg.adv_norm:
             adv = data['adv'].sum(axis=-1, keepdims=True)
