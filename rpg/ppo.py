@@ -24,7 +24,8 @@ class PPO(RLAlgo):
         rnd: Optional[RNDOptim] = None,
 
         obs_rms=None,
-        hooks: List[HookBase] = []
+        hooks: List[HookBase] = [],
+        ent_coef=0.,
     ) -> None:
 
         self.env = env
@@ -35,6 +36,8 @@ class PPO(RLAlgo):
         self.batch_size = batch_size
 
         self.rnd = rnd
+
+        self.ent_coef = ent_coef
 
         super().__init__(obs_rms, hooks)
 
@@ -83,6 +86,12 @@ class PPO(RLAlgo):
 
             reward = traj.get_tensor('r'); assert reward.dim() == 3, "rewards must be (nstep, nenv, reward_dim)"
 
+            if self.ent_coef > 0:
+                # add entropy as reward
+                # TODO: move to relbo.py
+                reward = torch.cat((reward, self.ent_coef * traj.get_tensor('log_p_a')), dim=-1)
+                print(reward.shape)
+
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
@@ -112,10 +121,11 @@ class train_ppo(TrainerBase):
                 critic=Critic.dc,
                 ppo = PPOAgent.dc,
                 gae = GAE.dc,
-                obs_norm=False,
+                obs_norm=True,
                 batch_size=256,
                 hooks = None,
                 rnd=None,
+                ent_coef=0.,
         ):
         #super().__init__()
         TrainerBase.__init__(self)
@@ -136,7 +146,8 @@ class train_ppo(TrainerBase):
             obs_rms=obs_rms,
             batch_size=batch_size,
             hooks=build_hooks(hooks),
-            rnd=rnd
+            rnd=rnd,
+            ent_coef=ent_coef
         )
 
         while True:

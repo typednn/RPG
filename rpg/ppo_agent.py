@@ -172,8 +172,8 @@ class PPOAgent(Configurable):
             assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
 
         if self._cfg.adv_norm:
-            data['adv'] = (data['adv'] - data['adv'].mean()) / (data['adv'].std() + 1e-8)
-
+            adv = data['adv'].sum(axis=-1, keepdims=True)
+            data['adv'] = (adv - adv.mean()) / (adv.std() + 1e-8)
 
         if logger_scope is not None:
             if len(logger_scope)>0:

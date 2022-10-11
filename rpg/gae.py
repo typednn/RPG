@@ -18,13 +18,10 @@ class GAE(Configurable):
         if self._cfg.ignore_done:
             done = done * 0
 
-        # scale = rew_rms.std if rew_rms is not None else 1.
-
         vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size)
         next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size)
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
-        #done = done.float()
         if not self._cfg.correct_gae:
             adv = torch.zeros_like(next_vpred)
 
@@ -40,14 +37,7 @@ class GAE(Configurable):
             adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
 
         vtarg = vpred + adv
-
         adv = vtarg-vpred
-        vtarg = vtarg
-
-        # if self._cfg.adv_norm:
-        #     adv = adv - adv.mean()
-        #     adv = adv/(adv.std() + 1e-9)
-
         return dict(
             adv=adv,
             vtarg = vtarg,
