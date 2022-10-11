@@ -50,13 +50,25 @@ class Critic(BaseNet):
             obs_space = (obs_space, z_space)
         BaseNet.__init__(self, obs_space, Box(-1, 1, (dim,)), head=dict(TYPE='Deterministic'))
 
-
-
-    def forward(self, state, hidden, timestep=None):
+    def forward(self, state, hidden, timestep):
         if self.z_space is None:
             return super().forward(state, timestep=timestep).rsample()[0]
         else:
             return super().forward((state, hidden), timestep=timestep).rsample()[0]
+
+
+class MultiCritic(BaseNet):
+    def __init__(self, obs_space, z_space, dim, cfg=None):
+        Network.__init__(self)
+        self.models = []
+        for i in range(dim):
+            self.models.append(Critic(obs_space, z_space, 1, cfg=cfg))
+        self.dim = dim
+        self.models = torch.nn.ModuleList(self.models)
+
+    def forward(self, state, hidden, timestep):
+        outs = [self.models[i](state, hidden, timestep) for i in range(self.dim)]
+        return torch.cat(outs, dim=-1)
 
 
 @as_builder

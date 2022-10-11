@@ -2,7 +2,7 @@
 import torch
 from typing import Optional
 from .env_base import VecEnv
-from .models import Policy, Critic
+from .models import Policy, Critic, MultiCritic
 from .rnd import RNDOptim
 from .traj import Trajectory
 from .ppo_agent import PPOAgent
@@ -121,7 +121,7 @@ class train_ppo(TrainerBase):
         obs_space = env.observation_space
         action_space = env.action_space
         actor = Policy(obs_space, None, action_space, cfg=actor).to(device)
-        critic = Critic(
+        critic = MultiCritic(
             obs_space, None,
             env.reward_dim + (rnd is not None) + (ppo.entropy.coef > 0.),
             cfg=critic

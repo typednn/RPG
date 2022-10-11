@@ -72,9 +72,11 @@ class PolicyOptim(Optim):
 
         # ---------------------------------------------------------------
         if entropy_coef > 0.:
-            entropy = -newlogp.mean() * entropy_coef
-            negent  = -entropy
+            # directly optimize the policy entropy ..
+            entropy = pd.entropy().mean()
+            negent  = -entropy * entropy_coef
         else:
+            entropy = 0.
             negent = th.tensor(0., device=device)
         # -----------------------------------------------------------
 
@@ -87,14 +89,13 @@ class PolicyOptim(Optim):
             pass
 
         output = {
-            'entropy': pd.entropy().mean().item(),
+            'entropy': float(entropy),
             'negent': negent.item(),
             'pg': pg_losses.item(),
             'approx_kl': approx_kl_div,
             'loss': loss.item(),
             'clip_frac': how_many_clipped.item(),
             'entropy_coef': float(entropy_coef),
-            'newlogp': newlogp,
         }
         if self._cfg.max_kl:
             from tools.dist_utils import get_world_size
@@ -118,20 +119,22 @@ class CriticOptim(Optim):
         vf = self.vfcoef * ((vpred - vtarg) ** 2).mean()
         return vf
 
+
 class EntropyOptim(Optim):
-    def __init__(self, cfg=None, coef=0.0, target=None, lr=5e-4, mode='step'):
+    def __init__(self, cfg=None, coef=0.0, target=None, lr=0.001, mode='step'):
         super().__init__(th.nn.Parameter(th.zeros(1, requires_grad=(target is not None), device='cuda:0')))
         self.log_alpha = self.network
 
     def __call__(self):
         return self._cfg.coef * self.log_alpha.exp().detach()
 
-    def compute_loss(self, newlogp):
-        return - (self.log_alpha.exp() * self._cfg.coef * (self._cfg.target + newlogp).detach()).mean()
+    def compute_loss(self, entropy):
+        # if self._cfg.target > entropy, increase log alpha
+        return - (self.log_alpha.exp() * self._cfg.coef * (self._cfg.target - entropy))
 
-    def step(self, newlogp):
+    def step(self, entropy):
         if self._cfg.target is not None:
-            return super().step(newlogp)
+            return super().step(entropy)
         return None
         
 
@@ -215,18 +218,20 @@ class PPOAgent(Configurable):
             assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
             data['vtarg'] = vtarg / self.rew_norm.std
             data['adv'] = data['adv'] / self.rew_norm.std
+            print(self.rew_norm.std)
 
         if self._cfg.adv_norm:
             adv = data['adv'].sum(axis=-1, keepdims=True)
-            data['adv'] = (adv - adv.mean()) / (adv.std() + 1e-8)
+            self.adv_std = float(adv.std()) + 1e-8
+            data['adv'] = (adv - adv.mean()) / self.adv_std
 
 
     def learn_step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
         actor_loss, actor_output = self.actor_optim.step(
-            obs, hidden, timestep, action, log_p_a, adv, entropy_coef=self.ent_coef())
+            obs, hidden, timestep, action, log_p_a, adv, entropy_coef=self.ent_coef() / self.adv_std)
         critic_loss, _ = self.critic_optim.step(
             obs, hidden, timestep, vtarg)
-        self.ent_optim.step(actor_output.pop('newlogp'))
+        self.ent_optim.step(actor_output['entropy'])
 
 
         if logger_scope is not None:
