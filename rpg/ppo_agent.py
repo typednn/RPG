@@ -95,7 +95,7 @@ class PolicyOptim(Optim):
             'approx_kl': approx_kl_div,
             'loss': loss.item(),
             'clip_frac': how_many_clipped.item(),
-            'entropy_coef': float(entropy_coef),
+            'entropy_coef_after_norm': float(entropy_coef),
         }
         if self._cfg.max_kl:
             from tools.dist_utils import get_world_size
@@ -130,7 +130,10 @@ class EntropyOptim(Optim):
 
     def compute_loss(self, entropy):
         # if self._cfg.target > entropy, increase log alpha
-        return - (self.log_alpha.exp() * self._cfg.coef * (self._cfg.target - entropy))
+        #print(self._cfg.target - entropy)
+        from tools.utils import logger
+        logger.logkv_mean('gap', float(self._cfg.target - entropy))
+        return - (self.log_alpha.exp() * (self._cfg.target - entropy))
 
     def step(self, entropy):
         if self._cfg.target is not None:
@@ -193,6 +196,8 @@ class PPOAgent(Configurable):
             done = done * 0
 
         if self.ent_coef() > 0.:
+            from tools.utils import logger
+            logger.logkv_mean('ent coef', self.ent_coef().item())
             ent = -logp[..., None] * self.ent_coef() # entropy reward..
             assert ent.shape[:-1] == reward.shape[:-1]
             reward = th.cat((reward, ent), dim=-1)
@@ -211,19 +216,24 @@ class PPOAgent(Configurable):
 
 
     def normalize(self, data):
+        from tools.utils import logger
         if self.rew_norm is not None:
             vtarg = data['vtarg']
             self.rew_norm.update(vtarg)
 
             assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
             data['vtarg'] = vtarg / self.rew_norm.std
-            data['adv'] = data['adv'] / self.rew_norm.std
+            # data['adv'] = data['adv'] / self.rew_norm.std # 
             # print(self.rew_norm.std)
+
+            for idx, i in enumerate(self.rew_norm.std.reshape(-1)):
+                logger.logkv_mean(f'rew{idx}', float(i))
 
         if self._cfg.adv_norm:
             adv = data['adv'].sum(axis=-1, keepdims=True)
             self.adv_std = float(adv.std()) + 1e-8
             data['adv'] = (adv - adv.mean()) / self.adv_std
+            logger.logkv_mean('adv_std', self.adv_std)
 
 
     def learn_step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
