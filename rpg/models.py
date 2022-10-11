@@ -5,6 +5,7 @@ from gym.spaces import Box, Discrete
 from tools.nn_base import Network
 from tools.config import as_builder
 from nn.distributions import DeterminisiticAction
+from tools.utils import RunningMeanStd
 
 
 class Policy(BaseNet):
@@ -48,6 +49,8 @@ class Critic(BaseNet):
         if z_space is not None:
             obs_space = (obs_space, z_space)
         BaseNet.__init__(self, obs_space, Box(-1, 1, (dim,)), head=dict(TYPE='Deterministic'))
+
+
 
     def forward(self, state, hidden, timestep=None):
         if self.z_space is None:

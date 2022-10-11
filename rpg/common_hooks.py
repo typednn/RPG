@@ -24,12 +24,11 @@ def as_hook(f):
 
 
 class RLAlgo(abc.ABC):
-    def __init__(self, rew_rms, obs_rms, hooks) -> None:
+    def __init__(self, obs_rms, hooks) -> None:
         super().__init__()
         self.epoch_id = 0
         self.total = 0
 
-        self.rew_rms = rew_rms
         self.obs_rms = obs_rms
 
         self.mode='training'

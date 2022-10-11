@@ -7,21 +7,21 @@ from tools.config import Configurable
 
 
 class GAE(Configurable):
-    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, adv_norm=True, correct_gae=False, ignore_done=True):
+    def __init__(self, pi: PPOAgent, cfg=None, gamma=0.995, lmbda=0.97, correct_gae=False, ignore_done=True):
         super().__init__()
         self.pi = pi
 
     @torch.no_grad()
-    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, rew_rms, debug=False):
+    def __call__(self, traj: Trajectory, reward: torch.Tensor, batch_size: int, debug=False):
         done, truncated = traj.get_truncated_done()
         #done = traj.get_tensor('done')
         if self._cfg.ignore_done:
             done = done * 0
 
-        scale = rew_rms.std if rew_rms is not None else 1.
+        # scale = rew_rms.std if rew_rms is not None else 1.
 
-        vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
-        next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size) * scale
+        vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size)
+        next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=batch_size)
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
         #done = done.float()
@@ -41,19 +41,12 @@ class GAE(Configurable):
 
         vtarg = vpred + adv
 
-        if rew_rms is not None:
-            # https://github.com/haosulab/pyrl/blob/926d3d07d45f3bf014e7c6ea64e1bba1d4f35f03/pyrl/utils/torch/module_utils.py#L192
-            rew_rms.update(vtarg.sum(axis=-1).reshape(-1)) # normalize it based on the final result.
-            scale = rew_rms.std
-        else:
-            scale = 1.
+        adv = vtarg-vpred
+        vtarg = vtarg
 
-        adv = (vtarg-vpred)/scale
-        vtarg = vtarg/scale
-
-        if self._cfg.adv_norm:
-            adv = adv - adv.mean()
-            adv = adv/(adv.std() + 1e-9)
+        # if self._cfg.adv_norm:
+        #     adv = adv - adv.mean()
+        #     adv = adv/(adv.std() + 1e-9)
 
         return dict(
             adv=adv,

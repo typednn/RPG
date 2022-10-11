@@ -10,6 +10,7 @@ from .ppo_agent import PPOAgent
 from tools.optim import TrainerBase
 from typing import List
 from .common_hooks import HookBase, build_hooks, RLAlgo
+from tools.utils import RunningMeanStd
 
 
 class PPO(RLAlgo):
@@ -22,7 +23,6 @@ class PPO(RLAlgo):
 
         rnd: Optional[RNDOptim] = None,
 
-        rew_rms=None,
         obs_rms=None,
         hooks: List[HookBase] = []
     ) -> None:
@@ -36,11 +36,11 @@ class PPO(RLAlgo):
 
         self.rnd = rnd
 
-        super().__init__(rew_rms, obs_rms, hooks)
+        super().__init__(obs_rms, hooks)
 
 
     def modules(self):
-        return [self.pi, self.rew_rms, self.obs_rms]
+        return [self.pi, self.obs_rms]
 
     def inference(
         self,
@@ -88,7 +88,7 @@ class PPO(RLAlgo):
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
                 # raise NotImplementedError
 
-            adv_targets = self.gae(traj, reward, batch_size=self.batch_size, rew_rms=self.rew_rms, debug=False)
+            adv_targets = self.gae(traj, reward, batch_size=self.batch_size, debug=False)
 
             data = traj.get_list_by_keys( ['obs', 'timestep', 'a', 'log_p_a'])
             data.update(adv_targets)
@@ -103,26 +103,23 @@ class PPO(RLAlgo):
 
 
 class train_ppo(TrainerBase):
-    def __init__(self,
-                        env: VecEnv, cfg=None, steps=2048, device='cuda:0',
-                        actor=Policy.get_default_config(
-                            head=dict(std_mode='fix_learnable', std_scale=0.5)
-                        ),
-                        critic=Critic.get_default_config(),
-                        ppo = PPOAgent.get_default_config(),
-                        gae = GAE.get_default_config(),
-                        reward_norm=True,
-                        obs_norm=False,
-                        batch_size=256,
-                        hooks = None,
-                        rnd=None,
-                ):
+    def __init__(
+                self,
+                env: VecEnv, cfg=None, steps=2048, device='cuda:0',
+                actor=Policy.get_default_config(
+                    head=dict(std_mode='fix_learnable', std_scale=0.5)
+                ),
+                critic=Critic.dc,
+                ppo = PPOAgent.dc,
+                gae = GAE.dc,
+                obs_norm=False,
+                batch_size=256,
+                hooks = None,
+                rnd=None,
+        ):
         #super().__init__()
         TrainerBase.__init__(self)
 
-
-        from tools.utils import RunningMeanStd
-        rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
         obs_rms = RunningMeanStd(clip_max=10.) if obs_norm else None
 
         obs_space = env.observation_space
@@ -136,7 +133,6 @@ class train_ppo(TrainerBase):
         self.ppo = PPO(
             env, pi,
             GAE(pi, cfg=gae),
-            rew_rms=rew_rms,
             obs_rms=obs_rms,
             batch_size=batch_size,
             hooks=build_hooks(hooks),

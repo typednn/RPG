@@ -5,6 +5,7 @@ from nn.distributions import ActionDistr
 from tools.optim import OptimModule as Optim
 from .utils import minibatch_gen
 from .traj import DataBuffer
+from tools.utils import RunningMeanStd
 
 
 class PolicyOptim(Optim):
@@ -117,6 +118,9 @@ class PPOAgent(Configurable):
         actor_optim=PolicyOptim.get_default_config(),
         critic_optim=None, 
         learning_epoch=10,
+
+        rew_norm=True,
+        adv_norm=True,
     ):
         super().__init__()
 
@@ -129,11 +133,20 @@ class PPOAgent(Configurable):
             critic_optim = dict(lr=actor_optim.lr)
         self.critic_optim = CriticOptim(self.critic, cfg=critic_optim)
 
+
+        if rew_norm:
+            self.rew_norm = RunningMeanStd(clip_max=10., last_dim=True)
+        else:
+            self.rew_norm = None
+
     def __call__(self, obs, hidden, timestep):
         return self.policy(obs, hidden, timestep=timestep)
 
     def value(self, obs, hidden, timestep):
-        return self.critic(obs, hidden, timestep=timestep)
+        value =  self.critic(obs, hidden, timestep=timestep)
+        if self.rew_norm is not None:
+            value = value * self.rew_norm.std # denormalize it.
+        return value
 
     def step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
         actor_loss, actor_output = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv)
@@ -150,6 +163,17 @@ class PPOAgent(Configurable):
 
     def learn(self, data: DataBuffer, batch_size, keys, logger_scope=None):
         stop = False
+
+        if self.rew_norm is not None:
+            vtarg = data['vtarg']
+            self.rew_norm.update(vtarg)
+            data['vtarg'] = vtarg / self.rew_norm.std
+            data['adv'] = data['adv'] / self.rew_norm.std
+            assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
+
+        if self._cfg.adv_norm:
+            data['adv'] = (data['adv'] - data['adv'].mean()) / (data['adv'].std() + 1e-8)
+
 
         if logger_scope is not None:
             if len(logger_scope)>0:
