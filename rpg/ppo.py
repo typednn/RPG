@@ -25,7 +25,6 @@ class PPO(RLAlgo):
 
         obs_rms=None,
         hooks: List[HookBase] = [],
-        ent_coef=0.,
     ) -> None:
 
         self.env = env
@@ -37,7 +36,6 @@ class PPO(RLAlgo):
 
         self.rnd = rnd
 
-        self.ent_coef = ent_coef
 
         super().__init__(obs_rms, hooks)
 
@@ -86,16 +84,15 @@ class PPO(RLAlgo):
 
             reward = traj.get_tensor('r'); assert reward.dim() == 3, "rewards must be (nstep, nenv, reward_dim)"
 
-            if self.ent_coef > 0:
-                # add entropy as reward
-                # TODO: move to relbo.py
-                reward = torch.cat((reward, self.ent_coef * traj.get_tensor('log_p_a')), dim=-1)
-                print(reward.shape)
+            #if self.ent_coef > 0:
+            #    reward = torch.cat((reward, self.ent_coef * traj.get_tensor('log_p_a')), dim=-1)
+            ent_coef = self.pi.actor_optim.get_entropy_coef()
+            if ent_coef > 0.:
+                reward = torch.cat((reward,  -ent_coef * traj.get_tensor('log_p_a')), dim=-1)
 
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
-                # raise NotImplementedError
 
             adv_targets = self.gae(traj, reward, batch_size=self.batch_size, debug=False)
 

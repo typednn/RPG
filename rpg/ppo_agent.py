@@ -6,26 +6,67 @@ from tools.optim import OptimModule as Optim
 from .utils import minibatch_gen
 from .traj import DataBuffer
 from tools.utils import RunningMeanStd
+from tools import dist_utils
 
 
 class PolicyOptim(Optim):
     # no need to store distribution, we only need to store actions ..
-    def __init__(self,
-                 actor,
-                 cfg=None,
-                 lr=5e-4,
-                 clip_param=0.2,
-                 entropy_coef=0.0,
-                 max_kl=0.1,
-                 #max_grad_norm=0.5,
-                 max_grad_norm=0.5,
-                 mode='step',
-                 ):
+    def __init__(
+        self,
+        actor,
+        cfg=None,
+        lr=5e-4,
+        clip_param=0.2,
+        entropy_coef=0.0,
+        max_kl=0.1,
+        #max_grad_norm=0.5,
+        max_grad_norm=0.5,
+        mode='step',
+
+        entropy_target=None,
+    ):
         super(PolicyOptim, self).__init__(actor)
 
         self.actor = actor
-        self.entropy_coef = entropy_coef
         self.clip_param = clip_param
+
+        self.entropy_coef = entropy_coef
+        self.entropy_target = entropy_target
+
+        if self.entropy_coef > 0.:
+            self.log_alpha = th.nn.Parameter(th.zeros(1, requires_grad=(self.entropy_target is not None)))
+
+            if self.entropy_target is not None:
+                self.entropy_target = entropy_target
+                dist_utils.sync_networks(self.log_alpha)
+                self.alpha_optim = th.optim.Adam([self.log_alpha], lr=lr, eps=self._cfg.eps)
+
+    def optim_step(self):
+        super().optim_step()
+
+        if self.entropy_target is not None:
+
+            dist_utils.sync_grads(self.log_alpha)
+            if self._cfg.max_grad_norm is not None:
+                th.nn.utils.clip_grad_norm_(self.params, self._cfg.max_grad_norm)
+            self.alpha_optim.step()
+
+    def step(self, *args, backward=True, **data):
+        assert self._cfg.mode == 'step', "please set the mode to be step to use this mode.. as we do not support accumulate_grad in this mode"
+        # one step optimization
+        if backward:
+            self.optimizer.zero_grad()
+            if self.entropy_target is not None:
+                self.alpha_optim.zero_grad()
+        loss, info = self._compute_loss(*args, backward=backward, **data)
+        if backward:
+            self.optim_step()
+        return loss, info
+
+    def get_entropy_coef(self):
+        if self.entropy_coef > 0.:
+            return self.log_alpha.exp().item() * self.entropy_coef
+        return 0.
 
     def _compute_loss(self, obs, hidden, timestep, action, logp, adv, backward=True):
         device = self.actor.device
@@ -54,18 +95,22 @@ class PolicyOptim(Optim):
 
             clipped_ratio = th.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
             pg_losses2 = -adv * clipped_ratio
+            pg_losses = th.max(pg_losses, pg_losses2)
 
             how_many_clipped = (clipped_ratio != ratio).float().mean()
                 
-            pg_losses = th.max(pg_losses, pg_losses2)
         else:
             raise NotImplementedError
 
-        entropy = pd.entropy()
-        assert entropy.shape == pg_losses.shape
+        # ---------------------------------------------------------------
+        if self.entropy_coef > 0.:
+            entropy = -newlogp.mean() * (self.log_alpha.exp()).detach()
+            negent  = -entropy * self.entropy_coef
+        else:
+            negent = th.zeros(0., device=device)
+        # -----------------------------------------------------------
 
-        pg_losses, entropy = pg_losses.mean(), entropy.mean()
-        negent = -entropy * self.entropy_coef
+        pg_losses = pg_losses.mean()
 
         loss = negent + pg_losses
 
@@ -73,6 +118,13 @@ class PolicyOptim(Optim):
 
         early_stop = self._cfg.max_kl is not None and (
             approx_kl_div > self._cfg.max_kl * 1.5)
+
+        if self.entropy_target > 0.:
+            # decrease, when entropy > self.entropy_target, positive
+            # newlogp = - entropy_term
+            alpha_loss = - (self.log_alpha.exp() * (self.entropy_target + newlogp).detach()).mean()
+            if not early_stop and backward:
+                alpha_loss.backward()
 
         if not early_stop and backward:
             loss.backward()
@@ -93,7 +145,6 @@ class PolicyOptim(Optim):
             output['early_stop'] = early_stop
 
         return loss, output
-
 
 
 class CriticOptim(Optim):
@@ -132,7 +183,6 @@ class PPOAgent(Configurable):
         if critic_optim is None:
             critic_optim = dict(lr=actor_optim.lr)
         self.critic_optim = CriticOptim(self.critic, cfg=critic_optim)
-
 
         if rew_norm:
             self.rew_norm = RunningMeanStd(clip_max=10., last_dim=True)

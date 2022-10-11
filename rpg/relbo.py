@@ -24,7 +24,6 @@ def create_prior(space, device='cuda:0'):
         raise NotImplementedError
 
 
-
 class Relbo(Configurable):
     def __init__(self,
             info_net,
