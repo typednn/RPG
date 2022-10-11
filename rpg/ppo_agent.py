@@ -3,7 +3,6 @@ from tools.config import Configurable
 from tools.utils import batch_input
 from nn.distributions import ActionDistr
 from tools.optim import OptimModule as Optim
-from .gae import GAE
 from .utils import compute_gae_by_hand
 from .traj import DataBuffer
 from tools.utils import RunningMeanStd
@@ -76,7 +75,7 @@ class PolicyOptim(Optim):
             entropy = -newlogp.mean() * entropy_coef
             negent  = -entropy
         else:
-            negent = th.zeros(0., device=device)
+            negent = th.tensor(0., device=device)
         # -----------------------------------------------------------
 
         pg_losses = pg_losses.mean()
@@ -88,7 +87,7 @@ class PolicyOptim(Optim):
             pass
 
         output = {
-            'entropy': entropy.item(),
+            'entropy': pd.entropy().mean().item(),
             'negent': negent.item(),
             'pg': pg_losses.item(),
             'approx_kl': approx_kl_div,
@@ -120,19 +119,19 @@ class CriticOptim(Optim):
         return vf
 
 class EntropyOptim(Optim):
-    def __init__(self, cfg=None, entropy_coef=0.0, entropy_target=None):
-        self.log_alpha = th.nn.Parameter(th.zeros(1, requires_grad=(entropy_target is not None)))
-        super().__init__(self.log_alpha)
+    def __init__(self, cfg=None, coef=0.0, target=None, lr=5e-4, mode='step'):
+        super().__init__(th.nn.Parameter(th.zeros(1, requires_grad=(target is not None))))
+        self.log_alpha = self.network
 
     def __call__(self):
-        return self._cfg.entropy_coef * self.log_alpha.exp().detach()
+        return self._cfg.coef * self.log_alpha.exp().detach()
 
     def compute_loss(self, newlog):
-        alpha_loss = - (self.log_alpha.exp() * (self.entropy_target + newlogp).detach()).mean()
+        alpha_loss = - (self.log_alpha.exp() * (self._cfg.target + newlogp).detach()).mean()
         return alpha_loss
 
     def step(self, newlogp):
-        if self._cfg.entropy_target is not None:
+        if self._cfg.target is not None:
             return super().step(newlogp)
         return None
         
@@ -151,14 +150,14 @@ class PPOAgent(Configurable):
         adv_norm=True,
 
         # gae config
-        gamma=0.995, lmbda=0.97, correct_gae=False, ignore_done=True
+        gamma=0.995, lmbda=0.97,
+        ignore_done=False
 
     ):
         super().__init__()
 
         self.policy = policy
         self.critic = critic
-        self.gae = GAE(self, **gae)
 
         self.actor_optim = PolicyOptim(self.policy, cfg=actor_optim)
 
@@ -187,16 +186,14 @@ class PPOAgent(Configurable):
         return self.ent_optim()
 
 
-    @torch.no_grad()
     def gae(
-        self, vpred, next_vpred, done_truncated, reward,  done, truncated, 
+        self, vpred, next_vpred, reward,  done, truncated, 
     ):
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
         if self._cfg.ignore_done:
             done = done * 0
 
-        if self.actor_optim.entropy_coef > 0.:
-            alpha = self.actor_optim.entropy_coef * self.actor_optim.log_alpha().exp().detach()
+        assert self.ent_optim() == 0.
 
         adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
         vtarg = vpred + adv
@@ -206,10 +203,11 @@ class PPOAgent(Configurable):
     def normalize(self, data):
         if self.rew_norm is not None:
             vtarg = data['vtarg']
+            assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
+
             self.rew_norm.update(vtarg)
             data['vtarg'] = vtarg / self.rew_norm.std
             data['adv'] = data['adv'] / self.rew_norm.std
-            assert self.rew_norm.std.shape[-1] == vtarg.shape[-1]
 
         if self._cfg.adv_norm:
             adv = data['adv'].sum(axis=-1, keepdims=True)
@@ -217,8 +215,10 @@ class PPOAgent(Configurable):
 
 
     def learn_step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
-        actor_loss, actor_output = self.actor_optim.step(obs, hidden, timestep, action, log_p_a, adv, entropy_coef=self.ent_coef())
-        critic_loss, _ = self.critic_optim.step(obs, hidden, timestep, vtarg)
+        actor_loss, actor_output = self.actor_optim.step(
+            obs, hidden, timestep, action, log_p_a, adv, entropy_coef=self.ent_coef())
+        critic_loss, _ = self.critic_optim.step(
+            obs, hidden, timestep, vtarg)
         self.ent_optim.step(actor_output.pop('newlogp'))
 
 

@@ -35,7 +35,7 @@ def create_hidden_space(z_dim, z_cont_dim):
     return z_space
 
 
-def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda, mode='approx', return_sum_weight_value=false):
+def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda, mode='approx', return_sum_weight_value=False):
 
     reward = reward.to(torch.float64)
     if value is not None:

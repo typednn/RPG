@@ -27,12 +27,9 @@ class PPO(RLAlgo):
 
         self.env = env
         self.pi = pi
-
         self.latent_z = None
         self.batch_size = batch_size
-
         self.rnd = rnd
-
 
         super().__init__(obs_rms, hooks)
 
@@ -76,16 +73,21 @@ class PPO(RLAlgo):
         with torch.no_grad():
             traj = self.inference(env, self.pi, steps=steps)
 
+            reward = traj.get_tensor('r', device='cuda:0')
+
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
 
+                
+            done, truncated = traj.get_truncated_done()
+            vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
+            #TODO: timestep to the next timestep
+            next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
+            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated)
 
-            vpred = traj.predict_value(('obs', 'z', 'timestep'), self.value, batch_size=batch_size)
-            next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.value, batch_size=batch_size)
-            adv_targets = self.pi.gae(vpred, next_vpred, reward, batch_size=self.batch_size, debug=False)
 
-            data = traj.get_list_by_keys( ['obs', 'timestep', 'a', 'log_p_a'])
+            data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'log_p_a'])
             data.update(adv_targets)
             data['z'] = None
 
@@ -110,7 +112,6 @@ class train_ppo(TrainerBase):
                 batch_size=256,
                 hooks = None,
                 rnd=None,
-                ent_coef=0.,
         ):
         #super().__init__()
         TrainerBase.__init__(self)
@@ -131,7 +132,6 @@ class train_ppo(TrainerBase):
             batch_size=batch_size,
             hooks=build_hooks(hooks),
             rnd=rnd,
-            ent_coef=ent_coef
         )
 
         while True:
