@@ -82,7 +82,7 @@ class RNDOptim(OptimModule):
     KEYS = ['obs']
     name = 'rnd'
 
-    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True):
+    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
         from .rnd import RNDNet
         inp_dim = obs_space.shape[0] # TODO support other observation ..
 
@@ -112,7 +112,7 @@ class RNDOptim(OptimModule):
             out = self.normalizer.normalize(out)
 
         logger.logkvs_mean({'rnd/reward': out.mean().item()})
-        return out
+        return out * self._cfg.rnd_scale
 
 
     def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):

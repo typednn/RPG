@@ -8,7 +8,7 @@ from .gae import HierarchicalGAE
 from .traj import Trajectory
 from .relbo import Relbo
 from .ppo_agent import PPOAgent, CriticOptim
-from .models import Policy, Critic, InfoNet
+from .models import Policy, Critic, InfoNet, MultiCritic
 from .common_hooks import HookBase, RLAlgo, build_hooks
 from tools.optim import TrainerBase
 
@@ -22,7 +22,6 @@ class RPG(RLAlgo):
         pi_a: PPOAgent,
         pi_z: PPOAgent,
         relbo: Relbo,
-        gae: HierarchicalGAE,
         rnd=None,
         batch_size=256,
 
@@ -36,7 +35,6 @@ class RPG(RLAlgo):
         self.p_z0 = p_z0
         self.relbo = relbo
 
-        self.gae = gae
         self.latent_z = None
 
 
@@ -82,10 +80,11 @@ class RPG(RLAlgo):
             transition.update(
                 **data,
                 a=a, z=z, log_p_a = log_p_a, log_p_z = log_p_z,
+                ent_a = p_a.entropy(), ent_z = p_z.entropy(),
             )
 
             transitions.append(transition)
-            timestep = transition['timestep']
+            timestep = transition['next_timestep']
 
             dones = transition['done']
             if dones.any():
@@ -107,24 +106,54 @@ class RPG(RLAlgo):
     def run_rpg(self, env, steps):
         batch_size = self.batch_size
         with torch.no_grad():
+            # trajectory and reward
             traj, self.latent_z = self.inference(
                 env, self.latent_z, self.pi_z, self.pi_a, steps=steps)
 
-            reward = self.relbo(traj, batch_size=batch_size)
+            reward = self.relbo(traj, batch_size=batch_size) # add mutual information reward 
 
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
 
+            done, truncated = traj.get_truncated_done()
 
-            adv_targets = self.gae(traj, reward, batch_size=batch_size, rew_rms=self.rew_rms)
+            # value predict ..
+            vpredz = traj.predict_value(('obs', 'old_z', 'timestep'), self.pi_z.value, batch_size=batch_size)
+            vpreda = traj.predict_value(('obs', 'z', 'timestep'), self.pi_a.value, batch_size=batch_size)
+            next_vpredz = traj.predict_next(('next_obs', 'z', 'next_timestep'), self.pi_z.value, batch_size=batch_size, vpred=vpredz)
+
+            next_vpreda = torch.zeros_like(next_vpredz)
+            ind = traj.get_truncated_index(include_done=True)
+            next_vpreda[:-1] = vpreda[1:]
+            next_vpreda[ind[:, 0], ind[:, 1]] = next_vpredz[ind[:, 0], ind[:, 1]] 
+
+            # entropy of the policy ..
+            entropy_z = traj.get_tensor('ent_z', device='cuda:0')[..., None]
+            entropy_a = traj.get_tensor('ent_a', device='cuda:0')[..., None]
+            next_entropy_z = traj.predict_next(('next_obs', 'z', 'next_timestep'), self.pi_z.entropy, self.batch_size, entropy_z)
+
+            # reward_z = torch.cat((reward, entropy_a * self.pi_a.ent_coef()), dim=-1)
+            reward_z = reward.clone()
+            info_z = self.pi_z.gae(vpredz, next_vpredz, reward_z, done, truncated, entropy_z, next_entropy_z)
+
+
+            # reward_a = torch.cat((reward, next_entropy_z * self.pi_z.ent_coef()), dim=-1)
+            reward_a = reward.clone()
+            next_entropy_a = torch.zeros_like(next_entropy_z)
+            next_entropy_a[:-1] = entropy_a[1:]
+            next_entropy_a[ind[:, 0], ind[:, 1]] = 0. #TODO: this is troublesome
+            info_a = self.pi_a.gae(vpreda, next_vpreda, reward_a, done, truncated, entropy_a, next_entropy_a)
 
             data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'old_z', 'z', 'log_p_a', 'log_p_z'])
-            data.update(adv_targets)
+            #data.update(adv_a=info_a['adv'], adv_z=info_z['adv'], vtarg_a=info_a['vtarg'], vtarg_z=info_z['vtarg'])
 
 
-        self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv_a', 'vtarg_a'], logger_scope='pi_a')
-        self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv_z', 'vtarg_z'], logger_scope='pi_z')
+        data.update(info_a)
+        self.pi_a.learn(data, batch_size, ['obs', 'z', 'timestep', 'a', 'log_p_a', 'adv', 'vtarg'], logger_scope='pi_a')
+
+        data.update(info_z)
+        self.pi_z.learn(data, batch_size, ['obs', 'old_z', 'timestep', 'z', 'log_p_z', 'adv', 'vtarg'], logger_scope='pi_z')
         self.relbo.learn(data, batch_size) # maybe training with a seq2seq model way ..
 
         if self.rnd is not None:
@@ -182,10 +211,10 @@ class train_rpg(TrainerBase):
         actor_a = Policy(obs_space, hidden_space, action_space, cfg=actor).to(device)
         actor_z = Policy(obs_space, hidden_space, hidden_space, backbone=actor.backbone, head=hidden_head, K=K).to(device)
 
-        reward_dim = env.reward_dim + (rnd is not None)
+        reward_dim = env.reward_dim + (rnd is not None) + 1 # include the entropy term.
 
-        critic_a = Critic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
-        critic_z = Critic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
+        critic_a = MultiCritic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
+        critic_z = MultiCritic(obs_space, hidden_space, reward_dim, cfg=critic).to(device)
 
         pi_a = PPOAgent(actor_a, critic_a, cfg=ppo)
         if ppo_higher is None:

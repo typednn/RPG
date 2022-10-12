@@ -208,7 +208,8 @@ class PPOAgent(Configurable):
             assert entropy.shape[:-1] == reward.shape[:-1]
             reward = th.cat((reward, ent_coef * entropy), dim=-1)
 
-        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
+        assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same "\
+            "length as reward, but got {} and {} and {}".format(vpred.shape, next_vpred.shape, reward.shape)
 
         adv = compute_gae_by_hand(
             reward, vpred, next_vpred, done, truncated,
@@ -223,7 +224,7 @@ class PPOAgent(Configurable):
         return dict(adv=adv, vtarg = vtarg)
 
 
-    def normalize(self, data):
+    def normalize(self, data, logger_scope):
         if self.rew_norm is not None:
             vtarg = data['vtarg']
             self.rew_norm.update(vtarg)
@@ -234,13 +235,13 @@ class PPOAgent(Configurable):
             # print(self.rew_norm.std)
 
             for idx, i in enumerate(self.rew_norm.std.reshape(-1)):
-                logger.logkv_mean(f'rew{idx}', float(i))
+                logger.logkv_mean(f'{logger_scope}rew{idx}_std', float(i))
 
         if self._cfg.adv_norm:
             adv = data['adv'].sum(axis=-1, keepdims=True)
             self.adv_std = float(adv.std()) + 1e-8
             data['adv'] = (adv - adv.mean()) / self.adv_std
-            logger.logkv_mean('adv_std', self.adv_std)
+            logger.logkv_mean(logger_scope + 'adv_std', self.adv_std)
 
 
     def learn_step(self, obs, hidden, timestep, action, log_p_a, adv, vtarg, logger_scope=None):
@@ -261,12 +262,12 @@ class PPOAgent(Configurable):
 
 
     def learn(self, data: DataBuffer, batch_size, keys, logger_scope=None):
-        self.normalize(data)
 
         stop = False
         if logger_scope is not None:
             if len(logger_scope)>0:
                 logger_scope = logger_scope + '/'
+        self.normalize(data, logger_scope)
 
         for i in range(self._cfg.learning_epoch):
             n_batches = 0

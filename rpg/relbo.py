@@ -30,8 +30,6 @@ class Relbo(Configurable):
             hidden_space,
             action_space,
             cfg=None,
-            ent_z=1.,
-            ent_a=1.,
             mutual_info=1.,
             reward=1.,
             prior=1.,
@@ -52,23 +50,17 @@ class Relbo(Configurable):
         device = 'cuda:0'
 
         r = traj.get_tensor('r', device).sum(axis=-1) # TODO: try not to sum up all rewards ..
-        ent_z = -traj.get_tensor('log_p_z', device)
-        ent_a = -traj.get_tensor('log_p_a', device)
         prior = self.prior_a.log_prob(traj.get_tensor('a', device))
         mutual_info = traj.predict_value(['obs', 'a', 'z', 'timestep'], self.info_net, batch_size = batch_size)
         #TODO: test by varying batch size
 
         logger.logkvs_mean({
             'relbo/r': r.mean().item(),
-            'relbo/ent_z': ent_z.mean().item(),
-            'relbo/ent_a': ent_a.mean().item(),
             'relbo/prior': prior.mean().item(),
             'relbo/mutual_info': mutual_info.mean().item(),
         })
-
-        elbo = r * self._cfg.reward + mutual_info * self._cfg.mutual_info + \
-            ent_z * self._cfg.ent_z + ent_a * self._cfg.ent_a + prior * self._cfg.prior
-
+        assert r.shape == prior.shape == mutual_info.shape
+        elbo = r * self._cfg.reward + mutual_info * self._cfg.mutual_info + prior * self._cfg.prior
         return elbo[..., None]
 
 

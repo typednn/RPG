@@ -22,7 +22,7 @@ class DeterminisiticAction(ActionDistr):
         return torch.zeros(len(self.action), device=self.action.device, dtype=torch.float32)
 
     def entropy(self):
-        return torch.zeros(len(self.action), device=self.action.device, dtype=torch.float32)
+        return torch.zeros(len(self.action), device=self.action[0].device, dtype=torch.float32)
 
     def get_parameters(self):
         return self.action,

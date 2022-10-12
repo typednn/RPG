@@ -22,19 +22,19 @@ train_rpg.parse(
     actor=dict(
         head=dict(linear=False, std_scale=0.2, std_mode='fix_no_grad')
     ),
-    relbo=dict(prior=0.0, mutual_info=0.01, ent_a=0.0, ent_z=0.),
+    relbo=dict(prior=0.0, mutual_info=0.1),
 
-    gae=dict(lmbda=0.97),
+    # gae=dict(lmbda=0.97),
     batch_size=2000,
-    ppo=dict(learning_epoch=5),
-    ppo_higher=dict(learning_epoch=5, actor_optim=dict(entropy_coef=10.)),
+    ppo=dict(learning_epoch=2, entropy=dict(coef=1e-9, target=None)),
+    ppo_higher=dict(learning_epoch=0, entropy=dict(coef=1e-9, target=None)),
 
     hooks=dict(
         #save_model=dict(n_epoch=10),
         plot_maze_env_rnd=dict(resolution=64),
         log_info=dict(n_epoch=1),
-        save_traj=dict(n_epoch=1, save_gif_epochs=10),
+        save_traj=dict(n_epoch=10, save_gif_epochs=10),
     ),
-    rnd=dict(learning_epoch=2), # no rnd
+    rnd=dict(learning_epoch=2, rnd_scale=0.), # no rnd
     path='tmp/rnd/rpg2',
 ) # use tanh
