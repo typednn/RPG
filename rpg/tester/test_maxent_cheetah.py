@@ -9,7 +9,7 @@ env = GymVecEnv('HalfCheetah-v3', N)
 
 train_ppo.parse(
     env, steps=2000, obs_norm=True, actor=dict(head=dict(linear=True, std_scale=0.5, std_mode='statewise')), 
-    batch_size=2000, ppo=dict(learning_epoch=2, ignore_done=True, entropy=dict(coef=0.01, target=-6.)),
+    batch_size=2000, ppo=dict(learning_epoch=2, ignore_done=True, entropy=dict(coef=1., target=-6.)),
 
     hooks=dict(
         save_model=dict(n_epoch=10), log_info=dict(n_epoch=1),
