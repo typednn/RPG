@@ -45,8 +45,8 @@ class RLAlgo(abc.ABC):
 
     def step(self, env, action):
         data = env.step(action)
-        data['next_obs'] = self.norm_obs(data['next_obs'], False)
         obs = self.norm_obs(data.pop('obs'), True)
+        data['next_obs'] = self.norm_obs(data['next_obs'], False)
         return data, obs
 
     def norm_obs(self, x, update=True):

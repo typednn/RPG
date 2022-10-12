@@ -53,6 +53,14 @@ class Trajectory:
             vpred[ind[:, 0], ind[:, 1]] = value
         return vpred
 
+    def predict_next(self, key, network, batch_size, vpred):
+        next_vpred = torch.zeros_like(vpred)
+        next_vpred[:-1] = vpred[1:]
+        ind = self.get_truncated_index(include_done=True)
+        self.predict_value(key, network, batch_size, index=ind, vpred=next_vpred)
+        return next_vpred
+
+
     def get_tensor(self, key, device='cuda:0') -> torch.Tensor:
         from tools.utils import totensor, dstack
         return totensor([i[key] for i in self.traj], device=device)
@@ -61,7 +69,6 @@ class Trajectory:
         # done means that we should ignore the next_value in the end
         # truncated means that we should even ignore rewards in the end
         # truncated must be done ..
-
 
         done = self.get_tensor('done', device)
         truncated = done.clone() # done must be truncated ..

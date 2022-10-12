@@ -186,6 +186,9 @@ class PPOAgent(Configurable):
             value = value * self.rew_norm.std # denormalize it.
         return value
 
+    def entropy(self, obs, hidden, timestep):
+        return self.policy(obs, hidden, timestep=timestep).entropy()[..., None]
+
     def ent_coef(self):
         return self.ent_optim()
 
@@ -202,7 +205,7 @@ class PPOAgent(Configurable):
             vpred[..., -1:] += ent_coef * entropy
             next_vpred[..., -1:] += ent_coef * next_entropy
 
-            assert ent.shape[:-1] == reward.shape[:-1]
+            assert entropy.shape[:-1] == reward.shape[:-1]
             reward = th.cat((reward, ent_coef * entropy), dim=-1)
 
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"

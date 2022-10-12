@@ -57,7 +57,7 @@ class PPO(RLAlgo):
                 a=a,
                 log_p_a = log_p_a,
                 z=None,
-                entropy_a = p_a.entropy().mean(),
+                entropy_a = p_a.entropy(),
             )
             timestep = transition['next_timestep']
             transitions.append(transition)
@@ -75,7 +75,6 @@ class PPO(RLAlgo):
             traj = self.inference(env, self.pi, steps=steps)
 
             reward = traj.get_tensor('r', device='cuda:0')
-            entropy_a = traj.get_tensor('entropy_a', device='cuda:0')
 
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
@@ -83,13 +82,19 @@ class PPO(RLAlgo):
                 
             done, truncated = traj.get_truncated_done()
 
+            cur_obs = traj.get_tensor('obs')
+            next_obs = traj.get_tensor('next_obs')
+
             vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
-            next_vpred = traj.predict_value(('next_obs', 'z', 'next_timestep'), self.pi.value, batch_size=self.batch_size)
+            # next_vpred2 = traj.predict_value(('next_obs', 'z', 'next_timestep'), self.pi.value, batch_size=self.batch_size)
+            next_vpred = traj.predict_next(('next_obs', 'z', 'next_timestep'), self.pi.value, self.batch_size, vpred)
+            # assert torch.allclose(next_vpred, next_vpred2, atol=1e-4, rtol=1e-3), f'{torch.abs(next_vpred - next_vpred2).max()}'
 
-            next_entropy_a = traj.pread()
+            #next_entropy_a = traj.pread()
+            entropy = traj.get_tensor('entropy_a', device='cuda:0')[..., None]
+            next_entropy = traj.predict_next(('next_obs', 'z', 'next_timestep'), self.pi.entropy, self.batch_size, entropy)
 
-
-            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated, entropy=entropy_a)
+            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated, entropy=entropy, next_entropy=next_entropy)
 
 
             data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'log_p_a'])
