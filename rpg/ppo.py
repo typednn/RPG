@@ -82,8 +82,8 @@ class PPO(RLAlgo):
                 
             done, truncated = traj.get_truncated_done()
 
-            cur_obs = traj.get_tensor('obs')
-            next_obs = traj.get_tensor('next_obs')
+            # cur_obs = traj.get_tensor('obs')
+            # next_obs = traj.get_tensor('next_obs')
 
             vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
             # next_vpred2 = traj.predict_value(('next_obs', 'z', 'next_timestep'), self.pi.value, batch_size=self.batch_size)
