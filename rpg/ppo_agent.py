@@ -2,6 +2,7 @@ import torch as th
 from tools.config import Configurable
 from tools.utils import batch_input
 from nn.distributions import ActionDistr
+from tools.utils import logger
 from tools.optim import OptimModule as Optim
 from .utils import compute_gae_by_hand
 from .traj import DataBuffer
@@ -131,7 +132,6 @@ class EntropyOptim(Optim):
     def compute_loss(self, entropy):
         # if self._cfg.target > entropy, increase log alpha
         #print(self._cfg.target - entropy)
-        from tools.utils import logger
         logger.logkv_mean('gap', float(self._cfg.target - entropy))
         return - (self.log_alpha.exp() * (self._cfg.target - entropy))
 
@@ -190,25 +190,30 @@ class PPOAgent(Configurable):
         return self.ent_optim()
 
     def gae(
-        self, vpred, next_vpred, reward, done, truncated, logp,
+        self, vpred, next_vpred, reward, done, truncated, entropy, next_entropy,
     ):
         if self._cfg.ignore_done:
             done = done * 0
 
-        if self.ent_coef() > 0.:
-            from tools.utils import logger
-            logger.logkv_mean('ent coef', self.ent_coef().item())
-            ent = -logp[..., None] * self.ent_coef() # entropy reward..
+        ent_coef = self.ent_coef()
+        if ent_coef > 0.:
+            logger.logkv_mean('ent coef', float(ent_coef))
+
+            vpred[..., -1:] += ent_coef * entropy
+            next_vpred[..., -1:] += ent_coef * next_entropy
+
             assert ent.shape[:-1] == reward.shape[:-1]
-            reward = th.cat((reward, ent), dim=-1)
+            reward = th.cat((reward, ent_coef * entropy), dim=-1)
 
         assert vpred.shape == next_vpred.shape == reward.shape, "vpred and next_vpred must be the same length as reward"
 
-        adv = compute_gae_by_hand(reward, vpred, next_vpred, done, truncated,
-                                  gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact')
+        adv = compute_gae_by_hand(
+            reward, vpred, next_vpred, done, truncated,
+            gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, mode='exact'
+        )
 
-        if self.ent_coef() > 0.:
-            adv[..., -1:] -= ent # do not include entropy reward in adv.
+        if ent_coef > 0.:
+            vpred[..., -1:] -= ent_coef * entropy
 
         vtarg = vpred + adv
 
@@ -216,7 +221,6 @@ class PPOAgent(Configurable):
 
 
     def normalize(self, data):
-        from tools.utils import logger
         if self.rew_norm is not None:
             vtarg = data['vtarg']
             self.rew_norm.update(vtarg)
@@ -245,7 +249,6 @@ class PPOAgent(Configurable):
 
 
         if logger_scope is not None:
-            from tools.utils import logger
             output = {logger_scope + k: v for k, v in actor_output.items()}
             output[logger_scope + 'critic_loss'] = critic_loss.item()
             output[logger_scope + 'actor_loss'] = actor_loss.item()

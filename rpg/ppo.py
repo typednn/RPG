@@ -57,8 +57,9 @@ class PPO(RLAlgo):
                 a=a,
                 log_p_a = log_p_a,
                 z=None,
+                entropy_a = p_a.entropy().mean(),
             )
-            timestep = transition['timestep']
+            timestep = transition['next_timestep']
             transitions.append(transition)
 
         return Trajectory(transitions, len(obs), steps)
@@ -74,17 +75,21 @@ class PPO(RLAlgo):
             traj = self.inference(env, self.pi, steps=steps)
 
             reward = traj.get_tensor('r', device='cuda:0')
-            logp = traj.get_tensor('log_p_a', device='cuda:0')
+            entropy_a = traj.get_tensor('entropy_a', device='cuda:0')
 
             if self.rnd is not None:
                 rnd_reward = self.rnd(traj, batch_size=self.batch_size, update_normalizer=True)
                 reward = torch.cat((reward, rnd_reward), dim=-1) # 2 dim rewards ..
                 
             done, truncated = traj.get_truncated_done()
+
             vpred = traj.predict_value(('obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
-            #TODO: timestep to the next timestep
-            next_vpred = traj.predict_value(('next_obs', 'z', 'timestep'), self.pi.value, batch_size=self.batch_size)
-            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated, logp=logp)
+            next_vpred = traj.predict_value(('next_obs', 'z', 'next_timestep'), self.pi.value, batch_size=self.batch_size)
+
+            next_entropy_a = traj.pread()
+
+
+            adv_targets = self.pi.gae(vpred, next_vpred, reward, done, truncated, entropy=entropy_a)
 
 
             data = traj.get_list_by_keys(['obs', 'timestep', 'a', 'log_p_a'])

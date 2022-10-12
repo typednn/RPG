@@ -98,7 +98,7 @@ class GymVecEnv(VecEnv):
         return {
             'obs': obs, # the current observation of the environment. 
             'next_obs': next_obs, # ending state of the previous transition.
-            'timestep': self.steps.copy(),
+            'next_timestep': self.steps.copy(),
             'r': np.array(reward)[:, None],
             'done': done,
             'info': info,
@@ -195,7 +195,7 @@ class TorchEnv(VecEnv):
         return {
             'obs': obs, # the current observation of the environment. 
             'next_obs': next_obs, # ending state of the previous transition.
-            'timestep': self.steps.clone(),
+            'next_timestep': self.steps.clone(),
             'r': reward[:, None], #np.array(reward)[:, None],
             'done': done,
             'info': info,
