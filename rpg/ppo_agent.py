@@ -16,7 +16,7 @@ class PolicyOptim(Optim):
         self,
         actor,
         cfg=None,
-        lr=5e-4,
+        lr=3e-4,
         clip_param=0.2,
         max_kl=0.1,
         #max_grad_norm=0.5,
@@ -108,7 +108,7 @@ class PolicyOptim(Optim):
 
 class CriticOptim(Optim):
     def __init__(self, critic, cfg=None,
-                 lr=5e-4, vfcoef=0.5, mode='step'):
+                 lr=3e-4, vfcoef=0.5, mode='step'):
         super(CriticOptim, self).__init__(critic)
         self.critic = critic
         self.vfcoef = vfcoef

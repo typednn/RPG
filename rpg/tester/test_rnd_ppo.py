@@ -8,15 +8,15 @@ N = 256
 env = TorchEnv('SmallMaze', N)
 
 train_ppo.parse(
-    env, steps=40, obs_norm=False, reward_norm=True,
+    env, steps=40, obs_norm=False,
 
     actor=dict(
-        head=dict(linear=False, std_scale=0.2, std_mode='fix_no_grad')
+        head=dict(linear=False, std_scale=0.2, std_mode='statewise')
     ),
 
-    gae=dict(correct_gae=True, ignore_done=False, lmbda=0.97),
+    #gae=dict(correct_gae=True, ignore_done=False, lmbda=0.97),
     batch_size=2000,
-    ppo=dict(learning_epoch=5),
+    ppo=dict(learning_epoch=5, ignore_done=False, lmbda=0.97, entropy=dict(coef=0.0, target=None)),
 
     hooks=dict(
         #save_model=dict(n_epoch=10),

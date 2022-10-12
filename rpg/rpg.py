@@ -26,7 +26,6 @@ class RPG(RLAlgo):
         rnd=None,
         batch_size=256,
 
-        rew_rms = None,
         obs_rms = None,
         hooks: List[HookBase] = []
     ) -> None:
@@ -44,11 +43,11 @@ class RPG(RLAlgo):
         self.rnd = rnd
         self.batch_size = batch_size
 
-        super().__init__(rew_rms, obs_rms, hooks)
+        super().__init__(obs_rms, hooks)
 
 
     def modules(self):
-        return [self.pi_a, self.pi_z, self.relbo, self.rew_rms, self.obs_rms]
+        return [self.pi_a, self.pi_z, self.relbo, self.obs_rms]
 
     def inference(
         self,
@@ -173,7 +172,6 @@ class train_rpg(TrainerBase):
 
 
         from tools.utils import RunningMeanStd
-        rew_rms = RunningMeanStd(last_dim=False) if reward_norm else None
         obs_rms = RunningMeanStd(clip_max=10.) if obs_norm else None
 
         obs_space = env.observation_space
@@ -199,13 +197,11 @@ class train_rpg(TrainerBase):
         self.relbo = Relbo(info_net, hidden_space, action_space, cfg=relbo)
 
 
-        hgae = HierarchicalGAE(pi_a, pi_z, cfg=gae)
-
         if rnd is not None:
             rnd = RNDOptim(obs_space, cfg=rnd).to(device)
 
-        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo, hgae, batch_size=batch_size,
-                        rew_rms=rew_rms, obs_rms=obs_rms, rnd=rnd, hooks=build_hooks(hooks))
+        self.ppo = RPG(env, self.sample_initial_latent, pi_a, pi_z, self.relbo,
+                       batch_size=batch_size, obs_rms=obs_rms, rnd=rnd, hooks=build_hooks(hooks))
 
         while True:
             self.ppo.run_rpg(env, steps)
