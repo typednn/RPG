@@ -116,9 +116,6 @@ class RNDOptim(OptimModule):
 
 
     def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):
-        if self.embeder is not None:
-            data = data.map(lambda x: self.embeder(x))
-
         for i in range(self._cfg.learning_epoch):
             n_batches = 0
             keys = ['obs', 'z', 'timestep']
