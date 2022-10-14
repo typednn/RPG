@@ -464,3 +464,18 @@ def mlp(in_dim, mlp_dim, out_dim, act_fn=torch.nn.ELU()):
         torch.nn.Linear(in_dim, mlp_dim[0]), act_fn,
         torch.nn.Linear(mlp_dim[0], mlp_dim[1]), act_fn,
         torch.nn.Linear(mlp_dim[1], out_dim))
+
+class Seq(torch.nn.Module):
+    def __init__(self, *main):
+        super().__init__()
+        self.main = torch.nn.ModuleList(main)
+    def forward(self, x, z=None):
+        if z is not None: x = torch.cat([x, z], dim=-1)
+        for m in self.main:
+            x = m(x)
+        return x
+
+class Identity(torch.nn.Module):
+    def forward(self, x):
+        return x
+

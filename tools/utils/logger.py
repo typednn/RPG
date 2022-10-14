@@ -312,11 +312,12 @@ def logkvs(d):
         logkv(k, v)
 
 
-def logkvs_mean(d):
+def logkvs_mean(d, prefix=None):
     """
     Log a dictionary of key-value pairs with averaging over multiple calls
     """
     for (k, v) in d.items():
+        if prefix: k = prefix + k
         logkv_mean(k, v)
 
 

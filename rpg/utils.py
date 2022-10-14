@@ -2,6 +2,7 @@ import tqdm
 import numpy as np
 import torch
 from nn.space import Discrete, Box, MixtureSpace
+from tools.config import Configurable
 
 
 
