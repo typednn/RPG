@@ -8,7 +8,7 @@ N = 10
 env = GymVecEnv('HalfCheetah-v3', N)
 
 train_ppo.parse(
-    env, steps=2000, obs_norm=True, actor=dict(head=dict(linear=True, std_scale=0.5, std_mode='fix_learnable')), 
+    env, steps=2000, obs_norm=True, actor=dict(head=dict(linear=False, std_scale=0.5, std_mode='fix_learnable')), 
     batch_size=2000, ppo=dict(learning_epoch=2, ignore_done=True),
 
     hooks=dict(

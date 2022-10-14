@@ -190,6 +190,16 @@ def animate(clip, filename='animation.mp4', _return=True, fps=10, embed=False):
         from IPython.display import Video
         return Video(filename, embed=embed) 
 
+def read_video(filename, dtype='float32'):
+    import imageio
+    reader = imageio.get_reader(filename)
+    frames = []
+    for i, frame in enumerate(reader):
+        frames.append(frame)
+    if dtype == 'float32':
+        frames = [f.astype(float)/255. for f in frames]
+    return frames
+
 # operator on dict/list of np array or tensor ..
 # the leaf can only be np array or tensor
 
@@ -426,3 +436,31 @@ def myround(a):
     x = torch.round(a).long()
     assert torch.allclose(x.float(), a), 'the rounding is not correct'
     return x
+
+
+
+def orthogonal_init(m):
+    from torch import nn
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.Conv2d):
+        gain = nn.init.calculate_gain('relu')
+        nn.init.orthogonal_(m.weight.data, gain)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+
+def ema(m, m_target, tau):
+    with torch.no_grad():
+        for p, p_target in zip(m.parameters(), m_target.parameters()):
+            p_target.data.lerp_(p.data, tau)
+
+def mlp(in_dim, mlp_dim, out_dim, act_fn=torch.nn.ELU()):
+    """Returns an MLP."""
+    if isinstance(mlp_dim, int):
+        mlp_dim = [mlp_dim, mlp_dim]
+    return torch.nn.Sequential(
+        torch.nn.Linear(in_dim, mlp_dim[0]), act_fn,
+        torch.nn.Linear(mlp_dim[0], mlp_dim[1]), act_fn,
+        torch.nn.Linear(mlp_dim[1], out_dim))

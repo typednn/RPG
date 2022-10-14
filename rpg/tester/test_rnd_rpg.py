@@ -15,7 +15,7 @@ train_rpg.parse(
     env, 
     hidden_space,
 
-    steps=40, obs_norm=False, reward_norm=True,
+    steps=40, obs_norm=False,
 
     hidden_head=dict(epsilon=0.),
 

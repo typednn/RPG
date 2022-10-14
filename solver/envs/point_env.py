@@ -31,9 +31,9 @@ class StateEnv(GoalEnv):
 class PointEnv(StateEnv):
     # let's consider the penalty based version, to ensure the environment is continuous  
 
-    def __init__(self, cfg=None, low_steps=15, num_stages=1, with_dt=False, penalty=False, boundary=True, clamp_action=True, save_traj=False):
+    def __init__(self, cfg=None, low_steps=15, num_stages=1, with_dt=False, penalty=False, boundary=True, clamp_action=True, save_traj=False, action_scale=0.1):
         super().__init__()
-        self.action_scale = 0.1
+        self.action_scale = action_scale
         self.observation_space = gym.spaces.Box(-1, 1, (3,))
         self.action_space = gym.spaces.Box(-1, 1, (2,))
         self.state = torch.zeros(3, dtype=torch.float32, device='cuda:0')

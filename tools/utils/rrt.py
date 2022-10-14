@@ -79,6 +79,8 @@ class Tree:
     def add_edge(self, q, parent_id):
         self.nodes.append(q)
         self.father.append(parent_id)
+        if parent_id != -1:
+            self.trees.append([q, self.nodes[parent_id]])
 
     def backtrace(self):
         cur = len(self.nodes) - 1
@@ -113,16 +115,20 @@ class RRTConnectPlanner:
         self.max_iter = max_iter
         self.use_lvc = use_lvc
 
-    def __call__(self, start, goal, info=False):
+    def __call__(self, start, goal, info=False, return_tree=False, rrt_connect=True):
         start = np.array(start)
         goal = np.array(goal)
         self.TA = self.TB = None
 
         # code for single direction
         self.TA = TA = Tree(self.collision_checker, self.expand_dis, self.step_size)
+
+        trees = []
+        TA.trees = trees
         TA.add_edge(start, -1)
 
         self.TB = TB = Tree(self.collision_checker, self.expand_dis, self.step_size)
+        TB.trees = trees
         TB.add_edge(goal, -1)
 
         ran = range if not info else tqdm.trange
@@ -130,8 +136,11 @@ class RRTConnectPlanner:
             q_rand = np.array(self.state_sampler())
             S, q_new = TA.extend(q_rand)
             if not (S == TRAPPED):
-                if TB.connect(q_new) == REACHED:
-                    if i % 2 == 1:
+                reached = (rrt_connect and TB.connect(q_new) == REACHED)
+                if not rrt_connect and np.linalg.norm(q_new - goal) < self.expand_dis:
+                    reached = steerTo(q_new, goal, self.collision_checker, step_size=self.step_size, expand_dis=self.expand_dis)[0]
+                if reached:
+                    if i % 2 == 1 and rrt_connect:
                         TA, TB = TB, TA
                         self.TA = TA
                         self.TB = TB
@@ -142,6 +151,9 @@ class RRTConnectPlanner:
                     if self.use_lvc and len(path) <= int(self.use_lvc):
                         self.original_path = path
                         path = lvc(path, self.collision_checker, steerTo, self.step_size)
+                    if return_tree:
+                        return path, trees
                     return path
-            TA, TB = TB, TA
+            if rrt_connect:
+                TA, TB = TB, TA
         return []
