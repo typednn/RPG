@@ -64,9 +64,9 @@ class RLAlgo(abc.ABC):
         raise NotImplementedError
 
 
-    @abc.abstractmethod
-    def modules(self, **kwargs):
-        pass
+    # @abc.abstractmethod
+    # def modules(self, **kwargs):
+    #     pass
 
     @abc.abstractmethod
     def evaluate(self, *args, **kwargs):

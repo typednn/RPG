@@ -8,6 +8,7 @@ class ReplayBuffer(Configurable):
     def __init__(self, obs_shape, action_dim, episode_length, horizon,
                        cfg=None, device='cuda:0', max_episode_num=2000,
                        modality='state', per_alpha=0.6, per_beta=0.4):
+        super().__init__()
 
         self.cfg = cfg
         self.device = torch.device(cfg.device)
@@ -20,9 +21,9 @@ class ReplayBuffer(Configurable):
         assert modality == 'state'
         dtype = torch.float32 if cfg.modality == 'state' else torch.uint8
 
-        self._obs = torch.empty((self.capacity+1, *obs_shape), dtype=dtype, device=self.device)
+        self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
         self._action = torch.empty((self.capacity, action_dim), dtype=torch.float32, device=self.device)
-        self._reward = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
+        self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._priorities = torch.ones((self.capacity,), dtype=torch.float32, device=self.device)
         self._last_obs = torch.empty((self.capacity//episode_length, *obs_shape), dtype=dtype, device=self.device)
 
@@ -73,7 +74,7 @@ class ReplayBuffer(Configurable):
         weights /= weights.max()
 
         obs = self._get_obs(self._obs, idxs)
-        next_obs = torch.empty((self.horizon+1, batch_size, self.obs_shape), dtype=obs.dtype, device=obs.device)
+        next_obs = torch.empty((self.horizon+1, batch_size, *self.obs_shape), dtype=obs.dtype, device=obs.device)
         action = torch.empty((self.horizon+1, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon+1, batch_size, 1), dtype=torch.float32, device=self.device)
         for t in range(self.horizon+1):
@@ -82,7 +83,8 @@ class ReplayBuffer(Configurable):
             action[t] = self._action[_idxs]
             reward[t] = self._reward[_idxs]
 
-        mask = (_idxs+1) % self.cfg.episode_length == 0
-        next_obs[-1, mask] = self._last_obs[_idxs[mask]//self.cfg.episode_length].cuda().float()
+        mask = (_idxs+1) % self.episode_length == 0
+        next_obs[-1, mask] = self._last_obs[_idxs[mask]//self.episode_length].cuda().float()
+        # print(obs.shape, next_obs.shape, action.shape, reward.shape)
 
         return obs, next_obs, action, reward, idxs, weights

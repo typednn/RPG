@@ -50,7 +50,7 @@ class GymVecEnv(VecEnv):
         self.observation_space = self.vec_env.observation_space[0]
         self.action_space = self.vec_env.action_space[0]
 
-        self.max_time_steps = self.vec_env._max_episode_steps
+        self.max_time_steps = self.vec_env._max_episode_steps[0]
 
     def start(self, reset=False, **kwargs):
         self.kwargs = kwargs
