@@ -81,7 +81,8 @@ class RLAlgo(abc.ABC):
 
         traj = locals_['traj']
         self.total += traj.n
-        print(self.total, traj.summarize_epsidoe_info())
+        #print(self.total, )
+        logger.logkvs_mean(traj.summarize_epsidoe_info())
 
         self.epoch_id += 1
         locals_.pop('self')

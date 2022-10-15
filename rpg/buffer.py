@@ -39,10 +39,10 @@ class ReplayBuffer(Configurable):
         rewards = traj.get_tensor('r', self.device)
 
         for i in range(traj.nenv):
-            self._obs[self.idx:self.idx+self.episode_length] = cur_obs[i]
-            self._last_obs[self.idx//self.episode_length] = next_obs[i, -1]
-            self._action[self.idx:self.idx+self.episode_length] = actions[i]
-            self._reward[self.idx:self.idx+self.episode_length] = rewards[i]
+            self._obs[self.idx:self.idx+self.episode_length] = cur_obs[:, i]
+            self._last_obs[self.idx//self.episode_length] = next_obs[-1, i]
+            self._action[self.idx:self.idx+self.episode_length] = actions[:, i]
+            self._reward[self.idx:self.idx+self.episode_length] = rewards[:, i]
 
 
             if self._full:

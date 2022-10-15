@@ -124,7 +124,7 @@ class Trainer(Configurable, RLAlgo):
         env: Union[GymVecEnv, TorchEnv],
         cfg=None,
         nsteps=2000,
-        head=DistHead.to_build(TYPE='Normal', std_mode='fix_learnable', std_scale=0.5),
+        head=DistHead.to_build(TYPE='Normal', linear=False, std_mode='fix_no_grad', std_scale=0.2),
         horizon=6,
         buffer = ReplayBuffer.dc,
         obs_norm=False,
@@ -208,7 +208,7 @@ class Trainer(Configurable, RLAlgo):
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
         self.dyna_optim.optimize((loss * weights).sum(axis=0))
-        logger.logkvs_mean(dyna_loss, prefix='dyna/')
+        logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
         # update the value network ..
         value = self.nets.value(obs, None, self.horizon, alpha=0.)[0]
@@ -252,8 +252,15 @@ class Trainer(Configurable, RLAlgo):
                 traj = self.inference(n_step)
                 self.buffer.add(traj)
 
-            for i in tqdm.trange(min(n_step, self._cfg.update_step)):
+            for _ in tqdm.trange(min(n_step, self._cfg.update_step)):
                 update_step += 1
                 self.update(self.buffer.sample(self._cfg.batch_size), update_step % self._cfg.update_freq == 0)
+
+            a = traj.get_tensor('a')
+            logger.logkv_mean('a_max', float(a.max()))
+            logger.logkv_mean('a_min', float(a.min()))
+
+            self.call_hooks(locals())
+            print(traj.summarize_epsidoe_info())
 
             logger.dumpkvs()
