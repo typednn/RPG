@@ -7,9 +7,8 @@ from rpg.rpgm import Trainer
 
 # N = 1
 #N = 1
-env = GymVecEnv('HalfCheetah-v3', 10, ignore_truncated_done=True)
-# env = TorchEnv('SmallMaze', n=100, ignore_truncated=True, reward=True)
+# env = GymVecEnv('HalfCheetah-v3', 10, ignore_truncated_done=True)
+env = TorchEnv('SmallMaze', n=100, ignore_truncated=True, reward=True)
 
-
-trainer = Trainer(env, update_step=20, buffer=dict(priority=False))
+trainer = Trainer.parse(env, update_step=10, buffer=dict(priority=False), head=dict(squash=True), hooks=dict(save_traj=dict(n_epoch=2, save_gif_epochs=10)))
 trainer.run_rpgm()

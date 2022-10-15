@@ -164,6 +164,7 @@ class Trainer(Configurable, RLAlgo):
         rho=0.7, # horizon decay
         weights=dict(state=2., prefix=0.5, value=0.5),
         qnet=GeneralizedQ.dc,
+        action_penalty=0.
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -185,8 +186,9 @@ class Trainer(Configurable, RLAlgo):
         self.actor_optim = LossOptimizer(self.nets.pi_a, cfg=actor_optim)
         self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=actor_optim)
 
-    def evaluate(self, *args, **kwargs):
-        pass
+    def evaluate(self, env, steps):
+        with torch.no_grad():
+            return self.inference(steps)
 
     def make_network(self, obs_space, action_space):
         hidden_dim = 256
@@ -251,7 +253,7 @@ class Trainer(Configurable, RLAlgo):
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
         # update the value network ..
-        value = self.nets.value(obs, None, self.horizon, alpha=0., action_penalty=0.001)[0]
+        value = self.nets.value(obs, None, self.horizon, alpha=0., action_penalty=self._cfg.action_penalty)[0]
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
         self.actor_optim.optimize(actor_loss)
@@ -264,7 +266,7 @@ class Trainer(Configurable, RLAlgo):
             buffer.update_priorities(idxs, loss[:, None])
 
     def inference(self, n_step):
-        obs, timestep = self.start(self.env)
+        obs, timestep = self.start(self.env, reset=True)
         assert (timestep == 0).all()
         transitions = []
 
@@ -283,8 +285,9 @@ class Trainer(Configurable, RLAlgo):
 
     def run_rpgm(self, max_epoch=None):
         logger.configure(dir=self._cfg.path)
+        env = self.env
 
-        n_step = self.env.max_time_steps
+        steps = self.env.max_time_steps
         epoch_id = 0
         update_step = 0
         while True:
@@ -292,10 +295,10 @@ class Trainer(Configurable, RLAlgo):
                 break
 
             with torch.no_grad():
-                traj = self.inference(n_step)
+                traj = self.inference(steps)
                 self.buffer.add(traj)
 
-            for _ in tqdm.trange(min(n_step, self._cfg.update_step)):
+            for _ in tqdm.trange(min(steps, self._cfg.update_step)):
                 update_step += 1
                 self.update(self.buffer, update_step % self._cfg.update_freq == 0)
 

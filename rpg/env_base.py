@@ -163,9 +163,10 @@ class TorchEnv(VecEnv):
         from .traj import Trajectory
         traj: Trajectory
         obs = traj.old_obs
-        if traj.traj[0]['z'] is not None:
-            assert 'z' not in kwargs
-            kwargs['z'] = traj.get_tensor('z')[1:]
+        if 'z' in traj.traj[0]:
+            if traj.traj[0]['z'] is not None:
+                assert 'z' not in kwargs
+                kwargs['z'] = traj.get_tensor('z')[1:]
         return self.goal_env._render_traj_rgb(obs, **kwargs)
 
 
