@@ -23,7 +23,7 @@ class SAC(Trainer):
     def __init__(
             self, env: Union[GymVecEnv, TorchEnv], cfg=None, 
 
-            head = DistHead.to_build(TYPE='Normal', linear=False, std_mode='fix_no_grad', std_scale=0.2), 
+            head = DistHead.to_build(TYPE='Normal', linear=False, squash=True, std_mode='statewise', std_scale=0.2), 
             weights=dict(state=0., prefix=1., value=1.), # predict reward + value from the o directly ..
             horizon=1,
             predict_Q=True,
@@ -31,10 +31,7 @@ class SAC(Trainer):
         super().__init__(env)
 
     def make_network(self, obs_space, action_space):
-        # let o_1 and s 1 be the concatenate of (s, a1)
-        # predict the Q as the sum of r(s, a) + V(s, a)
         hidden_dim = 256
-        latent_dim = 100 # encoding of state ..
 
         state_dim = obs_space.shape[0]
         action_dim = action_space.shape[0]

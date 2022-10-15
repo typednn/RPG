@@ -129,9 +129,15 @@ class GeneralizedQ(Network):
 
         return v, values, value_prefix
 
-    def value(self, obs, z, horizon, alpha=0):
+    def value(self, obs, z, horizon, alpha=0, action_penalty=0.):
         traj = self.inference(obs, z, horizon)
         extra_reward = traj['logp_a'] * alpha if alpha > 0 else None
+        if action_penalty > 0.:
+            penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True)
+            if extra_reward is None:
+                extra_reward = penalty
+            else: 
+                extra_reward += penalty
         return self.predict_values(traj['hidden'], traj['z_embed'], extra_reward)
 
 
@@ -201,10 +207,10 @@ class Trainer(Configurable, RLAlgo):
         network.apply(orthogonal_init)
         return network
         
-    def update(self, data, update_target):
+    def update(self, buffer: ReplayBuffer, update_target):
         supervised_horizon = self.horizon # not +1 yet
 
-        obs, next_obs, action, reward, idxs, weights = data
+        obs, next_obs, action, reward, idxs, weights = buffer.sample(self._cfg.batch_size)
         batch_size = obs.shape[0]
 
         with torch.no_grad():
@@ -213,17 +219,15 @@ class Trainer(Configurable, RLAlgo):
             state_gt = self.nets.enc_s(next_obs)[:supervised_horizon]
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             assert torch.allclose(reward[0], vprefix_gt[0])
-
             assert vprefix_gt.shape[-1] == 1
-
 
             if self.nets._cfg.predict_q:
                 for i in range(self.horizon):
                     vtarg[i] = vtarg[i] * (self.nets._cfg.gamma ** (i+1)) + vprefix_gt[i].mean(axis=-1, keepdim=True)
                 vprefix_gt = torch.zeros_like(vprefix_gt) # do not predit vprefix
-            else:
-                vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
-                vprefix_gt = vprefix_gt.mean(axis=-1, keepdims=True)  # take the avarage..
+
+            assert vprefix_gt.shape[-1] == 1
+            vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
 
         # update the dynamics model ..
         traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
@@ -247,7 +251,7 @@ class Trainer(Configurable, RLAlgo):
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
         # update the value network ..
-        value = self.nets.value(obs, None, self.horizon, alpha=0.)[0]
+        value = self.nets.value(obs, None, self.horizon, alpha=0., action_penalty=0.001)[0]
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
         self.actor_optim.optimize(actor_loss)
@@ -256,7 +260,8 @@ class Trainer(Configurable, RLAlgo):
         if update_target:
             ema(self.nets, self.target_nets, self._cfg.tau)
 
-        return loss.detach().cpu().numpy()
+        with torch.no_grad():
+            buffer.update_priorities(idxs, loss[:, None])
 
     def inference(self, n_step):
         obs, timestep = self.start(self.env)
@@ -292,7 +297,7 @@ class Trainer(Configurable, RLAlgo):
 
             for _ in tqdm.trange(min(n_step, self._cfg.update_step)):
                 update_step += 1
-                self.update(self.buffer.sample(self._cfg.batch_size), update_step % self._cfg.update_freq == 0)
+                self.update(self.buffer, update_step % self._cfg.update_freq == 0)
 
             a = traj.get_tensor('a')
             logger.logkv_mean('a_max', float(a.max()))

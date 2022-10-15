@@ -21,7 +21,6 @@ class NormalAction(ActionDistr):
         if self.tanh:
             action = torch.tanh(action)
             logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
-            raise NotImplementedError
         logp = logp.sum(axis=-1)
         return action, logp
 

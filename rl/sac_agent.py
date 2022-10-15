@@ -34,7 +34,7 @@ class SACAgent(Agent):
         action_space: Box,
         cfg: CN = None,
         actor=Actor.get_default_config(
-            head=dict(std_mode="statewise", squash=True)),
+            head=dict(std_mode="statewise", squash=True, squash=True)),
         actor_optim=Optim.get_default_config(),
         critic=None,
         critic_optim=Optim.get_default_config(),

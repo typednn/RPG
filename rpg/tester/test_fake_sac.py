@@ -12,5 +12,5 @@ from rpg.sac import SAC
 env = TorchEnv('SmallMaze', n=100, ignore_truncated=True, reward=True)
 
 
-trainer = SAC(env, update_step=100, buffer=dict(priority=False), qnet=dict(predict_q=True))
+trainer = SAC(env, update_step=10, buffer=dict(priority=False), qnet=dict(predict_q=True))
 trainer.run_rpgm()

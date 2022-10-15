@@ -80,11 +80,8 @@ class ReplayBuffer(Configurable):
             probs = (self._priorities if self._full else self._priorities[:self.idx]) ** self.cfg.per_alpha
             probs /= probs.sum()
             total = len(probs)
-
             idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
-
             assert idxs.max() < len(self._obs)
-
             weights = (total * probs[idxs]) ** (-self.cfg.per_beta)
             weights /= weights.max()
         else:
@@ -93,7 +90,6 @@ class ReplayBuffer(Configurable):
             probs /= probs.sum()
             total = len(probs)
             idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
-
             weights = torch.ones((batch_size,), device=self.device)
 
         obs = self._get_obs(self._obs, idxs)
