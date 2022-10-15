@@ -92,7 +92,7 @@ class GeneralizedQ(Network):
 
             hidden.append(o)
             actions.append(a)
-            logp_a.append(logp)
+            logp_a.append(logp[..., None])
             states.append(s)
 
         ss = torch.stack
@@ -106,7 +106,7 @@ class GeneralizedQ(Network):
         else:
             prefix = value_prefix
 
-        if rewards is not None:
+        if rewards is not None and (rewards is not 0):
             prefix = prefix + compute_value_prefix(rewards, self._cfg.gamma)
 
         values = self.value_fn(hidden, z_embed) # predict V(s, z_{t-1})
@@ -127,18 +127,18 @@ class GeneralizedQ(Network):
             lmbda *= self._cfg.lmbda
         v = (v + (1./(1-self._cfg.lmbda) - sum_lmbda) * vpred) * (1-self._cfg.lmbda)
 
-        return v, values, value_prefix
+        return dict(value=v, next_values=values, value_prefix=value_prefix)
 
     def value(self, obs, z, horizon, alpha=0, action_penalty=0.):
         traj = self.inference(obs, z, horizon)
-        extra_reward = traj['logp_a'] * alpha if alpha > 0 else None
-        if action_penalty > 0.:
-            penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True)
-            if extra_reward is None:
-                extra_reward = penalty
-            else: 
-                extra_reward += penalty
-        return self.predict_values(traj['hidden'], traj['z_embed'], extra_reward)
+        entropy_term = -traj['logp_a']
+        entropy = entropy_term * alpha if alpha > 0 else 0
+        penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True) if action_penalty > 0 else 0
+        extra_reward = entropy + penalty
+        values =  self.predict_values(traj['hidden'], traj['z_embed'], extra_reward)
+        values['entropy_term'] = entropy_term
+        values['penalty'] = penalty
+        return values
 
 
 class Trainer(Configurable, RLAlgo):
@@ -164,7 +164,10 @@ class Trainer(Configurable, RLAlgo):
         rho=0.7, # horizon decay
         weights=dict(state=2., prefix=0.5, value=0.5),
         qnet=GeneralizedQ.dc,
-        action_penalty=0.
+        action_penalty=0.,
+
+        entropy_coef=0.,
+        entropy_target=None,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -185,6 +188,10 @@ class Trainer(Configurable, RLAlgo):
         # only optimize pi_a here
         self.actor_optim = LossOptimizer(self.nets.pi_a, cfg=actor_optim)
         self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=actor_optim)
+
+        self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
+        if entropy_target is not None:
+            self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
 
     def evaluate(self, env, steps):
         with torch.no_grad():
@@ -210,6 +217,10 @@ class Trainer(Configurable, RLAlgo):
         return network
         
     def update(self, buffer: ReplayBuffer, update_target):
+        with torch.no_grad():
+            alpha = self._cfg.entropy_coef * torch.exp(self.log_alpha).detach()
+
+
         supervised_horizon = self.horizon # not +1 yet
 
         obs, next_obs, action, reward, idxs, weights = buffer.sample(self._cfg.batch_size)
@@ -217,7 +228,7 @@ class Trainer(Configurable, RLAlgo):
 
         with torch.no_grad():
             vtarg = self.target_nets.value(next_obs.reshape(-1, *obs.shape[1:]), None,
-                self.horizon, alpha=0.)[0].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
+                self.horizon, alpha=alpha)['value'].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
             state_gt = self.nets.enc_s(next_obs)[:supervised_horizon]
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             assert torch.allclose(reward[0], vprefix_gt[0])
@@ -234,8 +245,8 @@ class Trainer(Configurable, RLAlgo):
         # update the dynamics model ..
         traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
         states = traj['states']
-
-        _, vpred, value_prefix = self.nets.predict_values(traj['hidden'], None, None)
+        out = self.nets.predict_values(traj['hidden'], None, None)
+        vpred, value_prefix = out['next_values'], out['value_prefix']
 
         horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
         horizon_weights = horizon_weights / horizon_weights.sum()
@@ -252,12 +263,19 @@ class Trainer(Configurable, RLAlgo):
         self.dyna_optim.optimize((loss * weights).sum(axis=0)/weights.sum(axis=0))
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
-        # update the value network ..
-        value = self.nets.value(obs, None, self.horizon, alpha=0., action_penalty=self._cfg.action_penalty)[0]
+        # update the actor network ..
+        samples = self.nets.value(obs, None, self.horizon, alpha=alpha, action_penalty=self._cfg.action_penalty)
+        value = samples['value']
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
+
+        if self._cfg.entropy_target is not None:
+            entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - samples['entropy_term'].detach()))
+            self.entropy_optim.optimize(entropy_loss)
+        logger.logkv_mean('alpha', float(alpha))
+        logger.logkv_mean('entropy_term', float(samples['entropy_term'].mean()))
 
         if update_target:
             ema(self.nets, self.target_nets, self._cfg.tau)

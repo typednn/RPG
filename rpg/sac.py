@@ -27,6 +27,7 @@ class SAC(Trainer):
             weights=dict(state=0., prefix=1., value=1.), # predict reward + value from the o directly ..
             horizon=1,
             predict_Q=True,
+            entropy_coef=1.
         ):
         super().__init__(env)
 
