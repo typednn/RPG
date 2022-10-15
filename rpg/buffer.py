@@ -21,7 +21,7 @@ class ReplayBuffer(Configurable):
         assert modality == 'state'
         dtype = torch.float32 if cfg.modality == 'state' else torch.uint8
 
-        self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
+        self._obs = torch.empty((self.capacity+1, *obs_shape), dtype=dtype, device=self.device) # avoid last buggy..
         self._action = torch.empty((self.capacity, action_dim), dtype=torch.float32, device=self.device)
         self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._priorities = torch.ones((self.capacity,), dtype=torch.float32, device=self.device)
@@ -31,6 +31,7 @@ class ReplayBuffer(Configurable):
         self._full = False
         self.idx = 0
 
+    @torch.no_grad()
     def add(self, traj: Trajectory):
         assert self.episode_length == traj.timesteps, "episode length mismatch"
         cur_obs = traj.get_tensor('obs', self.device)
@@ -38,7 +39,13 @@ class ReplayBuffer(Configurable):
         actions = traj.get_tensor('a', self.device)
         rewards = traj.get_tensor('r', self.device)
 
+        assert cur_obs.shape[-1:] == self.obs_shape
+        assert actions.shape[-1] == self.action_dim
+
         for i in range(traj.nenv):
+            assert self.idx//self.episode_length < len(self._last_obs)
+            assert self.idx + self.episode_length <= len(self._obs)
+
             self._obs[self.idx:self.idx+self.episode_length] = cur_obs[:, i]
             self._last_obs[self.idx//self.episode_length] = next_obs[-1, i]
             self._action[self.idx:self.idx+self.episode_length] = actions[:, i]
@@ -54,6 +61,7 @@ class ReplayBuffer(Configurable):
             new_priorities = torch.full((self.episode_length,), max_priority, device=self.device)
             new_priorities[mask] = 0
             self._priorities[self.idx:self.idx+self.episode_length] = new_priorities
+
             self.idx = (self.idx + self.episode_length) % self.capacity
             self._full = self._full or self.idx == 0
 
@@ -62,14 +70,20 @@ class ReplayBuffer(Configurable):
 
     def _get_obs(self, arr, idxs):
         if self.cfg.modality == 'state':
+            assert idxs.max() < len(arr), f"{idxs.max()} {len(arr)}"
             return arr[idxs]
         raise NotImplementedError
 
+    @torch.no_grad()
     def sample(self, batch_size):
         probs = (self._priorities if self._full else self._priorities[:self.idx]) ** self.cfg.per_alpha
         probs /= probs.sum()
         total = len(probs)
+
         idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
+
+        assert idxs.max() < len(self._obs)
+
         weights = (total * probs[idxs]) ** (-self.cfg.per_beta)
         weights /= weights.max()
 
@@ -79,12 +93,14 @@ class ReplayBuffer(Configurable):
         reward = torch.empty((self.horizon+1, batch_size, 1), dtype=torch.float32, device=self.device)
         for t in range(self.horizon+1):
             _idxs = idxs + t
-            next_obs[t] = self._get_obs(self._obs, _idxs+1)
             action[t] = self._action[_idxs]
             reward[t] = self._reward[_idxs]
+            next_obs[t] = self._get_obs(self._obs, _idxs+1)
 
-        mask = (_idxs+1) % self.episode_length == 0
-        next_obs[-1, mask] = self._last_obs[_idxs[mask]//self.episode_length].cuda().float()
-        # print(obs.shape, next_obs.shape, action.shape, reward.shape)
+        mask = ((_idxs+1) % self.episode_length == 0)
+        # print(self.idx, len(self._obs))
+
+        l_id = _idxs[mask]//self.episode_length
+        next_obs[-1, mask] = self._last_obs[l_id].cuda().float()
 
         return obs, next_obs, action, reward, idxs, weights

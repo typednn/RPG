@@ -135,7 +135,7 @@ class Trainer(Configurable, RLAlgo):
 
         batch_size=512,
         update_freq=2, # update target network ..
-        update_step=100,
+        update_step=200,
         tau=0.01,
         rho=0.7, # horizon decay
         weights=dict(state=2., prefix=0.5, value=0.5)

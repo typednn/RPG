@@ -83,6 +83,7 @@ class RLAlgo(abc.ABC):
         self.total += traj.n
         #print(self.total, )
         logger.logkvs_mean(traj.summarize_epsidoe_info())
+        logger.logkv_mean('total_steps', self.total)
 
         self.epoch_id += 1
         locals_.pop('self')
