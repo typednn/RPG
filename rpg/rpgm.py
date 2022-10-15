@@ -134,6 +134,7 @@ class GeneralizedQ(Network):
         extra_reward = traj['logp_a'] * alpha if alpha > 0 else None
         return self.predict_values(traj['hidden'], traj['z_embed'], extra_reward)
 
+
 class Trainer(Configurable, RLAlgo):
     def __init__(
         self,
@@ -156,6 +157,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         rho=0.7, # horizon decay
         weights=dict(state=2., prefix=0.5, value=0.5),
+        qnet=GeneralizedQ.dc,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -195,7 +197,7 @@ class Trainer(Configurable, RLAlgo):
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim, hidden_dim, head.get_input_dim()), head)
-        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec,  value_prefix, value)
+        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec,  value_prefix, value, cfg=self._cfg.qnet)
         network.apply(orthogonal_init)
         return network
         
@@ -235,7 +237,6 @@ class Trainer(Configurable, RLAlgo):
             assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
             if a.shape[-1] != b.shape[-1]:
                 assert b.shape[-1] == 1 and (a.shape[-1] in [1, 2]), f'{a.shape} vs {b.shape}'
-
             h = horizon_weights[:len(a)]
             return (((a-b)**2).mean(axis=-1) * h).sum(axis=0)
         
