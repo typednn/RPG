@@ -18,7 +18,7 @@ class ActionDistr:
             logp = logp.sum(dim=-1)
         if self.tanh:
             action = torch.tanh(action)
-            logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
+            logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6).sum(axis=-1)
         return action, logp
 
     def rsample(self, *args, sum=True, **kwargs):
@@ -30,7 +30,7 @@ class ActionDistr:
             logp = logp.sum(dim=-1)
         if self.tanh:
             action = torch.tanh(action)
-            logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
+            logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6).sum(axis=-1)
         return action, logp
 
     def batch_action(self, action):

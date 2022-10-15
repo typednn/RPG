@@ -475,6 +475,13 @@ class Seq(torch.nn.Module):
             x = m(x)
         return x
 
+class CatNet(torch.nn.Module):
+    def __init__(self, *args) -> None:
+        super().__init__()
+        self.main = torch.nn.ModuleList(args)
+    def forward(self, *args):
+        return torch.cat([m(*args) for m in self.main], dim=-1)
+
 class Identity(torch.nn.Module):
     def forward(self, x):
         return x

@@ -7,7 +7,7 @@ from .traj import Trajectory
 class ReplayBuffer(Configurable):
     def __init__(self, obs_shape, action_dim, episode_length, horizon,
                        cfg=None, device='cuda:0', max_episode_num=2000,
-                       modality='state', per_alpha=0.6, per_beta=0.4):
+                       modality='state', per_alpha=0.6, per_beta=0.4, priority=True):
         super().__init__()
 
         self.cfg = cfg
@@ -76,31 +76,42 @@ class ReplayBuffer(Configurable):
 
     @torch.no_grad()
     def sample(self, batch_size):
-        probs = (self._priorities if self._full else self._priorities[:self.idx]) ** self.cfg.per_alpha
-        probs /= probs.sum()
-        total = len(probs)
+        if self._cfg.priority:
+            probs = (self._priorities if self._full else self._priorities[:self.idx]) ** self.cfg.per_alpha
+            probs /= probs.sum()
+            total = len(probs)
 
-        idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
+            idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
 
-        assert idxs.max() < len(self._obs)
+            assert idxs.max() < len(self._obs)
 
-        weights = (total * probs[idxs]) ** (-self.cfg.per_beta)
-        weights /= weights.max()
+            weights = (total * probs[idxs]) ** (-self.cfg.per_beta)
+            weights /= weights.max()
+        else:
+            probs = (self._priorities if self._full else self._priorities[:self.idx]) ** self.cfg.per_alpha
+            probs = (probs > 0.).float() # greater than zero ..
+            probs /= probs.sum()
+            total = len(probs)
+            idxs = torch.from_numpy(np.random.choice(total, batch_size, p=probs.cpu().numpy(), replace=not self._full)).to(self.device)
+
+            weights = torch.ones((batch_size,), device=self.device)
 
         obs = self._get_obs(self._obs, idxs)
         next_obs = torch.empty((self.horizon+1, batch_size, *self.obs_shape), dtype=obs.dtype, device=obs.device)
         action = torch.empty((self.horizon+1, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon+1, batch_size, 1), dtype=torch.float32, device=self.device)
-        for t in range(self.horizon+1):
+        for t in range(self.horizon + 1):
             _idxs = idxs + t
+            assert _idxs.max() < len(self._action), f"{_idxs.max()} {len(self._action)} {t}"
             action[t] = self._action[_idxs]
             reward[t] = self._reward[_idxs]
             next_obs[t] = self._get_obs(self._obs, _idxs+1)
 
         mask = ((_idxs+1) % self.episode_length == 0)
         # print(self.idx, len(self._obs))
-
-        l_id = _idxs[mask]//self.episode_length
-        next_obs[-1, mask] = self._last_obs[l_id].cuda().float()
+        if mask.any():
+            l_id = _idxs[mask]//self.episode_length
+            assert l_id.max() < len( self._last_obs), f"{l_id.max()} {len(self._last_obs)}"
+            next_obs[-1, mask] = self._last_obs[l_id].cuda().float()
 
         return obs, next_obs, action, reward, idxs, weights

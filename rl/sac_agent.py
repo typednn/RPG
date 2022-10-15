@@ -118,7 +118,7 @@ class SACAgent(Agent):
         actor_output = self.actor(state)
         sampled_actions, logp = actor_output.rsample()
         entropy = actor_output.entropy()[:, None]
-        entropy_term = -logp.sum(dim=-1, keepdim=True) #actor_output.log_prob(sampled_actions, sum=True)[:, None]
+        entropy_term = -logp[:, None] #.sum(dim=-1, keepdim=True) #actor_output.log_prob(sampled_actions, sum=True)[:, None]
 
         # Expectations of Q with clipped double Q technique.
         qs1, qs2 = self.critic(state, sampled_actions)
@@ -141,15 +141,12 @@ class SACAgent(Agent):
         with torch.no_grad():
             actor_output = self.actor(next_state)
             next_action, next_log_prob = actor_output.sample()
-            next_log_prob = next_log_prob.sum(dim=-1, keepdim=True)
-            #next_entropy = actor_output.entropy()[:, None] 
-            #next_log_prob = actor_output.log_prob(next_action, sum=True)[:, None]
-            #raise NotImplementedError("Not use entropy here..")
+            next_log_prob = next_log_prob[:, None]
 
             next_qs1, next_qs2 = self.critic_target(next_state, next_action)
             next_qs = torch.min(next_qs1, next_qs2) 
 
-            assert next_qs.shape == next_log_prob.shape
+            assert next_qs.shape == next_log_prob.shape, f"{next_qs.shape}, {next_log_prob.shape}"
             next_qs = next_qs - self.log_alpha.detach().exp() * next_log_prob
 
             assert reward.shape == next_qs.shape, f"{reward.shape}, {next_qs.shape}"

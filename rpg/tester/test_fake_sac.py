@@ -2,7 +2,8 @@ import tqdm
 import numpy as np
 from rpg.env_base import GymVecEnv, TorchEnv
 from rpg.ppo import train_ppo
-from rpg.rpgm import Trainer
+#from rpg.rpgm import Trainer
+from rpg.sac import SAC
 
 
 # N = 1
@@ -11,5 +12,5 @@ env = GymVecEnv('HalfCheetah-v3', 10, ignore_truncated_done=True)
 # env = TorchEnv('SmallMaze', n=100, ignore_truncated=True, reward=True)
 
 
-trainer = Trainer(env, update_step=20, buffer=dict(priority=False))
+trainer = SAC(env, update_step=1, buffer=dict(priority=False))
 trainer.run_rpgm()

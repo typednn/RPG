@@ -4,7 +4,7 @@ import copy
 import torch
 from tools.config import Configurable
 from tools.nn_base import Network
-from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, logger, totensor, Identity, ema
+from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, logger, totensor, Identity, ema, CatNet
 from tools.optim import LossOptimizer
 from .common_hooks import RLAlgo, build_hooks
 from .buffer import ReplayBuffer
@@ -35,17 +35,14 @@ class GeneralizedQ(Network):
         cfg=None,
         gamma=0.995,
         lmbda=0.97,
+        predict_q=False,
     ) -> None:
         super().__init__()
 
-        self.pi_a = pi_a
-        self.pi_z = pi_z
+        self.pi_a, self.pi_z = pi_a, pi_z
+        self.enc_s, self.enc_z, self.enc_a = enc_s, enc_z, enc_a
         assert self.pi_z is None
 
-
-        self.enc_s = enc_s
-        self.enc_z = enc_z
-        self.enc_a = enc_a
         self.init_h = init_h
         self.dynamic_fn: torch.nn.GRU = dynamic_fn
 
@@ -65,6 +62,15 @@ class GeneralizedQ(Network):
         return self.pi_a(s, self.enc_z(z))
 
     def inference(self, obs, z, step, a_seq=None):
+        """
+        s      a_1    a_2    ...
+        |      |      |
+        h_0 -> h_1 -> h_2 -> h_3 -> h_4
+               |      |      |      |   
+               o_1    o_2    o_3    o_4
+             / |  \
+            s1 r1  v1    
+        """
         z_embed = self.enc_z(z)
         assert z_embed is None
         s = self.enc_s(obs)
@@ -93,10 +99,15 @@ class GeneralizedQ(Network):
         return dict(hidden=ss(hidden), actions=ss(actions), logp_a=ss(logp_a), states=ss(states), z_embed=None)
 
     def predict_values(self, hidden, z_embed, rewards=None):
-        value_prefix = self.value_prefix(hidden) # predict reward
+        value_prefix = self.value_prefix(hidden) # predict reward prefix
+
+        if self._cfg.predict_q:
+            prefix = torch.zeros_like(value_prefix)
+        else:
+            prefix = value_prefix
 
         if rewards is not None:
-            value_prefix = value_prefix + compute_value_prefix(rewards, self._cfg.gamma)
+            prefix = prefix + compute_value_prefix(rewards, self._cfg.gamma)
 
         values = self.value_fn(hidden, z_embed) # predict V(s, z_{t-1})
 
@@ -105,12 +116,17 @@ class GeneralizedQ(Network):
         sum_lmbda = 0.
         v = 0
         for i in range(len(hidden)):
-            vpred = (value_prefix[i] + values[i] * gamma * self._cfg.gamma)
+            if self._cfg.predict_q:
+                vpred = values[i] + prefix[i] # add the additional rewards like entropies 
+            else:
+                vpred = (prefix[i] + values[i] * gamma * self._cfg.gamma)
+
             v = v + vpred * lmbda
             sum_lmbda += lmbda
             gamma *= self._cfg.gamma
             lmbda *= self._cfg.lmbda
         v = (v + (1./(1-self._cfg.lmbda) - sum_lmbda) * vpred) * (1-self._cfg.lmbda)
+
         return v, values, value_prefix
 
     def value(self, obs, z, horizon, alpha=0):
@@ -126,6 +142,7 @@ class Trainer(Configurable, RLAlgo):
         nsteps=2000,
         head=DistHead.to_build(TYPE='Normal', linear=False, std_mode='fix_no_grad', std_scale=0.2),
         horizon=6,
+        supervised_horizon=None,
         buffer = ReplayBuffer.dc,
         obs_norm=False,
 
@@ -136,9 +153,9 @@ class Trainer(Configurable, RLAlgo):
         batch_size=512,
         update_freq=2, # update target network ..
         update_step=200,
-        tau=0.01,
+        tau=0.005,
         rho=0.7, # horizon decay
-        weights=dict(state=2., prefix=0.5, value=0.5)
+        weights=dict(state=2., prefix=0.5, value=0.5),
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -150,7 +167,7 @@ class Trainer(Configurable, RLAlgo):
         self.env = env
 
         # buffer samples horizon + 1
-        self.buffer = ReplayBuffer(obs_space.shape, action_dim, env.max_time_steps, horizon)
+        self.buffer = ReplayBuffer(obs_space.shape, action_dim, env.max_time_steps, horizon, cfg=buffer)
         self.nets = self.make_network(obs_space, env.action_space).cuda()
 
         with torch.no_grad():
@@ -183,43 +200,60 @@ class Trainer(Configurable, RLAlgo):
         return network
         
     def update(self, data, update_target):
+        supervised_horizon = self.horizon # not +1 yet
+
         obs, next_obs, action, reward, idxs, weights = data
+        batch_size = obs.shape[0]
 
         with torch.no_grad():
             vtarg = self.target_nets.value(next_obs.reshape(-1, *obs.shape[1:]), None,
-                self.horizon, alpha=0.)[0].reshape(next_obs.shape[0], -1, 1)
-            state_gt = self.nets.enc_s(next_obs)
-            vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
+                self.horizon, alpha=0.)[0].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
+            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon]
+            vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
+            assert torch.allclose(reward[0], vprefix_gt[0])
+
+            assert vprefix_gt.shape[-1] == 1
+
+
+            if self.nets._cfg.predict_q:
+                for i in range(self.horizon):
+                    vtarg[i] = vtarg[i] * (self.nets._cfg.gamma ** (i+1)) + vprefix_gt[i].mean(axis=-1, keepdim=True)
+                vprefix_gt = torch.zeros_like(vprefix_gt) # do not predit vprefix
+            else:
+                vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
+                vprefix_gt = vprefix_gt.mean(axis=-1, keepdims=True)  # take the avarage..
 
         # update the dynamics model ..
-        traj = self.nets.inference(obs, None, self.horizon+1, action)
+        traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
         states = traj['states']
 
         _, vpred, value_prefix = self.nets.predict_values(traj['hidden'], None, None)
 
-        horizon_weights = (self._cfg.rho ** torch.arange(self.horizon+1, device=obs.device))[:, None]
+        horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
         horizon_weights = horizon_weights / horizon_weights.sum()
         def hmse(a, b):
-            assert a.shape == b.shape, f'{a.shape} vs {b.shape}'
+            assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
+            if a.shape[-1] != b.shape[-1]:
+                assert b.shape[-1] == 1 and (a.shape[-1] in [1, 2]), f'{a.shape} vs {b.shape}'
+
             h = horizon_weights[:len(a)]
             return (((a-b)**2).mean(axis=-1) * h).sum(axis=0)
-
+        
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
-        self.dyna_optim.optimize((loss * weights).sum(axis=0))
+        self.dyna_optim.optimize((loss * weights).sum(axis=0)/weights.sum(axis=0))
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
         # update the value network ..
         value = self.nets.value(obs, None, self.horizon, alpha=0.)[0]
-        assert value.shape[-1] == 1
-        actor_loss = -value.mean(axis=0)
+        assert value.shape[-1] in [1, 2]
+        actor_loss = -value[..., 0].mean(axis=0)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
 
         if update_target:
-            with torch.no_grad():
-                ema(self.nets, self.target_nets, self._cfg.tau)
+            ema(self.nets, self.target_nets, self._cfg.tau)
 
         return loss.detach().cpu().numpy()
 
@@ -230,7 +264,10 @@ class Trainer(Configurable, RLAlgo):
 
         for _ in range(n_step):
             transition = dict(obs = obs)
-            a, _ = self.nets.policy(obs, None).rsample()
+            pd = self.nets.policy(obs, None)
+            scale = pd.dist.scale
+            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
+            a, _ = pd.rsample()
             data, obs = self.step(self.env, a)
 
             transition.update(**data, a=a)
