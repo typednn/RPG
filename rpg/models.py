@@ -112,3 +112,16 @@ class InfoNet(Network):
             head = merge_inputs(head, **self._cfg.head)
         return head
 
+
+
+class MLPDynamics(torch.nn.Module):
+    def __init__(self, hidden_dim) -> None:
+        super().__init__()
+        from tools.utils import mlp
+        self.dyna = mlp(hidden_dim + hidden_dim, hidden_dim, hidden_dim)
+        self.output = mlp(hidden_dim, hidden_dim, hidden_dim)
+    
+    def forward(self, i, h):
+        h = self.dyna(torch.cat([i, h], dim=-1))
+        o = self.output(h)
+        return o, h

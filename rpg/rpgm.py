@@ -9,6 +9,7 @@ from tools.optim import LossOptimizer
 from .common_hooks import RLAlgo, build_hooks
 from .buffer import ReplayBuffer
 from .traj import Trajectory
+from .models import MLPDynamics
 from typing import Union
 from .env_base import GymVecEnv, TorchEnv
 from nn.distributions import DistHead
@@ -205,8 +206,12 @@ class Trainer(Configurable, RLAlgo):
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
         init_h = mlp(latent_dim, hidden_dim, hidden_dim) # reconstruct obs ..
-        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1) # num layer 1..
-        value = Seq(mlp(hidden_dim, hidden_dim, 1))#layer norm, if necesssary
+        # dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 3) # num layer 1..
+        dynamics = MLPDynamics(hidden_dim)
+        value = CatNet(
+            Seq(mlp(hidden_dim, hidden_dim, 1)),
+            Seq(mlp(hidden_dim, hidden_dim, 1)),
+        ) #layer norm, if necesssary
         value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 
