@@ -11,5 +11,5 @@ from rpg.rpgm import Trainer
 
 # trainer = Trainer.parse(env, update_step=10, buffer=dict(priority=False), head=dict(squash=True), hooks=dict(save_traj=dict(n_epoch=2, save_gif_epochs=10)))
 env = GymVecEnv('HalfCheetah-v3', 10, ignore_truncated_done=True)
-trainer = Trainer.parse(env, update_step=200, buffer=dict(priority=False), head=dict(std_mode='statewise', std_scale=1., squash=True), entropy_coef=1., entropy_target=-6, actor_optim=dict(max_grad_norm=5.)) # do not know if we need max_grad_norm
+trainer = Trainer.parse(env, update_step=200, buffer=dict(priority=False), head=dict(std_mode='statewise', std_scale=1., squash=True), entropy_coef=1., entropy_target=-6, actor_optim=dict(max_grad_norm=1.)) # do not know if we need max_grad_norm
 trainer.run_rpgm()

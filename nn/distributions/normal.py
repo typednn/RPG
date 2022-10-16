@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from .dist_head import DistHead, ActionDistr
 import numpy as np
+import torch.nn.functional as F
 from torch.distributions import Normal as Gaussian
 # from .gmm import GMMAction
 
@@ -19,8 +20,13 @@ class NormalAction(ActionDistr):
 
         logp = self.dist.log_prob(action)
         if self.tanh:
+            # https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/sac/core.py
+            logp -= (2*(np.log(2) - action - F.softplus(-2*action)))
+
             action = torch.tanh(action)
-            logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
+            #logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
+
+
         logp = logp.sum(axis=-1)
         return action, logp
 
@@ -43,7 +49,7 @@ class NormalAction(ActionDistr):
 
 
 class Normal(DistHead):
-    LOG_STD_MAX = 10
+    LOG_STD_MAX = 2
     LOG_STD_MIN = -20
 
     STD_MODES = ['statewise', 'fix_learnable', 'fix_no_grad']
@@ -54,7 +60,6 @@ class Normal(DistHead):
                  std_mode: str = 'fix_no_grad',
                  std_scale=0.1,
                  minimal_std_val=-np.inf,
-                 use_gmm=0,
                  squash=False, linear=True, nocenter=False):
         super().__init__(action_space)
 
@@ -66,8 +71,6 @@ class Normal(DistHead):
         n_output = 2 if std_mode == 'statewise' else 1
 
         self.net_output_dim = self.action_dim * n_output
-        if use_gmm:
-            self.net_output_dim = (n_output * self.action_dim + 1) * use_gmm
 
         if std_mode.startswith('fix'):
             self.log_std = nn.Parameter(torch.zeros(
@@ -79,12 +82,6 @@ class Normal(DistHead):
         return self.net_output_dim
 
     def forward(self, means):
-        if self._cfg.use_gmm > 0:
-            raise NotImplementedError
-            log_loc = means[:, :self._cfg.use_gmm]
-            means = means[:, self._cfg.use_gmm:]
-            means = means.reshape(means.shape[0], self._cfg.use_gmm, -1)
-
         if self.std_mode.startswith('fix'):  # fix, determine
             log_stds = self.log_std.expand_as(means)
         else:  # 'tanh',
@@ -108,9 +105,4 @@ class Normal(DistHead):
 
         if self._cfg.nocenter:
             means = means * 0
-
-        if self._cfg.use_gmm == 0:
-            return NormalAction(means, action_std, tanh=tanh)
-        else:
-            raise NotImplementedError
-            #return GMMAction(log_loc, means, action_std, tanh=tanh)
+        return NormalAction(means, action_std, tanh=tanh)
