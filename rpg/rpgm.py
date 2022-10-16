@@ -69,8 +69,10 @@ class GeneralizedQ(Network):
         h_0 -> h_1 -> h_2 -> h_3 -> h_4
                |      |      |      |   
                o_1    o_2    o_3    o_4
-             / |  \
-            s1 r1  v1    
+             / |  
+            s1 r1    
+            |
+            v1
         """
         z_embed = self.enc_z(z)
         assert z_embed is None
