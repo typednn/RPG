@@ -166,7 +166,7 @@ class Trainer(Configurable, RLAlgo):
         update_step=200,
         tau=0.005,
         rho=0.7, # horizon decay
-        weights=dict(state=2., prefix=0.5, value=0.5),
+        weights=dict(state=1000., prefix=0.5, value=0.5),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
