@@ -99,7 +99,7 @@ class GeneralizedQ(Network):
         ss = torch.stack
         return dict(hidden=ss(hidden), actions=ss(actions), logp_a=ss(logp_a), states=ss(states), z_embed=None)
 
-    def predict_values(self, hidden, z_embed, rewards=None):
+    def predict_values(self, ss, hidden, z_embed, rewards=None):
         value_prefix = self.value_prefix(hidden) # predict reward prefix
 
         if self._cfg.predict_q:
@@ -110,7 +110,10 @@ class GeneralizedQ(Network):
         if rewards is not None and (rewards is not 0):
             prefix = prefix + compute_value_prefix(rewards, self._cfg.gamma)
 
-        values = self.value_fn(hidden, z_embed) # predict V(s, z_{t-1})
+        if self._cfg.predict_q:
+            values = self.value_fn(hidden, z_embed) # predict V(s, z_{t-1})
+        else:
+            values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
         gamma = 1
         lmbda = 1
@@ -136,7 +139,7 @@ class GeneralizedQ(Network):
         entropy = entropy_term * alpha if alpha > 0 else 0
         penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True) if action_penalty > 0 else 0
         extra_reward = entropy + penalty
-        values =  self.predict_values(traj['hidden'], traj['z_embed'], extra_reward)
+        values =  self.predict_values(traj['states'], traj['hidden'], traj['z_embed'], extra_reward)
         values['entropy_term'] = entropy_term
         values['penalty'] = penalty
         return values
@@ -205,12 +208,13 @@ class Trainer(Configurable, RLAlgo):
         enc_z = Identity()
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
-        init_h = mlp(latent_dim, hidden_dim, hidden_dim) # reconstruct obs ..
-        # dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 3) # num layer 1..
-        dynamics = MLPDynamics(hidden_dim)
+        init_h = mlp(latent_dim, hidden_dim, hidden_dim)
+        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
+        # dynamics = MLPDynamics(hidden_dim)
+        v_in = hidden_dim if self._cfg.qnet.predict_q else latent_dim
         value = CatNet(
-            Seq(mlp(hidden_dim, hidden_dim, 1)),
-            Seq(mlp(hidden_dim, hidden_dim, 1)),
+            Seq(mlp(v_in, hidden_dim, 1)),
+            Seq(mlp(v_in, hidden_dim, 1)),
         ) #layer norm, if necesssary
         value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
@@ -250,7 +254,7 @@ class Trainer(Configurable, RLAlgo):
         # update the dynamics model ..
         traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
         states = traj['states']
-        out = self.nets.predict_values(traj['hidden'], None, None)
+        out = self.nets.predict_values(states, traj['hidden'], None, None)
         vpred, value_prefix = out['next_values'], out['value_prefix']
 
         horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
