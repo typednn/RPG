@@ -52,14 +52,10 @@ class GeneralizedQ(Network):
         self.value_fn = value_fn
             
 
-        d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
         v_nets = [enc_s, enc_z, value_fn]
-        if not predict_q:
-            self.value_nets = torch.nn.ModuleList(v_nets)
-            self.dynamics = torch.nn.ModuleList(d_nets)
-        else:
-            # SAC, we directly predict the Q value
-            self.dynamics = torch.nn.ModuleList(d_nets + v_nets)
+        d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
+        self.value_nets = torch.nn.ModuleList(v_nets)
+        self.dynamics = torch.nn.ModuleList(d_nets)
 
 
     def policy(self, obs, z):
@@ -67,6 +63,11 @@ class GeneralizedQ(Network):
         obs = totensor(obs, self.device)
         s = self.enc_s(obs)
         return self.pi_a(s, self.enc_z(z))
+
+    def value_from_obs(self, obs, z):
+        assert not self._cfg.predict_q
+        s = self.enc_s(obs)
+        return self.value_fn(s, self.enc_z(z))
 
     def inference(self, obs, z, step, a_seq=None):
         """
@@ -152,11 +153,6 @@ class GeneralizedQ(Network):
         values['penalty'] = penalty
         return values
 
-    def value_from_obs(self, obs, z):
-        assert not self._cfg.predict_q
-        s = self.enc_s(obs)
-        return self.value_fn(s, self.enc_z(z))
-
 
 class Trainer(Configurable, RLAlgo):
     def __init__(
@@ -185,6 +181,9 @@ class Trainer(Configurable, RLAlgo):
 
         entropy_coef=0.,
         entropy_target=None,
+
+        
+        separate_value_dyna=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -197,17 +196,20 @@ class Trainer(Configurable, RLAlgo):
 
         # buffer samples horizon + 1
         self.buffer = ReplayBuffer(obs_space.shape, action_dim, env.max_time_steps, horizon, cfg=buffer)
-        self.nets = self.make_network(obs_space, env.action_space).cuda()
+        nets = self.nets = self.make_network(obs_space, env.action_space).cuda()
 
         with torch.no_grad():
-            self.target_nets = copy.deepcopy(self.nets).cuda()
+            self.target_nets = copy.deepcopy(nets).cuda()
 
         # only optimize pi_a here
-        self.actor_optim = LossOptimizer(self.nets.pi_a, cfg=actor_optim)
-        self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=actor_optim)
+        self.actor_optim = LossOptimizer(nets.pi_a, cfg=actor_optim)
 
-        if not self.nets._cfg.predict_q:
-            self.value_optim = LossOptimizer(self.nets.value_nets, cfg=actor_optim)
+        if separate_value_dyna:
+            assert not nets._cfg.predict_q
+            self.dyna_optim = LossOptimizer(nets.dynamics, cfg=actor_optim)
+            self.value_optim = LossOptimizer(nets.value_nets, cfg=actor_optim)
+        else:
+            self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
 
         self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
@@ -221,6 +223,8 @@ class Trainer(Configurable, RLAlgo):
         hidden_dim = 256
         latent_dim = 100 # encoding of state ..
         enc_s = mlp(obs_space.shape[0], hidden_dim, latent_dim) # TODO: layer norm?
+        if self._cfg.separate_value_dyna:
+            enc_s = Seq(enc_s, torch.nn.LayerNorm(latent_dim))
         enc_z = Identity()
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
@@ -285,8 +289,11 @@ class Trainer(Configurable, RLAlgo):
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
-        self.dyna_optim.optimize((loss * weights).sum(axis=0)/weights.sum(axis=0))
+
+        dyna_loss_total = (loss * weights).sum(axis=0)/weights.sum(axis=0)
+        self.dyna_optim.optimize(dyna_loss_total)
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
+        logger.logkv_mean('dyna_loss', float(dyna_loss_total))
 
 
         # update the actor network ..
@@ -298,11 +305,13 @@ class Trainer(Configurable, RLAlgo):
         logger.logkv_mean('actor', float(actor_loss))
 
         # value
-        if not self.nets._cfg.predict_q:
+        if self._cfg.separate_value_dyna:
             with torch.no_grad():
-                vtarg = torch.cat((value[None,:].min(axis=-1, keepdims=True)[0], vtarg), axis=0) # add the value of the first state ..
+                value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
+                vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
             vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
-            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0).mean() # do not weight it again ..
+            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
+            critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
             self.value_optim.optimize(critic_loss)
             logger.logkv_mean('critic', float(critic_loss))
 
