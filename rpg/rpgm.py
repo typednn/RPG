@@ -51,9 +51,15 @@ class GeneralizedQ(Network):
         self.value_prefix = value_prefix
         self.value_fn = value_fn
             
-        def get_dynamics():
-            return [enc_s, enc_a, enc_z, init_h, dynamic_fn, state_dec, value_prefix, value_fn]
-        self.dynamics = torch.nn.ModuleList(get_dynamics())
+
+        d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
+        v_nets = [enc_s, enc_z, value_fn]
+        if not predict_q:
+            self.value_nets = torch.nn.ModuleList(v_nets)
+            self.dynamics = torch.nn.ModuleList(d_nets)
+        else:
+            # SAC, we directly predict the Q value
+            self.dynamics = torch.nn.ModuleList(d_nets + v_nets)
 
 
     def policy(self, obs, z):
@@ -99,7 +105,7 @@ class GeneralizedQ(Network):
             states.append(s)
 
         ss = torch.stack
-        return dict(hidden=ss(hidden), actions=ss(actions), logp_a=ss(logp_a), states=ss(states), z_embed=None)
+        return dict(hidden=ss(hidden), actions=ss(actions), logp_a=ss(logp_a), states=ss(states), z_embed=None, init_s=s)
 
     def predict_values(self, ss, hidden, z_embed, rewards=None):
         value_prefix = self.value_prefix(hidden) # predict reward prefix
@@ -145,6 +151,11 @@ class GeneralizedQ(Network):
         values['entropy_term'] = entropy_term
         values['penalty'] = penalty
         return values
+
+    def value_from_obs(self, obs, z):
+        assert not self._cfg.predict_q
+        s = self.enc_s(obs)
+        return self.value_fn(s, self.enc_z(z))
 
 
 class Trainer(Configurable, RLAlgo):
@@ -194,6 +205,9 @@ class Trainer(Configurable, RLAlgo):
         # only optimize pi_a here
         self.actor_optim = LossOptimizer(self.nets.pi_a, cfg=actor_optim)
         self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=actor_optim)
+
+        if not self.nets._cfg.predict_q:
+            self.value_optim = LossOptimizer(self.nets.value_nets, cfg=actor_optim)
 
         self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
@@ -274,6 +288,7 @@ class Trainer(Configurable, RLAlgo):
         self.dyna_optim.optimize((loss * weights).sum(axis=0)/weights.sum(axis=0))
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
 
+
         # update the actor network ..
         samples = self.nets.value(obs, None, self.horizon, alpha=alpha, action_penalty=self._cfg.action_penalty)
         value = samples['value']
@@ -281,6 +296,16 @@ class Trainer(Configurable, RLAlgo):
         actor_loss = -value[..., 0].mean(axis=0)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
+
+        # value
+        if not self.nets._cfg.predict_q:
+            with torch.no_grad():
+                vtarg = torch.cat((value[None,:].min(axis=-1, keepdims=True)[0], vtarg), axis=0) # add the value of the first state ..
+            vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
+            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0).mean() # do not weight it again ..
+            self.value_optim.optimize(critic_loss)
+            logger.logkv_mean('critic', float(critic_loss))
+
 
         if self._cfg.entropy_target is not None:
             entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - samples['entropy_term'].detach()))
