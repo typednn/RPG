@@ -34,9 +34,11 @@ class GeneralizedQ(Network):
         state_dec, value_prefix, value_fn,
 
         cfg=None,
-        gamma=0.995,
+        gamma=0.99,
         lmbda=0.97,
         predict_q=False,
+
+        lmbda_last=False,
     ) -> None:
         super().__init__()
 
@@ -138,7 +140,11 @@ class GeneralizedQ(Network):
             sum_lmbda += lmbda
             gamma *= self._cfg.gamma
             lmbda *= self._cfg.lmbda
-        v = (v + (1./(1-self._cfg.lmbda) - sum_lmbda) * vpred) * (1-self._cfg.lmbda)
+
+        if self._cfg.lmbda_last:
+            v = (v + (1./(1-self._cfg.lmbda) - sum_lmbda) * vpred) * (1-self._cfg.lmbda)
+        else:
+            v = v / sum_lmbda
 
         return dict(value=v, next_values=values, value_prefix=value_prefix)
 
@@ -183,7 +189,8 @@ class Trainer(Configurable, RLAlgo):
         entropy_target=None,
 
         
-        separate_value_dyna=False,
+        critic_weight=0.,
+        norm_s_enc=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -204,12 +211,11 @@ class Trainer(Configurable, RLAlgo):
         # only optimize pi_a here
         self.actor_optim = LossOptimizer(nets.pi_a, cfg=actor_optim)
 
-        if separate_value_dyna:
-            assert not nets._cfg.predict_q
-            self.dyna_optim = LossOptimizer(nets.dynamics, cfg=actor_optim)
-            self.value_optim = LossOptimizer(nets.value_nets, cfg=actor_optim)
-        else:
-            self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
+        # if separate_value_dyna:
+        #     assert not nets._cfg.predict_q
+        #     self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
+        #     self.value_optim = LossOptimizer(nets.value_nets, cfg=actor_optim)
+        self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
 
         self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
@@ -223,7 +229,7 @@ class Trainer(Configurable, RLAlgo):
         hidden_dim = 256
         latent_dim = 100 # encoding of state ..
         enc_s = mlp(obs_space.shape[0], hidden_dim, latent_dim) # TODO: layer norm?
-        if self._cfg.separate_value_dyna:
+        if self._cfg.norm_s_enc:
             enc_s = Seq(enc_s, torch.nn.LayerNorm(latent_dim))
         enc_z = Identity()
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
@@ -289,8 +295,20 @@ class Trainer(Configurable, RLAlgo):
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
-
         dyna_loss_total = (loss * weights).sum(axis=0)/weights.sum(axis=0)
+
+        # value
+        if self._cfg.critic_weight > 0.:
+            with torch.no_grad():
+                value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
+                vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
+            vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
+            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
+            critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
+            #self.value_optim.optimize(critic_loss)
+            logger.logkv_mean('critic', float(critic_loss))
+            dyna_loss_total += self._cfg.critic_weight * critic_loss # additional value predict .. 
+
         self.dyna_optim.optimize(dyna_loss_total)
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
         logger.logkv_mean('dyna_loss', float(dyna_loss_total))
@@ -304,16 +322,6 @@ class Trainer(Configurable, RLAlgo):
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
 
-        # value
-        if self._cfg.separate_value_dyna:
-            with torch.no_grad():
-                value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
-                vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
-            vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
-            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
-            critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
-            self.value_optim.optimize(critic_loss)
-            logger.logkv_mean('critic', float(critic_loss))
 
 
         if self._cfg.entropy_target is not None:
@@ -347,7 +355,7 @@ class Trainer(Configurable, RLAlgo):
         return Trajectory(transitions, len(obs), n_step)
 
     def run_rpgm(self, max_epoch=None):
-        logger.configure(dir=self._cfg.path)
+        logger.configure(dir=self._cfg.path, format_strs=["stdout", "log", "csv", 'tensorboard'])
         env = self.env
 
         steps = self.env.max_time_steps
