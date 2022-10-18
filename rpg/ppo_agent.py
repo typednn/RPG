@@ -12,7 +12,7 @@ from tools.constrained_optim import COptim
 
 class CPO(COptim):
     # constrained optimizer ..
-    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-5) -> None:
+    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-9, max_grad_norm=0.5) -> None:
         self.actor = network
         super().__init__(network, 1)
 
@@ -60,6 +60,7 @@ class CPO(COptim):
             entropy=float(entropy),
             negent=negent.item(),
             pg=pg_losses.item(),
+            ratio = float((constraints > 0.).float().mean())
         )
         return float(pg_losses), output
 

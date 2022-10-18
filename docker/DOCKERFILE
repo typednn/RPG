@@ -37,6 +37,7 @@ RUN pip install --no-cache torch torchvision torchaudio --extra-index-url https:
 WORKDIR /root/RPG/
 RUN git branch
 RUN git checkout rpg
+RUN cat setup.py
 RUN python setup.py develop
 
 RUN pip install --no-cache wandb

@@ -1,7 +1,7 @@
 from setuptools import setup
 
 install_requires = [
-    'urllib3'
+    'urllib3',
     'scipy',
     'numpy',
     'wandb',
