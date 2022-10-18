@@ -75,6 +75,8 @@ class COptim(Configurable):
             if c <= 0.:
                 self.last_good = [i.data.clone() for i in self.params]
 
+        if penalty > 0.:
+            print('penalty', penalty)
         return {
             'penalty': penalty,
             'rec_action': float(reg_action),
