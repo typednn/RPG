@@ -318,7 +318,6 @@ class Trainer(Configurable, RLAlgo):
 
         # value
         if self._cfg.critic_weight > 0.:
-            assert self.rew_norm is None, "not implemented yet"
             with torch.no_grad():
                 value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
                 vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..

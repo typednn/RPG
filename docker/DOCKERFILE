@@ -54,8 +54,36 @@ RUN mkdir -p /root/.mujoco \
 ENV LD_LIBRARY_PATH /root/.mujoco/mujoco210/bin:${LD_LIBRARY_PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 RUN pip install mujoco_py
+RUN pip install tensorboardX
+RUN pip install opencv-python
+RUN pip install tqdm
+RUN pip install gym==0.25.2
+RUN pip install yacs>=0.1.8
+RUN pip install matplotlib
+RUN pip install transforms3d
+RUN pip install h5py
+RUN pip install moviepy
 
 RUN python setup.py develop
 
 RUN pip install pytorch3d --upgrade --no-cache -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
+
+
+RUN apt-get update -q \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    curl \
+    git \
+    libgl1-mesa-dev \
+    libgl1-mesa-glx \
+    libglew-dev \
+    libosmesa6-dev \
+    software-properties-common \
+    net-tools \
+    vim \
+    virtualenv \
+    wget \
+    xpra \
+    xserver-xorg-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 # RUN conda install ffmpeg -y && conda clean -ya

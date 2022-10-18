@@ -10,7 +10,7 @@ install_requires = [
     'tqdm',
     # 'taichi',
     'gym==0.25.2',
-    'tensorboard',
+    # 'tensorboard',
     'yacs>=0.1.8',
     'matplotlib',
     # 'descartes',
@@ -23,15 +23,15 @@ install_requires = [
     'h5py',
     #'bezier',
     # 'pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git',
-    'chamferdist',
+    # 'chamferdist',
     #'geomloss',
     # 'open3d',
     # 'pydprint',
     # 'pyro-ppl',
-    'moviepy>=1.0.3',
+    'moviepy',
     # 'gitpython',
     # 'ninja',
-    'diffusers',
+    # 'diffusers',
     #'pyvista', # maybe not needed
     #'pythreejs', # maybe not needed
 ]
