@@ -198,9 +198,11 @@ class Trainer(Configurable, RLAlgo):
 
         # reward_norm=False,  # normalize the reward
         adv_norm = False,  # if adv_norm is True, normalize the values..
+        rew_norm =  False
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
+        self.rew_norm = RunningMeanStd(clip_max=10.) if rew_norm else None
 
         obs_space = env.observation_space
         action_dim = env.action_space.shape[0]
@@ -265,6 +267,7 @@ class Trainer(Configurable, RLAlgo):
             alpha = self._cfg.entropy_coef * torch.exp(self.log_alpha).detach()
 
 
+
         supervised_horizon = self.horizon # not +1 yet
 
         obs, next_obs, action, reward, idxs, weights = self.buffer.sample(self._cfg.batch_size)
@@ -276,6 +279,13 @@ class Trainer(Configurable, RLAlgo):
             state_gt = self.nets.enc_s(next_obs)[:supervised_horizon]
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             assert torch.allclose(reward[0], vprefix_gt[0])
+
+
+            if self.rew_norm is not None:
+                # vtarg = vtarg * self.rew_norm.std # denormalize it.
+                self.rew_norm.update(vprefix_gt) # 'normalize reward during update ..'
+                vprefix_gt = vprefix_gt / self.rew_norm.std
+
             assert vprefix_gt.shape[-1] == 1
 
             if self.nets._cfg.predict_q:
@@ -308,6 +318,7 @@ class Trainer(Configurable, RLAlgo):
 
         # value
         if self._cfg.critic_weight > 0.:
+            assert self.rew_norm is None, "not implemented yet"
             with torch.no_grad():
                 value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
                 vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
@@ -329,7 +340,7 @@ class Trainer(Configurable, RLAlgo):
 
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
-        if self._adv_norm:
+        if self._cfg.adv_norm:
             actor_loss = actor_loss / (actor_loss.std(axis=0).detach() + 1e-8)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
