@@ -1,6 +1,7 @@
 from setuptools import setup
 
 install_requires = [
+    'urllib3'
     'scipy',
     'numpy',
     'wandb',
@@ -26,11 +27,11 @@ install_requires = [
     'chamferdist',
     #'geomloss',
     'open3d',
-    'pydprint',
-    'pyro-ppl',
+    # 'pydprint',
+    # 'pyro-ppl',
     'moviepy>=1.0.3',
-    'gitpython',
-    'ninja',
+    # 'gitpython',
+    # 'ninja',
     'diffusers',
     #'pyvista', # maybe not needed
     #'pythreejs', # maybe not needed

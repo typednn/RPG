@@ -39,6 +39,8 @@ class GeneralizedQ(Network):
         predict_q=False,
 
         lmbda_last=False,
+
+        reward_norm=False,
     ) -> None:
         super().__init__()
 
@@ -192,6 +194,10 @@ class Trainer(Configurable, RLAlgo):
         critic_weight=0.,
         norm_s_enc=False,
         update_train_step=1,
+
+
+        # reward_norm=False,  # normalize the reward
+        adv_norm = False,  # if adv_norm is True, normalize the values..
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -320,8 +326,11 @@ class Trainer(Configurable, RLAlgo):
         # update the actor network ..
         samples = self.nets.value(obs, None, self.horizon, alpha=alpha, action_penalty=self._cfg.action_penalty)
         value = samples['value']
+
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
+        if self._adv_norm:
+            actor_loss = actor_loss / (actor_loss.std(axis=0).detach() + 1e-8)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
 
