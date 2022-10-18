@@ -2,7 +2,20 @@ FROM nvcr.io/nvidia/cudagl:11.3.1-devel-ubuntu20.04
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get update && apt-get install -y git wget && rm -rf /var/lib/apt/lists/* 
+RUN apt-get update && apt-get install -y git wget ssh && rm -rf /var/lib/apt/lists/* 
+# ENV GIT_SSH_COMMAND "ssh -i ~/.ssh/id_rsa_git"
+
+ARG SSH_PRIVATE_KEY
+RUN mkdir ~/.ssh/
+RUN echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa_git
+RUN chmod 600 ~/.ssh/id_rsa_git
+RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+RUN echo "Host github.com\n\tStrictHostKeyChecking no\n\tHostName github.com\n\tIdentityFile ~/.ssh/id_rsa_git" >> ~/.ssh/config
+# RUN ssh-keyscan /github.com/ >> ~/.ssh/known_hosts
+
+RUN cat ~/.ssh/config
+RUN GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa_git -o IdentitiesOnly=yes" git clone git@github.com:hzaskywalker/RPG.git ~/RPG
+
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
     chmod +x ~/miniconda.sh && \
     ~/miniconda.sh -b -u -p /opt/conda && \
@@ -12,20 +25,23 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
     /opt/conda/bin/conda clean -ya
 ENV PATH /opt/conda/bin:$PATH
 
+RUN pip install --no-cache ninja cython 
 RUN pip install --no-cache torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
 
-RUN git clone https://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@github.com/haosulab/pyrl.git
-RUN pip install --no-cache ninja cython 
-# WORKDIR pyrl/
-# RUN python setup.py develop
-# WORKDIR /root
+# Print SSH_PRIVATE_KEY (for test)
+# RUN echo "${SSH_PRIVATE_KEY}"
+# RUN npm install
 
-# WORKDIR Concept/
-# RUN python setup.py develop
+
+# RUN git clone https://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@github.com/haosulab/pyrl.git
+WORKDIR /root/RPG/
+RUN git branch
+RUN git checkout rpg
+RUN python setup.py develop
 
 RUN pip install --no-cache wandb
 RUN pip install --no-cache yapf sorcery nimblephysics sapien tensorboardX pynvml lmdb
 RUN pip install --no-cache gym==0.18.3 --no-deps --upgrade
 
 RUN pip install pytorch3d --upgrade --no-cache -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
-RUN conda install ffmpeg -y && conda clean -ya
+# RUN conda install ffmpeg -y && conda clean -ya

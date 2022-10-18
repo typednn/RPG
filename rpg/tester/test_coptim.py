@@ -11,7 +11,7 @@ def f(x):
     return (x**2).sum()
 
 
-optim = COptim(x, 1, weight_penalty=1.)
+optim = COptim(x, 1, weight_penalty=0.0001)
 
 while True:
     optim.optimize(f(x), c(x))

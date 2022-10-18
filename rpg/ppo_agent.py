@@ -10,10 +10,58 @@ from tools.utils import RunningMeanStd
 from tools import dist_utils
 from tools.constrained_optim import COptim
 
-# class CPO(COptim):
-#     # constrained optimizer ..
-#     def __init__(self, network, cf=None, clip_param=0.2) -> None:
-#         super().__init__(network, 1)
+class CPO(COptim):
+    # constrained optimizer ..
+    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-5) -> None:
+        self.actor = network
+        super().__init__(network, 1)
+
+    def step(self, obs, hidden, timestep, action, logp, adv, entropy_coef):
+
+        device = self.actor.device
+        action = batch_input(action, device)
+        if hidden is not None:
+            hidden = batch_input(hidden, device, dtype=hidden[0].dtype)
+        timestep = batch_input(timestep, device)
+
+        pd: ActionDistr = self.actor(obs, hidden, timestep)
+
+        newlogp = pd.log_prob(action)
+        device = newlogp.device
+
+        adv = batch_input(adv, device).sum(axis=-1)
+        logp = batch_input(logp, device)
+        assert adv.shape == logp.shape
+
+        # prob ratio for KL / clipping based on a (possibly) recomputed logp
+        logratio = newlogp - logp
+        ratio = th.exp(logratio)
+        assert newlogp.shape == logp.shape
+        assert adv.shape == ratio.shape, f"Adv shape is {adv.shape}, and ratio shape is {ratio.shape}"
+        pg_losses = -adv * ratio
+
+        constraints = self._cfg.clip_param - th.abs(ratio - 1.) # the change of ratio should be smaller than 0.2
+        constraints = (-th.relu(-constraints)).mean(0, keepdim=True)
+
+        if entropy_coef > 0.:
+            # directly optimize the policy entropy ..
+            entropy = pd.entropy().mean()
+            negent  = -entropy * entropy_coef
+        else:
+            entropy = 0.
+            negent = th.tensor(0., device=device)
+
+
+        pg_losses = pg_losses.mean()
+        loss = negent + pg_losses
+
+        output = self.optimize(loss, constraints)
+        output.update(
+            entropy=float(entropy),
+            negent=negent.item(),
+            pg=pg_losses.item(),
+        )
+        return float(pg_losses), output
 
 
 class PolicyOptim(Optim):
@@ -34,6 +82,7 @@ class PolicyOptim(Optim):
 
         self.actor = actor
         self.clip_param = clip_param
+
 
 
 
@@ -161,7 +210,9 @@ class PPOAgent(Configurable):
 
         # gae config
         gamma=0.995, lmbda=0.97,
-        ignore_done=False
+        ignore_done=False,
+
+        constrained=False,
 
     ):
         super().__init__()
@@ -169,7 +220,11 @@ class PPOAgent(Configurable):
         self.policy = policy
         self.critic = critic
 
-        self.actor_optim = PolicyOptim(self.policy, cfg=actor_optim)
+        if not constrained:
+            self.actor_optim = PolicyOptim(self.policy, cfg=actor_optim)
+        else:
+            self.actor_optim = CPO(self.policy,
+                                   cfg=dict(lr=actor_optim.lr, clip_param=actor_optim.clip_param, max_grad_norm=actor_optim.max_grad_norm))
 
         if critic_optim is None:
             critic_optim = dict(lr=actor_optim.lr)
@@ -261,7 +316,7 @@ class PPOAgent(Configurable):
         if logger_scope is not None:
             output = {logger_scope + k: v for k, v in actor_output.items()}
             output[logger_scope + 'critic_loss'] = critic_loss.item()
-            output[logger_scope + 'actor_loss'] = actor_loss.item()
+            output[logger_scope + 'actor_loss'] = float(actor_loss)
             logger.logkvs_mean(output)
 
         return 'early_stop' in actor_output and actor_output['early_stop']

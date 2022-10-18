@@ -11,7 +11,7 @@ class COptim(Configurable):
         n_constraints,
         cfg=None,
         clip_lmbda=(0.1, 1e10),
-        weight_penalty=0.001,
+        weight_penalty=0.0001,
         max_grad_norm=None,
         reg_proj=0.01,
         constraint_threshold=0.,
@@ -56,7 +56,8 @@ class COptim(Configurable):
         c = constraints.sum()
 
         if c <= self._cfg.constraint_threshold:
-            penalties = -torch.log(-c.clamp(min=1e-10)) * (1. - mask) 
+            # C must be negative ..
+            penalties = -torch.log((-C).clamp(min=1e-10)) * (1. - mask) 
             penalty = penalties.sum() * self._cfg.weight_penalty
             self.optimize_loss(self.loss_optim, self.params, loss + penalty)
         else:
