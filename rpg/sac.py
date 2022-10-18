@@ -24,7 +24,7 @@ class SAC(Trainer):
             self, env: Union[GymVecEnv, TorchEnv], cfg=None, 
 
             head = DistHead.to_build(TYPE='Normal', linear=False, squash=True, std_mode='statewise', std_scale=0.2), 
-            weights=dict(state=0., prefix=1., value=1.), # predict reward + value from the o directly ..
+            weights=dict(state=0., prefix=0., value=1.), # predict reward + value from the o directly ..
             horizon=1,
             predict_Q=True,
             entropy_coef=1.

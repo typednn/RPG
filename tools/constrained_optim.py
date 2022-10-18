@@ -4,7 +4,7 @@ from tools import dist_utils
 from tools.config import Configurable
 from .optim import OptimModule
 
-class COptim(OptimModule):
+class COptim(Configurable):
     def __init__(
         self,
         network,
@@ -12,6 +12,7 @@ class COptim(OptimModule):
         cfg=None,
         clip_lmbda=(0.1, 1e10),
         weight_penalty=0.001,
+        max_grad_norm=None,
         reg_proj=0.01,
         constraint_threshold=0.,
         mu=1.,
@@ -35,10 +36,16 @@ class COptim(OptimModule):
         self.alpha_optim = torch.optim.Adam([self.log_alpha], lr=cfg.lr)
         self.last_good = None
 
-    def optimize(self, loss, C):
-        # loss and C can't be constraint based ..
-        assert C.shape[0] == self.log_alpha.shape[0]
+    def optimize_loss(self, optim, params, loss):
+        optim.zero_grad()
+        loss.backward()
+        dist_utils.sync_grads(params)
+        if self._cfg.max_grad_norm is not None:
+            nn.utils.clip_grad_norm_(params, self._cfg.max_grad_norm)
+        optim.step()
 
+    def optimize(self, loss, C):
+        assert C.shape[0] == self.log_alpha.shape[0]
         penalty = 0.
         mask = (C > 0.).float()
 
@@ -49,35 +56,24 @@ class COptim(OptimModule):
         c = constraints.sum()
 
         if c <= self._cfg.constraint_threshold:
-            self.loss_optim.zero_grad()
-
             penalties = -torch.log(-c.clamp(min=1e-10)) * (1. - mask) 
             penalty = penalties.sum() * self._cfg.weight_penalty
-            (loss + penalty).backward()
-            self.loss_optim.step()
+            self.optimize_loss(self.loss_optim, self.params, loss + penalty)
         else:
-            self.constraint_optim.zero_grad()
-
             if self._cfg.reg_proj > 0. and self.last_good is not None:
                 for a, b in zip(self.params, self.last_good):
                     reg_action += torch.sum((a - b) ** 2)
                 reg_action = reg_action * self._cfg.reg_proj
-            (c + reg_action).backward()
-
-            self.constraint_optim.step()
+            self.optimize_loss(self.constraint_optim, self.params, c + reg_action)
 
         alpha = self.log_alpha.exp()
         alpha_loss = torch.sum(self.log_alpha.exp() * C.detach()) # c later than 0, reduce log_alpha
-        self.alpha_optim.zero_grad()
-        alpha_loss.backward()
-        self.alpha_optim.step()
+        self.optimize_loss(self.alpha_optim, [self.log_alpha], alpha_loss)
 
         with torch.no_grad():
             if c <= 0.:
                 self.last_good = [i.data.clone() for i in self.params]
 
-        if penalty > 0.:
-            print('penalty', penalty)
         return {
             'penalty': penalty,
             'rec_action': float(reg_action),

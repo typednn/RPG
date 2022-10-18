@@ -177,10 +177,10 @@ class Trainer(Configurable, RLAlgo):
         path = None,
 
         batch_size=512,
-        update_freq=2, # update target network ..
-        update_step=200,
+        update_target_freq=2,
         tau=0.005,
         rho=0.7, # horizon decay
+        max_update_step=200,
         weights=dict(state=1000., prefix=0.5, value=0.5),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
@@ -335,7 +335,8 @@ class Trainer(Configurable, RLAlgo):
 
 
         self.update_step += 1
-        if self.update_step % self._cfg.update_step == 0:
+        # previous the update_freq 
+        if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
 
         with torch.no_grad():
@@ -347,7 +348,8 @@ class Trainer(Configurable, RLAlgo):
             assert (timestep == 0).all()
             transitions = []
 
-        for idx in range(n_step):
+        r = tqdm.trange if self._cfg.update_train_step > 0 else range 
+        for idx in r(n_step):
             with torch.no_grad():
                 transition = dict(obs = obs)
                 pd = self.nets.policy(obs, None)
@@ -371,7 +373,6 @@ class Trainer(Configurable, RLAlgo):
 
         steps = self.env.max_time_steps
         epoch_id = 0
-        update_step = 0
         while True:
             if max_epoch is not None and epoch_id >= max_epoch:
                 break
@@ -380,8 +381,7 @@ class Trainer(Configurable, RLAlgo):
             self.buffer.add(traj)
 
             if self._cfg.update_train_step == 0:
-                for _ in tqdm.trange(min(steps, self._cfg.update_step)):
-                    update_step += 1
+                for _ in tqdm.trange(min(steps, self._cfg.max_update_step)):
                     self.update()
 
             a = traj.get_tensor('a')
