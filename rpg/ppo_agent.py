@@ -8,6 +8,12 @@ from .utils import compute_gae_by_hand
 from .traj import DataBuffer
 from tools.utils import RunningMeanStd
 from tools import dist_utils
+from tools.constrained_optim import COptim
+
+# class CPO(COptim):
+#     # constrained optimizer ..
+#     def __init__(self, network, cf=None, clip_param=0.2) -> None:
+#         super().__init__(network, 1)
 
 
 class PolicyOptim(Optim):

@@ -31,6 +31,11 @@ class ReplayBuffer(Configurable):
         self._full = False
         self.idx = 0
 
+    def total_size(self):
+        if self._full:
+            return self.capacity
+        return self.idx
+
     @torch.no_grad()
     def add(self, traj: Trajectory):
         assert self.episode_length == traj.timesteps, "episode length mismatch"

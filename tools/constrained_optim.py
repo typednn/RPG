@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 from tools import dist_utils
 from tools.config import Configurable
+from .optim import OptimModule
 
-class COptim(Configurable):
+class COptim(OptimModule):
     def __init__(
         self,
         network,

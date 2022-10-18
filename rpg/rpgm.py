@@ -191,6 +191,7 @@ class Trainer(Configurable, RLAlgo):
         
         critic_weight=0.,
         norm_s_enc=False,
+        update_train_step=1,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -220,6 +221,8 @@ class Trainer(Configurable, RLAlgo):
         self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
+
+        self.update_step = 0
 
     def evaluate(self, env, steps):
         with torch.no_grad():
@@ -251,14 +254,14 @@ class Trainer(Configurable, RLAlgo):
         network.apply(orthogonal_init)
         return network
         
-    def update(self, buffer: ReplayBuffer, update_target):
+    def update(self):
         with torch.no_grad():
             alpha = self._cfg.entropy_coef * torch.exp(self.log_alpha).detach()
 
 
         supervised_horizon = self.horizon # not +1 yet
 
-        obs, next_obs, action, reward, idxs, weights = buffer.sample(self._cfg.batch_size)
+        obs, next_obs, action, reward, idxs, weights = self.buffer.sample(self._cfg.batch_size)
         batch_size = obs.shape[0]
 
         with torch.no_grad():
@@ -330,27 +333,35 @@ class Trainer(Configurable, RLAlgo):
         logger.logkv_mean('alpha', float(alpha))
         logger.logkv_mean('entropy_term', float(samples['entropy_term'].mean()))
 
-        if update_target:
+
+        self.update_step += 1
+        if self.update_step % self._cfg.update_step == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
 
         with torch.no_grad():
-            buffer.update_priorities(idxs, loss[:, None])
+            self.buffer.update_priorities(idxs, loss[:, None])
 
     def inference(self, n_step):
-        obs, timestep = self.start(self.env, reset=True)
-        assert (timestep == 0).all()
-        transitions = []
+        with torch.no_grad():
+            obs, timestep = self.start(self.env, reset=True)
+            assert (timestep == 0).all()
+            transitions = []
 
-        for _ in range(n_step):
-            transition = dict(obs = obs)
-            pd = self.nets.policy(obs, None)
-            scale = pd.dist.scale
-            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-            a, _ = pd.rsample()
-            data, obs = self.step(self.env, a)
+        for idx in range(n_step):
+            with torch.no_grad():
+                transition = dict(obs = obs)
+                pd = self.nets.policy(obs, None)
+                scale = pd.dist.scale
+                logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
+                a, _ = pd.rsample()
+                data, obs = self.step(self.env, a)
 
-            transition.update(**data, a=a)
-            transitions.append(transition)
+                transition.update(**data, a=a)
+                transitions.append(transition)
+
+            if self.buffer.total_size() > 10000 and self._cfg.update_train_step > 0:
+                if idx % self._cfg.update_train_step == 0:
+                    self.update()
 
         return Trajectory(transitions, len(obs), n_step)
 
@@ -365,13 +376,13 @@ class Trainer(Configurable, RLAlgo):
             if max_epoch is not None and epoch_id >= max_epoch:
                 break
 
-            with torch.no_grad():
-                traj = self.inference(steps)
-                self.buffer.add(traj)
+            traj = self.inference(steps)
+            self.buffer.add(traj)
 
-            for _ in tqdm.trange(min(steps, self._cfg.update_step)):
-                update_step += 1
-                self.update(self.buffer, update_step % self._cfg.update_freq == 0)
+            if self._cfg.update_train_step == 0:
+                for _ in tqdm.trange(min(steps, self._cfg.update_step)):
+                    update_step += 1
+                    self.update()
 
             a = traj.get_tensor('a')
             logger.logkv_mean('a_max', float(a.max()))
