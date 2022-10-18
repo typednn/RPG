@@ -43,7 +43,19 @@ RUN pip install --no-cache wandb
 RUN pip install --no-cache wandb
 RUN pip install --no-cache yapf sorcery nimblephysics sapien tensorboardX pynvml lmdb
 RUN pip install --no-cache gym==0.18.3 --no-deps --upgrade
-# RUN python setup.py develop
+
+
+
+RUN mkdir -p /root/.mujoco \
+    && wget https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz -O mujoco.tar.gz \
+    && tar -xf mujoco.tar.gz -C /root/.mujoco \
+    && rm mujoco.tar.gz
+
+ENV LD_LIBRARY_PATH /root/.mujoco/mujoco210/bin:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+RUN pip install mujoco_py
+
+RUN python setup.py develop
 
 RUN pip install pytorch3d --upgrade --no-cache -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
 # RUN conda install ffmpeg -y && conda clean -ya
