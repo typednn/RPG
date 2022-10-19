@@ -12,7 +12,7 @@ from tools.constrained_optim import COptim
 
 class CPO(COptim):
     # constrained optimizer ..
-    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-4, max_grad_norm=0.5, lr=3e-4) -> None:
+    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=0., max_grad_norm=0.5, lr=3e-4) -> None:
         self.actor = network
         super().__init__(network, 1)
 
@@ -39,8 +39,7 @@ class CPO(COptim):
         assert adv.shape == ratio.shape, f"Adv shape is {adv.shape}, and ratio shape is {ratio.shape}"
         pg_losses = -adv * ratio
 
-        constraints = self._cfg.clip_param - (ratio - 1.).abs() # the change of ratio should be smaller than 0.2
-        constraints = th.relu(-constraints).mean(0, keepdim=True)
+        constraints = (ratio - 1.).abs() - self._cfg.clip_param # the change of ratio should be smaller than 0.2
 
         if entropy_coef > 0.:
             # directly optimize the policy entropy ..
@@ -51,14 +50,16 @@ class CPO(COptim):
             negent = th.tensor(0., device=device)
 
 
-        pg_losses = pg_losses.mean()
+        pg_losses = pg_losses
         loss = negent + pg_losses
 
         output = self.optimize(loss, constraints)
+
+        pg_losses = pg_losses.mean()
         output.update(
             entropy=float(entropy),
             negent=negent.item(),
-            pg=pg_losses.item(),
+            pg=pg_losses.mean().item(),
             r=(ratio - 1).abs().max(),
             ratio = float((constraints > 0.).float().mean())
         )
