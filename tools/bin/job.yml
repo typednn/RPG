@@ -6,6 +6,9 @@ metadata:
 spec:
   ttlSecondsAfterFinished: 86400 # Wait one day to delete completed jobs
   template:
+    metadata:
+      labels:
+        nautilus.io/rl: "true"
     spec:
       containers:
         - name: gpu-container
@@ -15,7 +18,7 @@ spec:
             - "bash"
             - "-c"
           args:
-            - "source /root/.bashrc; export PATH=/root/anaconda3/bin:$PATH; export DATA_PATH=/cephfs/hza/data; export MODEL_PATH=/cephfs/hza/models; conda activate; cd /root/Concept; git pull; cd WORKSPACE; CMD" # replace with actual command
+            - "export PATH=/root/anaconda3/bin:$PATH; export DATA_PATH=/cephfs/hza/data; export MODEL_PATH=/cephfs/hza/models; conda activate; cd /root/RPG; git pull; cd WORKSPACE; CMD" # replace with actual command
             # For multiple commands, concatenate them with &&
           resources:
             requests:

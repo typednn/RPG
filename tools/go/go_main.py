@@ -18,13 +18,14 @@ def get_parser():
     parser.add_argument("--go", action="store_true", help="start to execute multiple commands")
     parser.add_argument('--override', action="store_true", help='override even if path exists')
 
-    parser.add_argument('-o', '--opts', help='Remaining args to perform hyper parameter search',
-                        default=[], nargs=argparse.REMAINDER)
     parser.add_argument('--cfg', help='configurations', default=None)
 
     parser.add_argument('--memory', help='number of gpu for nautilus', type=int, default=None)
 
     parser.add_argument('--mpi_size', default=None, type=int)
+
+    parser.add_argument('opts', help='Remaining args to perform hyper parameter search',
+                        default=[], nargs=argparse.REMAINDER)
     return parser
 
 
