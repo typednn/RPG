@@ -155,6 +155,23 @@ class save_traj(HookBase):
                 if len(self.imgs) % self.save_gif_epochs == 0:
                     logger.animate(self.imgs, self.traj_name + '.gif')
 
+
+@as_hook
+class evaluate_pi(HookBase):
+    def __init__(self, n_epoch=10, **kwargs) -> None:
+        super().__init__()
+        self.n_epoch = n_epoch
+        self.kwargs = kwargs
+
+    def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
+        if trainer.epoch_id % self.n_epoch == 0:
+            assert trainer.mode == 'sample'
+            traj = trainer.evaluate(env, steps)
+            from tools.utils import logger
+            logger.logkvs_mean(
+                {'eval_' + k: v 
+                 for k, v in traj.summarize_epsidoe_info().items()}
+            )
                     
 
 

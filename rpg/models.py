@@ -122,6 +122,6 @@ class MLPDynamics(torch.nn.Module):
         self.output = mlp(hidden_dim, hidden_dim, hidden_dim)
     
     def forward(self, i, h):
-        h = self.dyna(torch.cat([i, h], dim=-1))
+        h = self.dyna(torch.cat([i, h], dim=-1)) + h
         o = self.output(h)
         return o, h

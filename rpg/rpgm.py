@@ -94,7 +94,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs)
         return self.value_fn(s, self.enc_z(z))
 
-    def inference(self, obs, z, step, a_seq=None):
+    def inference(self, obs, z, step, a_seq=None, pi=None):
         """
         s      a_1    a_2    ...
         |      |      |
@@ -110,13 +110,14 @@ class GeneralizedQ(Network):
         assert z_embed is None
         s = self.enc_s(obs)
         h = self.init_h(s)[None, ] # GRU of layer 1
+        if pi is None: pi = self.pi_a
 
         hidden, logp_a, actions, states = [], [], [], []
         for idx in range(step):
             assert self.pi_z is None, "this means that we will not update z, anyway.."
 
             if a_seq is None:
-                a, logp = self.pi_a(s, z_embed).rsample()
+                a, logp = pi(s, z_embed).rsample()
             else:
                 a, logp = a_seq[idx], torch.zeros((len(obs),), device=self.device)
 
@@ -164,8 +165,8 @@ class GeneralizedQ(Network):
         v = (vpreds * self.weights[:, None, None]).sum(axis=0)
         return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds)
 
-    def value(self, obs, z, horizon, alpha=0, action_penalty=0.):
-        traj = self.inference(obs, z, horizon)
+    def value(self, obs, z, horizon, alpha=0, action_penalty=0., pi=None):
+        traj = self.inference(obs, z, horizon, pi=pi)
         entropy_term = -traj['logp_a']
         entropy = entropy_term * alpha if alpha > 0 else 0
         penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True) if action_penalty > 0 else 0
@@ -210,11 +211,13 @@ class Trainer(Configurable, RLAlgo):
 
         # reward_norm=False,  # normalize the reward
         adv_norm = False,  # if adv_norm is True, normalize the values..
-        rew_norm =  False,
+        rew_norm = False,
 
 
         learning_coef=False,
         selfsupervised=False,
+
+        use_target_net=True,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -253,7 +256,7 @@ class Trainer(Configurable, RLAlgo):
 
     def evaluate(self, env, steps):
         with torch.no_grad():
-            return self.inference(steps)
+            return self.inference(steps, mode='not_sample')
 
     def make_network(self, obs_space, action_space):
         hidden_dim = 256
@@ -265,8 +268,8 @@ class Trainer(Configurable, RLAlgo):
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)
-        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
-        # dynamics = MLPDynamics(hidden_dim)
+        # dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
+        dynamics = MLPDynamics(hidden_dim)
         v_in = hidden_dim if self._cfg.qnet.predict_q else latent_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
@@ -293,9 +296,10 @@ class Trainer(Configurable, RLAlgo):
         batch_size = obs.shape[0]
 
         with torch.no_grad():
+            pi = None if self._cfg.use_target_net else self.nets.pi_a
             vtarg = self.target_nets.value(next_obs.reshape(-1, *obs.shape[1:]), None,
-                self.horizon, alpha=alpha)['value'].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
-            state_gt = self.target_nets.enc_s(next_obs)[:supervised_horizon]
+                self.horizon, alpha=alpha, pi=pi)['value'].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
+            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon] # use the current model ..
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             assert torch.allclose(reward[0], vprefix_gt[0])
 
@@ -400,7 +404,7 @@ class Trainer(Configurable, RLAlgo):
         with torch.no_grad():
             self.buffer.update_priorities(idxs, loss[:, None])
 
-    def inference(self, n_step):
+    def inference(self, n_step, mode='sample'):
         with torch.no_grad():
             obs, timestep = self.start(self.env, reset=True)
             assert (timestep == 0).all()
@@ -413,7 +417,10 @@ class Trainer(Configurable, RLAlgo):
                 pd = self.nets.policy(obs, None)
                 scale = pd.dist.scale
                 logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-                a, _ = pd.rsample()
+                if mode == 'sample':
+                    a, _ = pd.rsample()
+                else:
+                    a = pd.dist.loc.detach().cpu().numpy()
                 data, obs = self.step(self.env, a)
 
                 transition.update(**data, a=a)
