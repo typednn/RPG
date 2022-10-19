@@ -15,7 +15,7 @@ spec:
           memory: "4Gi"
           nvidia.com/gpu: "1"
         limits:
-          cpu: "2"
+          cpu: "1"
           memory: "8Gi"
           nvidia.com/gpu: "1"
       volumeMounts:
