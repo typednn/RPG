@@ -59,10 +59,10 @@ class COptim(Configurable):
         #if (C<=0).any():
         #    self.optimize_loss(self.loss_optim, self.params, (loss + penalties).mean())
 
-        self.optimize_loss(self.loss_optim, self.params, (loss + penalties + constraints * 0).mean())
+        self.optimize_loss(self.loss_optim, self.params, (loss + penalties + constraints).mean())
 
         alpha = self.log_alpha.exp()
-        alpha_loss = torch.sum( -self.log_alpha.exp() * C.mean().detach()) # c later than 0, increase log_alpha
+        alpha_loss = torch.sum( -self.log_alpha.exp() * C.max().detach()) # c later than 0, increase log_alpha
         self.optimize_loss(self.alpha_optim, [self.log_alpha], alpha_loss)
 
         return {
