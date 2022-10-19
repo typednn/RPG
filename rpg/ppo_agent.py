@@ -12,7 +12,7 @@ from tools.constrained_optim import COptim
 
 class CPO(COptim):
     # constrained optimizer ..
-    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-9, max_grad_norm=0.5) -> None:
+    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=0., max_grad_norm=0.5) -> None:
         self.actor = network
         super().__init__(network, 1)
 
