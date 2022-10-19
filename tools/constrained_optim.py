@@ -68,7 +68,7 @@ class COptim(Configurable):
             self.optimize_loss(self.constraint_optim, self.params, c + reg_action)
 
         alpha = self.log_alpha.exp()
-        alpha_loss = torch.sum(self.log_alpha.exp() * C.detach()) # c later than 0, reduce log_alpha
+        alpha_loss = torch.sum(-self.log_alpha.exp() * C.detach()) # c later than 0, increase log_alpha
         self.optimize_loss(self.alpha_optim, [self.log_alpha], alpha_loss)
 
         with torch.no_grad():
@@ -79,5 +79,6 @@ class COptim(Configurable):
             'penalty': penalty,
             'rec_action': float(reg_action),
             'c': float(c),
+            'C': float(torch.relu(C).mean()),
             'alpha': alpha.detach().cpu().numpy(),
         }

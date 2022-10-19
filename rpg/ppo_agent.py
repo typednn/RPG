@@ -12,12 +12,11 @@ from tools.constrained_optim import COptim
 
 class CPO(COptim):
     # constrained optimizer ..
-    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=0., max_grad_norm=0.5) -> None:
+    def __init__(self, network, cfg=None, clip_param=0.2, weight_penalty=1e-4, max_grad_norm=0.5, lr=3e-4) -> None:
         self.actor = network
         super().__init__(network, 1)
 
     def step(self, obs, hidden, timestep, action, logp, adv, entropy_coef):
-
         device = self.actor.device
         action = batch_input(action, device)
         if hidden is not None:
@@ -40,8 +39,8 @@ class CPO(COptim):
         assert adv.shape == ratio.shape, f"Adv shape is {adv.shape}, and ratio shape is {ratio.shape}"
         pg_losses = -adv * ratio
 
-        constraints = self._cfg.clip_param - th.abs(ratio - 1.) # the change of ratio should be smaller than 0.2
-        constraints = (-th.relu(-constraints)).mean(0, keepdim=True)
+        constraints = self._cfg.clip_param - (ratio - 1.).abs() # the change of ratio should be smaller than 0.2
+        constraints = th.relu(-constraints).mean(0, keepdim=True)
 
         if entropy_coef > 0.:
             # directly optimize the policy entropy ..
@@ -60,6 +59,7 @@ class CPO(COptim):
             entropy=float(entropy),
             negent=negent.item(),
             pg=pg_losses.item(),
+            r=(ratio - 1).abs().max(),
             ratio = float((constraints > 0.).float().mean())
         )
         return float(pg_losses), output
@@ -80,6 +80,7 @@ class PolicyOptim(Optim):
 
     ):
         super(PolicyOptim, self).__init__(actor)
+
 
         self.actor = actor
         self.clip_param = clip_param
