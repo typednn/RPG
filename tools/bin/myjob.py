@@ -14,7 +14,7 @@ def main():
     output = subprocess.check_output(["kubectl", "get", "job"]).decode('utf-8').strip()
     jobs = []
     for i in output.split('\n'):
-        if 'llt-job' not in i: 
+        if 'hza-job' not in i: 
             continue
         if args.filter is not None:
             if args.filter not in i:
