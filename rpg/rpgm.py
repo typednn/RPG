@@ -1,6 +1,7 @@
 # model-based verison RPG
 import tqdm
 import copy
+import numpy as np
 import torch
 from tools.config import Configurable
 from tools.nn_base import Network
@@ -40,7 +41,8 @@ class GeneralizedQ(Network):
 
         lmbda_last=False,
 
-        reward_norm=False,
+
+        horizon=1,
     ) -> None:
         super().__init__()
 
@@ -60,6 +62,25 @@ class GeneralizedQ(Network):
         d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
         self.value_nets = torch.nn.ModuleList(v_nets)
         self.dynamics = torch.nn.ModuleList(d_nets)
+
+
+        weights = []
+        lmbda = 1
+        sum_lmbda = 0.
+        for _ in range(horizon):
+            weights.append(lmbda)
+            sum_lmbda += lmbda
+            lmbda *= self._cfg.lmbda
+        weights = torch.tensor(weights, dtype=torch.float32)
+
+        if lmbda_last:
+            weights[-1] += (1./(1-self._cfg.lmbda) - sum_lmbda) 
+        weights = weights / weights.sum()
+        self._weights = torch.nn.Parameter(np.log(weights), requires_grad=True)
+
+    @property
+    def weights(self):
+        return torch.softmax(self._weights, 0)
 
 
     def policy(self, obs, z):
@@ -129,26 +150,19 @@ class GeneralizedQ(Network):
             values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
         gamma = 1
-        lmbda = 1
-        sum_lmbda = 0.
-        v = 0
+        vpreds = []
         for i in range(len(hidden)):
             if self._cfg.predict_q:
                 vpred = values[i] + prefix[i] # add the additional rewards like entropies 
             else:
                 vpred = (prefix[i] + values[i] * gamma * self._cfg.gamma)
 
-            v = v + vpred * lmbda
-            sum_lmbda += lmbda
+            vpreds.append(vpred)
             gamma *= self._cfg.gamma
-            lmbda *= self._cfg.lmbda
 
-        if self._cfg.lmbda_last:
-            v = (v + (1./(1-self._cfg.lmbda) - sum_lmbda) * vpred) * (1-self._cfg.lmbda)
-        else:
-            v = v / sum_lmbda
-
-        return dict(value=v, next_values=values, value_prefix=value_prefix)
+        vpreds = torch.stack(vpreds)
+        v = (vpreds * self.weights[:, None, None]).sum(axis=0)
+        return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds)
 
     def value(self, obs, z, horizon, alpha=0, action_penalty=0.):
         traj = self.inference(obs, z, horizon)
@@ -198,7 +212,10 @@ class Trainer(Configurable, RLAlgo):
 
         # reward_norm=False,  # normalize the reward
         adv_norm = False,  # if adv_norm is True, normalize the values..
-        rew_norm =  False
+        rew_norm =  False,
+
+
+        learning_coef=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -230,6 +247,9 @@ class Trainer(Configurable, RLAlgo):
         if entropy_target is not None:
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
 
+        if learning_coef:
+            self.lmbda_optim = LossOptimizer(nets._weights, cfg=actor_optim)
+
         self.update_step = 0
 
     def evaluate(self, env, steps):
@@ -258,7 +278,7 @@ class Trainer(Configurable, RLAlgo):
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim, hidden_dim, head.get_input_dim()), head)
-        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec,  value_prefix, value, cfg=self._cfg.qnet)
+        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec,  value_prefix, value, cfg=self._cfg.qnet, horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network
         
@@ -302,7 +322,12 @@ class Trainer(Configurable, RLAlgo):
         out = self.nets.predict_values(states, traj['hidden'], None, None)
         vpred, value_prefix = out['next_values'], out['value_prefix']
 
-        horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
+        if not self._cfg.learning_coef:
+            horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
+        else:
+            #horizon_weights = self.nets.weights.detach()[:, None]
+            horizon_weights = torch.ones_like(self.nets.weights.detach())[:, None]
+
         horizon_weights = horizon_weights / horizon_weights.sum()
         def hmse(a, b):
             assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
@@ -315,6 +340,7 @@ class Trainer(Configurable, RLAlgo):
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
         dyna_loss_total = (loss * weights).sum(axis=0)/weights.sum(axis=0)
+
 
         # value
         if self._cfg.critic_weight > 0.:
@@ -344,6 +370,16 @@ class Trainer(Configurable, RLAlgo):
         actor_loss = actor_loss.mean(axis=0)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
+
+        if self._cfg.learning_coef:
+            with torch.no_grad():
+                # TD-error
+                vpreds = samples['vpreds'].detach()
+                next_vtarg = vtarg[0] * self.nets._cfg.gamma + vprefix_gt[0]
+            lmbda_loss = (((self.nets.weights[:, None, None] * vpreds).sum() - next_vtarg)**2).mean()
+            self.lmbda_optim.optimize(lmbda_loss)
+            if self.update_step % 1000 == 0:
+                print(self.nets.weights)
 
 
 
