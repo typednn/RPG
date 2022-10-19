@@ -203,8 +203,6 @@ class Trainer(Configurable, RLAlgo):
 
         entropy_coef=0.,
         entropy_target=None,
-
-        
         critic_weight=0.,
         norm_s_enc=False,
         update_train_step=1,
@@ -216,6 +214,7 @@ class Trainer(Configurable, RLAlgo):
 
 
         learning_coef=False,
+        selfsupervised=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -296,7 +295,7 @@ class Trainer(Configurable, RLAlgo):
         with torch.no_grad():
             vtarg = self.target_nets.value(next_obs.reshape(-1, *obs.shape[1:]), None,
                 self.horizon, alpha=alpha)['value'].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
-            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon]
+            state_gt = self.target_nets.enc_s(next_obs)[:supervised_horizon]
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             assert torch.allclose(reward[0], vprefix_gt[0])
 
@@ -315,6 +314,9 @@ class Trainer(Configurable, RLAlgo):
 
             assert vprefix_gt.shape[-1] == 1
             vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
+        
+        if self._cfg.selfsupervised:
+            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon] # pass grad
 
         # update the dynamics model ..
         traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
