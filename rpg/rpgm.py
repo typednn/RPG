@@ -338,9 +338,10 @@ class Trainer(Configurable, RLAlgo):
         value = samples['value']
 
         assert value.shape[-1] in [1, 2]
-        actor_loss = -value[..., 0].mean(axis=0)
+        actor_loss = -value[..., 0]
         if self._cfg.adv_norm:
             actor_loss = actor_loss / (actor_loss.std(axis=0).detach() + 1e-8)
+        actor_loss = actor_loss.mean(axis=0)
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
 
