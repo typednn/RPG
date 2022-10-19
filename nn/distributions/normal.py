@@ -8,10 +8,11 @@ from torch.distributions import Normal as Gaussian
 
 
 class NormalAction(ActionDistr):
-    def __init__(self, loc, scale, tanh=False):
+    def __init__(self, loc, scale, tanh=False, act_scale=1.):
         self.dist = Gaussian(loc, scale)
         self.tanh = tanh
-        self.kwargs = {'tanh': tanh}
+        self.kwargs = {'tanh': tanh, 'scale': act_scale}
+        self.act_scale = act_scale
 
     def rsample(self, detach=False):
         action = self.dist.rsample()
@@ -28,7 +29,7 @@ class NormalAction(ActionDistr):
 
 
         logp = logp.sum(axis=-1)
-        return action, logp
+        return action * self.act_scale, logp
 
     def entropy(self):
         return self.dist.entropy().sum(axis=-1)
@@ -42,6 +43,7 @@ class NormalAction(ActionDistr):
     def log_prob(self, action):
         if self.tanh:
             raise NotImplementedError
+        action = action / self.act_scale
         return self.dist.log_prob(action).sum(axis=-1)
 
     def render(self, print_fn):
@@ -66,6 +68,7 @@ class Normal(DistHead):
         self.std_mode = std_mode
         self.std_scale = std_scale  # initial std scale
         self.minimal_std_val = minimal_std_val
+        self.action_scale = action_space.high[0]
 
         assert std_mode in self.STD_MODES
         n_output = 2 if std_mode == 'statewise' else 1
@@ -105,4 +108,5 @@ class Normal(DistHead):
 
         if self._cfg.nocenter:
             means = means * 0
-        return NormalAction(means, action_std, tanh=tanh)
+        return NormalAction(means, action_std,
+                            tanh=tanh, act_scale=self.action_scale)

@@ -46,7 +46,7 @@ class DistHead(Network):
 
     def __init__(self, action_space, cfg=None):
         low, high = action_space.low, action_space.high
-        assert (low == -1).all() and (high == 1).all(), f"{low} {high}"
+        assert (low == low[0]).all() and (high == high[1]).all(), f"{low} {high}"
         self.action_dim = low.shape[0]
         super().__init__()
 
