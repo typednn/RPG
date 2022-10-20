@@ -219,11 +219,11 @@ class Trainer(Configurable, RLAlgo):
         path = None,
 
         batch_size=512,
-        update_target_freq=2,
+        update_target_freq=1,
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5, done=1000.),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=100.),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
