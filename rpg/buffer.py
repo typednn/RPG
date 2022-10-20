@@ -59,18 +59,14 @@ class ReplayBuffer(Configurable):
             self.idx = (self.idx + self.episode_length) % self.capacity
             self._full = self._full or self.idx == 0
 
-    def _get_obs(self, arr, idxs):
-        if self.cfg.modality == 'state':
-            assert idxs.max() < len(arr), f"{idxs.max()} {len(arr)}"
-            return arr[idxs]
-        raise NotImplementedError
-
     @torch.no_grad()
     def sample(self, batch_size):
+        # NOTE that the data after truncated will be something random ..
         total = self.total_size()
         idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
 
-        obs = self._get_obs(self._obs, idxs)
+        #obs = self._get_obs(self._obs, idxs)
+        obs = self._obs[idxs]
         next_obs = torch.empty((self.horizon, batch_size, *self.obs_shape), dtype=obs.dtype, device=obs.device)
         action = torch.empty((self.horizon, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
@@ -84,7 +80,5 @@ class ReplayBuffer(Configurable):
             reward[t] = self._reward[_idxs]
             done[t] = self._dones[_idxs]
             truncated[t] = self._truncated[_idxs]
-
-        # NOTE that the data after truncated will be something random ..
 
         return obs, next_obs, action, reward, done, truncated

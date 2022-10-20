@@ -159,10 +159,10 @@ class GeneralizedQ(Network):
         assert not self._cfg.predict_q
         exepected_values = values
         if self.done_fn is not None:
-            dones = torch.sigmoid(self.done_fn(hidden, z_embed))
-            assert dones.shape == values.shape
+            dones = torch.sigmoid(self.done_fn(hidden))
+            assert dones.shape == prefix.shape
             not_done = 1 - dones
-            alive = torch.cumprod(not_done, 0)[..., None]
+            alive = torch.cumprod(not_done, 0)
 
             r = prefix.clone()
             r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
@@ -227,7 +227,7 @@ class Trainer(Configurable, RLAlgo):
 
         entropy_coef=0.,
         entropy_target=None,
-        critic_weight=0.,
+        # critic_weight=0.,
         norm_s_enc=False,
         update_train_step=1,
 
@@ -267,13 +267,18 @@ class Trainer(Configurable, RLAlgo):
         self.log_alpha = torch.nn.Parameter(
             torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
+            if entropy_target > 0:
+                entropy_target =  - action_dim
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
 
         self.update_step = 0
 
     def evaluate(self, env, steps):
         with torch.no_grad():
-            return self.inference(steps, mode='not_sample')
+            self.start(self.env, reset=True)
+            out = self.inference(steps, mode='not_sample')
+            self.start(self.env, reset=True)
+            return out
 
     def make_network(self, obs_space, action_space):
         hidden_dim = 256
@@ -351,12 +356,7 @@ class Trainer(Configurable, RLAlgo):
         horizon_weights = horizon_weights / horizon_weights.sum()
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
-        #print('visualize done mask please ..')
-        #assert not done_gt.any() and (truncated_mask > 0.5).all(), 'done mask is not supported yet ..'
         assert truncated_mask.shape[-1] == 1
-        # idx = truncated_mask[-1].argmin()
-        # print(truncated[:, idx, 0])
-        # print(truncated_mask[:, idx, 0])
 
         def hmse(a, b):
             assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
@@ -370,10 +370,11 @@ class Trainer(Configurable, RLAlgo):
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
 
         if self._cfg.have_done:
-            raise NotImplementedError
-            dyna_loss['done'] = (torch.nn.functional.binary_cross_entropy(
-                out['dones'], done_gt,
-            ) * horizon_weights[:len(done_gt)]).sum(axis=0)
+            loss = torch.nn.functional.binary_cross_entropy(
+                out['dones'], done_gt, reduction='none'
+            ).mean(axis=-1) * truncated_mask[..., 0]
+            dyna_loss['done'] = (loss * horizon_weights[:len(done_gt)]).sum(axis=0)
+            logger.logkv_mean('done_acc', ((out['dones'] > 0.5) == done_gt).float().mean())
 
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         dyna_loss_total = loss.mean(axis=0)
@@ -422,8 +423,7 @@ class Trainer(Configurable, RLAlgo):
 
     def inference(self, n_step, mode='sample'):
         with torch.no_grad():
-            obs, timestep = self.start(self.env, reset=True)
-            assert (timestep == 0).all()
+            obs, timestep = self.start(self.env)
             transitions = []
 
         r = tqdm.trange if self._cfg.update_train_step > 0 else range 
