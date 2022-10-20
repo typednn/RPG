@@ -237,7 +237,6 @@ class Trainer(Configurable, RLAlgo):
         rew_norm = False,
 
 
-        learning_coef=False,
         selfsupervised=False,
 
         use_target_net=True,
@@ -263,19 +262,12 @@ class Trainer(Configurable, RLAlgo):
 
         # only optimize pi_a here
         self.actor_optim = LossOptimizer(nets.pi_a, cfg=actor_optim)
-
-        # if separate_value_dyna:
-        #     assert not nets._cfg.predict_q
-        #     self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
-        #     self.value_optim = LossOptimizer(nets.value_nets, cfg=actor_optim)
         self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
 
-        self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
+        self.log_alpha = torch.nn.Parameter(
+            torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
-
-        if learning_coef:
-            self.lmbda_optim = LossOptimizer(nets._weights, cfg=actor_optim)
 
         self.update_step = 0
 
@@ -317,11 +309,9 @@ class Trainer(Configurable, RLAlgo):
         with torch.no_grad():
             alpha = self._cfg.entropy_coef * torch.exp(self.log_alpha).detach()
 
-
-
         supervised_horizon = self.horizon # not +1 yet
 
-        obs, next_obs, action, reward, done_gt, idxs, weights = self.buffer.sample(self._cfg.batch_size)
+        obs, next_obs, action, reward, done_gt, truncated = self.buffer.sample(self._cfg.batch_size)
         batch_size = obs.shape[0]
 
         with torch.no_grad():
@@ -357,43 +347,47 @@ class Trainer(Configurable, RLAlgo):
         out = self.nets.predict_values(states, traj['hidden'], None, None)
         vpred, value_prefix = out['next_values'], out['value_prefix']
 
-        if not self._cfg.learning_coef:
-            horizon_weights = (self._cfg.rho ** torch.arange(self.horizon, device=obs.device))[:, None]
-        else:
-            #horizon_weights = self.nets.weights.detach()[:, None]
-            horizon_weights = torch.ones_like(self.nets.weights.detach())[:, None]
-
+        horizon_weights = torch.ones_like(self.nets.weights.detach())[:, None]
         horizon_weights = horizon_weights / horizon_weights.sum()
+        truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
+        truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
+        #print('visualize done mask please ..')
+        #assert not done_gt.any() and (truncated_mask > 0.5).all(), 'done mask is not supported yet ..'
+        assert truncated_mask.shape[-1] == 1
+        #assert (truncated_mask > 0).all()
+        # idx = truncated_mask[-1].argmin()
+        # print(truncated[:, idx, 0])
+        # print(truncated_mask[:, idx, 0])
+
         def hmse(a, b):
             assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
             if a.shape[-1] != b.shape[-1]:
                 assert b.shape[-1] == 1 and (a.shape[-1] in [1, 2]), f'{a.shape} vs {b.shape}'
-            h = horizon_weights[:len(a)]
+            h = horizon_weights[:len(a)] * truncated_mask[..., 0]
             return (((a-b)**2).mean(axis=-1) * h).sum(axis=0)
         
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
 
         if self._cfg.have_done:
+            raise NotImplementedError
             dyna_loss['done'] = (torch.nn.functional.binary_cross_entropy(
                 out['dones'], done_gt,
             ) * horizon_weights[:len(done_gt)]).sum(axis=0)
 
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
-        assert loss.shape == weights.shape
-        dyna_loss_total = (loss * weights).sum(axis=0)/weights.sum(axis=0)
+        dyna_loss_total = loss.mean(axis=0)
 
-
-        # value
-        if self._cfg.critic_weight > 0.:
-            with torch.no_grad():
-                value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
-                vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
-            vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
-            critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
-            critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
-            #self.value_optim.optimize(critic_loss)
-            logger.logkv_mean('critic', float(critic_loss))
-            dyna_loss_total += self._cfg.critic_weight * critic_loss # additional value predict .. 
+        # # value
+        # if self._cfg.critic_weight > 0.:
+        #     with torch.no_grad():
+        #         value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
+        #         vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
+        #     vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
+        #     critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
+        #     critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
+        #     #self.value_optim.optimize(critic_loss)
+        #     logger.logkv_mean('critic', float(critic_loss))
+        #     dyna_loss_total += self._cfg.critic_weight * critic_loss # additional value predict .. 
 
         self.dyna_optim.optimize(dyna_loss_total)
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
@@ -412,18 +406,6 @@ class Trainer(Configurable, RLAlgo):
         self.actor_optim.optimize(actor_loss)
         logger.logkv_mean('actor', float(actor_loss))
 
-        if self._cfg.learning_coef:
-            with torch.no_grad():
-                # TD-error
-                vpreds = samples['vpreds'].detach()
-                next_vtarg = vtarg[0] * self.nets._cfg.gamma + vprefix_gt[0]
-            lmbda_loss = (((self.nets.weights[:, None, None] * vpreds).sum() - next_vtarg)**2).mean()
-            self.lmbda_optim.optimize(lmbda_loss)
-            if self.update_step % 1000 == 0:
-                print(self.nets.weights)
-
-
-
         if self._cfg.entropy_target is not None:
             entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - samples['entropy_term'].detach()))
             self.entropy_optim.optimize(entropy_loss)
@@ -436,8 +418,6 @@ class Trainer(Configurable, RLAlgo):
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
 
-        with torch.no_grad():
-            self.buffer.update_priorities(idxs, loss[:, None])
 
     def inference(self, n_step, mode='sample'):
         with torch.no_grad():
