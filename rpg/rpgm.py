@@ -34,6 +34,8 @@ class GeneralizedQ(Network):
         init_h, dynamic_fn,
         state_dec, value_prefix, value_fn,
 
+        done_fn,
+
         cfg=None,
         gamma=0.99,
         lmbda=0.97,
@@ -56,6 +58,8 @@ class GeneralizedQ(Network):
         self.state_dec = state_dec
         self.value_prefix = value_prefix
         self.value_fn = value_fn
+
+        self.done_fn = done_fn
             
 
         v_nets = [enc_s, enc_z, value_fn]
@@ -109,7 +113,8 @@ class GeneralizedQ(Network):
         z_embed = self.enc_z(z)
         assert z_embed is None
         s = self.enc_s(obs)
-        h = self.init_h(s)[None, ] # GRU of layer 1
+        h = self.init_h(s)
+        h = h.reshape(len(s), self.dynamic_fn.layer, -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         if pi is None: pi = self.pi_a
 
         hidden, logp_a, actions, states = [], [], [], []
@@ -121,7 +126,7 @@ class GeneralizedQ(Network):
             else:
                 a, logp = a_seq[idx], torch.zeros((len(obs),), device=self.device)
 
-            o, h = self.dynamic_fn(self.enc_a(a)[None, :], h)
+            o, h = self.dynamic_fn(self.enc_a(a)[None, :].expand_as(h), h)
             o = o[-1]
             assert o.shape[0] == a.shape[0] 
             s = self.state_dec(o) # predict the next hidden state ..
@@ -150,20 +155,38 @@ class GeneralizedQ(Network):
         else:
             values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
+        weights = self.weights
+        assert not self._cfg.predict_q
+        exepected_values = values
+        if self.done_fn is not None:
+            dones = torch.sigmoid(self.done_fn(hidden, z_embed))
+            assert dones.shape == values.shape
+            not_done = 1 - dones
+            alive = torch.cumprod(not_done, 0)[..., None]
+
+            r = prefix.clone()
+            r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
+
+            prefix = (r * alive).cumsum(0)
+            exepected_values = exepected_values * alive
+        else:
+            dones = None
+            #alive = torch.ones((len(hidden),), device=self.device)[:, None, None]
+
         gamma = 1
         vpreds = []
         for i in range(len(hidden)):
             if self._cfg.predict_q:
-                vpred = values[i] + prefix[i] # add the additional rewards like entropies 
+                vpred = exepected_values[i] + prefix[i] # add the additional rewards like entropies 
             else:
-                vpred = (prefix[i] + values[i] * gamma * self._cfg.gamma)
+                vpred = (prefix[i] + exepected_values[i] * gamma * self._cfg.gamma)
 
             vpreds.append(vpred)
             gamma *= self._cfg.gamma
 
         vpreds = torch.stack(vpreds)
-        v = (vpreds * self.weights[:, None, None]).sum(axis=0)
-        return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds)
+        v = (vpreds * weights[:, None, None]).sum(axis=0)
+        return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds, dones=dones)
 
     def value(self, obs, z, horizon, alpha=0, action_penalty=0., pi=None):
         traj = self.inference(obs, z, horizon, pi=pi)
@@ -198,7 +221,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=0.5),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
@@ -218,6 +241,8 @@ class Trainer(Configurable, RLAlgo):
         selfsupervised=False,
 
         use_target_net=True,
+
+        have_done=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -267,20 +292,24 @@ class Trainer(Configurable, RLAlgo):
         enc_z = Identity()
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
-        init_h = mlp(latent_dim, hidden_dim, hidden_dim)
-        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
+        layer = 1
+        init_h = mlp(latent_dim, hidden_dim, hidden_dim * layer)
+        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
+        dynamics.layer = layer
         # dynamics = MLPDynamics(hidden_dim)
         v_in = hidden_dim if self._cfg.qnet.predict_q else latent_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
             Seq(mlp(v_in, hidden_dim, 1)),
         ) #layer norm, if necesssary
+        done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None
+
         value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim, hidden_dim, head.get_input_dim()), head)
-        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec,  value_prefix, value, cfg=self._cfg.qnet, horizon=self._cfg.horizon)
+        network = GeneralizedQ(enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec, value_prefix, value, done_fn, cfg=self._cfg.qnet, horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network
         
@@ -292,7 +321,7 @@ class Trainer(Configurable, RLAlgo):
 
         supervised_horizon = self.horizon # not +1 yet
 
-        obs, next_obs, action, reward, idxs, weights = self.buffer.sample(self._cfg.batch_size)
+        obs, next_obs, action, reward, done_gt, idxs, weights = self.buffer.sample(self._cfg.batch_size)
         batch_size = obs.shape[0]
 
         with torch.no_grad():
@@ -343,6 +372,12 @@ class Trainer(Configurable, RLAlgo):
             return (((a-b)**2).mean(axis=-1) * h).sum(axis=0)
         
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
+
+        if self._cfg.have_done:
+            dyna_loss['done'] = (torch.nn.functional.binary_cross_entropy(
+                out['dones'], done_gt,
+            ) * horizon_weights[:len(done_gt)]).sum(axis=0)
+
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         assert loss.shape == weights.shape
         dyna_loss_total = (loss * weights).sum(axis=0)/weights.sum(axis=0)
