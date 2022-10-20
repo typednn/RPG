@@ -219,7 +219,7 @@ class Trainer(Configurable, RLAlgo):
         path = None,
 
         batch_size=512,
-        update_target_freq=1,
+        update_target_freq=2,
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
