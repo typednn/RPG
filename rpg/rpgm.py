@@ -268,8 +268,8 @@ class Trainer(Configurable, RLAlgo):
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)
-        # dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
-        dynamics = MLPDynamics(hidden_dim)
+        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, 1)
+        # dynamics = MLPDynamics(hidden_dim)
         v_in = hidden_dim if self._cfg.qnet.predict_q else latent_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
