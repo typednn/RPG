@@ -223,7 +223,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5, done=100.),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=1000.),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
