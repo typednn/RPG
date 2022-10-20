@@ -354,7 +354,6 @@ class Trainer(Configurable, RLAlgo):
         #print('visualize done mask please ..')
         #assert not done_gt.any() and (truncated_mask > 0.5).all(), 'done mask is not supported yet ..'
         assert truncated_mask.shape[-1] == 1
-        #assert (truncated_mask > 0).all()
         # idx = truncated_mask[-1].argmin()
         # print(truncated[:, idx, 0])
         # print(truncated_mask[:, idx, 0])
@@ -364,7 +363,9 @@ class Trainer(Configurable, RLAlgo):
             if a.shape[-1] != b.shape[-1]:
                 assert b.shape[-1] == 1 and (a.shape[-1] in [1, 2]), f'{a.shape} vs {b.shape}'
             h = horizon_weights[:len(a)] * truncated_mask[..., 0]
-            return (((a-b)**2).mean(axis=-1) * h).sum(axis=0)
+            difference = ((a-b)**2).mean(axis=-1)
+            assert difference.shape == h.shape
+            return (difference * h).sum(axis=0)
         
         dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
 
