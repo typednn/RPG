@@ -156,10 +156,10 @@ class GeneralizedQ(Network):
             values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
         weights = self.weights
-        assert not self._cfg.predict_q
         exepected_values = values
         if self.done_fn is not None:
-            dones = torch.sigmoid(self.done_fn(hidden))
+            assert not self._cfg.predict_q
+            dones = torch.sigmoid(self.done_fn(hidden)) #TODO: predict done based on states for better generalization?
             assert dones.shape == prefix.shape
             not_done = 1 - dones
             alive = torch.cumprod(not_done, 0)
@@ -167,7 +167,9 @@ class GeneralizedQ(Network):
             r = prefix.clone()
             r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
 
-            prefix = (r * alive).cumsum(0)
+            alive_r = torch.ones_like(alive)
+            alive_r[1:] = alive[:-1]
+            prefix = (r * alive_r).cumsum(0)
             exepected_values = exepected_values * alive
         else:
             dones = None
@@ -221,7 +223,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5, done=0.5),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=100.),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
@@ -268,7 +270,8 @@ class Trainer(Configurable, RLAlgo):
             torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
         if entropy_target is not None:
             if entropy_target > 0:
-                entropy_target =  - action_dim
+                self._cfg.defrost()
+                self._cfg.entropy_target = -action_dim
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
 
         self.update_step = 0
@@ -285,7 +288,7 @@ class Trainer(Configurable, RLAlgo):
         latent_dim = 100 # encoding of state ..
         enc_s = mlp(obs_space.shape[0], hidden_dim, latent_dim) # TODO: layer norm?
         if self._cfg.norm_s_enc:
-            enc_s = Seq(enc_s, torch.nn.LayerNorm(latent_dim))
+            enc_s = Seq(enc_s, torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
         enc_z = Identity()
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
