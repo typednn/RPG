@@ -163,6 +163,7 @@ class GeneralizedQ(Network):
             assert dones.shape == prefix.shape
             not_done = 1 - dones
             alive = torch.cumprod(not_done, 0)
+            assert (alive <= 1.).all()
 
             r = prefix.clone()
             r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
