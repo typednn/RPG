@@ -224,7 +224,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5, done=100.),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=10.),
         qnet=GeneralizedQ.dc,
         action_penalty=0.,
 
@@ -376,7 +376,7 @@ class Trainer(Configurable, RLAlgo):
         if self._cfg.have_done:
             loss = torch.nn.functional.binary_cross_entropy(
                 out['dones'], done_gt, reduction='none'
-            ).mean(axis=-1) * truncated_mask[..., 0]
+            ).mean(axis=-1) # predict done all the way ..
             dyna_loss['done'] = (loss * horizon_weights[:len(done_gt)]).sum(axis=0)
             logger.logkv_mean('done_acc', ((out['dones'] > 0.5) == done_gt).float().mean())
 
