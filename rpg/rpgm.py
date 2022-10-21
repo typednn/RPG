@@ -156,22 +156,30 @@ class GeneralizedQ(Network):
             values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
         weights = self.weights
-        exepected_values = values
+        expected_values = values
         if self.done_fn is not None:
             assert not self._cfg.predict_q
             dones = torch.sigmoid(self.done_fn(hidden)) #TODO: predict done based on states for better generalization?
             assert dones.shape == prefix.shape
             not_done = 1 - dones
+
+            # not_done  = (dones < 0.5).float()
+
             alive = torch.cumprod(not_done, 0)
             assert (alive <= 1.).all()
 
             r = prefix.clone()
             r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
+            # print(r.cumsum(0)[:, 0], prefix[:, 0])
+            # assert torch.allclose(r.cumsum(0), prefix, atol=1e-5, rtol=1e-4)
 
             alive_r = torch.ones_like(alive)
             alive_r[1:] = alive[:-1]
             prefix = (r * alive_r).cumsum(0)
-            exepected_values = exepected_values * alive
+            # print(alive[:, 0])
+            expected_values = expected_values * alive
+            from tools.utils import logger
+            logger.logkv_mean('not_done',  not_done.mean().item())
         else:
             dones = None
             #alive = torch.ones((len(hidden),), device=self.device)[:, None, None]
@@ -180,9 +188,9 @@ class GeneralizedQ(Network):
         vpreds = []
         for i in range(len(hidden)):
             if self._cfg.predict_q:
-                vpred = exepected_values[i] + prefix[i] # add the additional rewards like entropies 
+                vpred = expected_values[i] + prefix[i] # add the additional rewards like entropies 
             else:
-                vpred = (prefix[i] + exepected_values[i] * gamma * self._cfg.gamma)
+                vpred = (prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
 
             vpreds.append(vpred)
             gamma *= self._cfg.gamma
@@ -191,15 +199,13 @@ class GeneralizedQ(Network):
         v = (vpreds * weights[:, None, None]).sum(axis=0)
         return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds, dones=dones)
 
-    def value(self, obs, z, horizon, alpha=0, action_penalty=0., pi=None):
+    def value(self, obs, z, horizon, alpha=0, pi=None):
         traj = self.inference(obs, z, horizon, pi=pi)
         entropy_term = -traj['logp_a']
         entropy = entropy_term * alpha if alpha > 0 else 0
-        penalty = action_penalty * (1 - traj['actions']**2).mean(axis=-1, keepdims=True) if action_penalty > 0 else 0
-        extra_reward = entropy + penalty
-        values =  self.predict_values(traj['states'], traj['hidden'], traj['z_embed'], extra_reward)
+        extra_reward = entropy
+        values = self.predict_values(traj['states'], traj['hidden'], traj['z_embed'], extra_reward)
         values['entropy_term'] = entropy_term
-        values['penalty'] = penalty
         return values
 
 
@@ -222,11 +228,10 @@ class Trainer(Configurable, RLAlgo):
         batch_size=512,
         update_target_freq=2,
         tau=0.005,
-        rho=0.97, # horizon decay
+        # rho=0.97, # horizon decay
         max_update_step=200,
         weights=dict(state=1000., prefix=0.5, value=0.5, done=10.),
         qnet=GeneralizedQ.dc,
-        action_penalty=0.,
 
         entropy_coef=0.,
         entropy_target=None,
@@ -241,9 +246,7 @@ class Trainer(Configurable, RLAlgo):
 
 
         selfsupervised=False,
-
         use_target_net=True,
-
         have_done=False,
     ):
         Configurable.__init__(self)
@@ -377,7 +380,7 @@ class Trainer(Configurable, RLAlgo):
             loss = torch.nn.functional.binary_cross_entropy(
                 out['dones'], done_gt, reduction='none'
             ).mean(axis=-1) # predict done all the way ..
-            dyna_loss['done'] = (loss * horizon_weights[:len(done_gt)]).sum(axis=0)
+            dyna_loss['done'] = (loss * truncated_mask[..., 0] * horizon_weights[:len(done_gt)]).sum(axis=0)
             logger.logkv_mean('done_acc', ((out['dones'] > 0.5) == done_gt).float().mean())
 
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
@@ -401,7 +404,7 @@ class Trainer(Configurable, RLAlgo):
 
 
         # update the actor network ..
-        samples = self.nets.value(obs, None, self.horizon, alpha=alpha, action_penalty=self._cfg.action_penalty)
+        samples = self.nets.value(obs, None, self.horizon, alpha=alpha)
         value = samples['value']
 
         assert value.shape[-1] in [1, 2]

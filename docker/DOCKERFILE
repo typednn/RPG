@@ -69,7 +69,7 @@ RUN pip install mujoco_py
 RUN pip install tensorboardX
 RUN pip install opencv-python
 RUN pip install tqdm
-RUN pip install gym==0.25.2
+RUN pip install gym==0.23.1
 RUN pip install yacs>=0.1.8
 RUN pip install matplotlib
 RUN pip install transforms3d
