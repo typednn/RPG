@@ -222,6 +222,7 @@ class Trainer(Configurable, RLAlgo):
         obs_norm=False,
 
         actor_optim = LossOptimizer.gdc(lr=3e-4),
+        dyna_optim=None,
         hooks = None,
         path = None,
 
@@ -230,7 +231,7 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005,
         # rho=0.97, # horizon decay
         max_update_step=200,
-        weights=dict(state=1000., prefix=0.5, value=0.5, done=10.),
+        weights=dict(state=1000., prefix=0.5, value=0.5, done=1.),
         qnet=GeneralizedQ.dc,
 
         entropy_coef=0.,
@@ -268,7 +269,10 @@ class Trainer(Configurable, RLAlgo):
 
         # only optimize pi_a here
         self.actor_optim = LossOptimizer(nets.pi_a, cfg=actor_optim)
-        self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim)
+        kwargs = {}
+        if dyna_optim is not None:
+            kwargs = {**dyna_optim}
+        self.dyna_optim = LossOptimizer(torch.nn.ModuleList([nets.dynamics, nets.value_nets]), cfg=actor_optim, **kwargs)
 
         self.log_alpha = torch.nn.Parameter(
             torch.zeros(1, requires_grad=(entropy_target is not None), device='cuda:0'))
@@ -276,7 +280,7 @@ class Trainer(Configurable, RLAlgo):
             if entropy_target > 0:
                 self._cfg.defrost()
                 self._cfg.entropy_target = -action_dim
-            self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim) #TODO: change the optim ..
+            self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim, **kwargs) #TODO: change the optim ..
 
         self.update_step = 0
 
@@ -423,7 +427,6 @@ class Trainer(Configurable, RLAlgo):
 
 
         self.update_step += 1
-        # previous the update_freq 
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
 
@@ -449,7 +452,7 @@ class Trainer(Configurable, RLAlgo):
                 transition.update(**data, a=a)
                 transitions.append(transition)
 
-            if self.buffer.total_size() > 10000 and self._cfg.update_train_step > 0:
+            if self.buffer.total_size() > 10000 and self._cfg.update_train_step > 0 and mode == 'sample':
                 if idx % self._cfg.update_train_step == 0:
                     self.update()
 
