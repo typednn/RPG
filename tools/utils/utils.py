@@ -469,8 +469,8 @@ class Seq(torch.nn.Module):
     def __init__(self, *main):
         super().__init__()
         self.main = torch.nn.ModuleList(main)
-    def forward(self, x, z=None):
-        if z is not None: x = torch.cat([x, z], dim=-1)
+    def forward(self, *args):
+        x = torch.cat([i for i in args if i is not None], dim=-1)
         for m in self.main:
             x = m(x)
         return x
