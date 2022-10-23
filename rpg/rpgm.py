@@ -39,6 +39,7 @@ class GeneralizedQ(Network):
         cfg=None,
         gamma=0.99,
         lmbda=0.97,
+        done_weight=1.,
         predict_q=False,
 
         lmbda_last=False,
@@ -173,7 +174,7 @@ class GeneralizedQ(Network):
             assert not self._cfg.predict_q
             dones = torch.sigmoid(self.done_fn(hidden)) #TODO: predict done based on states for better generalization?
             assert dones.shape == prefix.shape
-            not_done = 1 - dones
+            not_done = 1 - dones * self._cfg.done_weight
 
             # not_done  = (dones < 0.5).float()
 
@@ -263,7 +264,7 @@ class Trainer(Configurable, RLAlgo):
         selfsupervised=False,
         use_target_net=True,
         have_done=False,
-        zero_value_for_done=True,
+        zero_value_for_done=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
