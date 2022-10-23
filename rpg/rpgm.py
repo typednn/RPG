@@ -257,12 +257,13 @@ class Trainer(Configurable, RLAlgo):
         adv_norm = False,  # if adv_norm is True, normalize the values..
         rew_norm = False,
 
-        reward_prefix=False,
+        reward_prefix=True,
 
 
         selfsupervised=False,
         use_target_net=True,
         have_done=False,
+        zero_value_for_done=True,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -374,6 +375,9 @@ class Trainer(Configurable, RLAlgo):
 
             assert vprefix_gt.shape[-1] == 1
             vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
+
+            if self._cfg.zero_value_for_done:
+                vprefix_gt = vprefix_gt * (1 - done_gt[:supervised_horizon].float()) #TODO: not sure if this is correct
         
         if self._cfg.selfsupervised:
             state_gt = self.nets.enc_s(next_obs)[:supervised_horizon] # pass grad
