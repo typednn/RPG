@@ -176,20 +176,16 @@ class GeneralizedQ(Network):
             assert dones.shape == prefix.shape
             not_done = 1 - dones * self._cfg.done_weight
 
-            # not_done  = (dones < 0.5).float()
-
             alive = torch.cumprod(not_done, 0)
             assert (alive <= 1.).all()
 
             r = prefix.clone()
             r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
-            # print(r.cumsum(0)[:, 0], prefix[:, 0])
-            # assert torch.allclose(r.cumsum(0), prefix, atol=1e-5, rtol=1e-4)
 
             alive_r = torch.ones_like(alive)
             alive_r[1:] = alive[:-1]
             prefix = (r * alive_r).cumsum(0)
-            # print(alive[:, 0])
+
             expected_values = expected_values * alive
             from tools.utils import logger
             logger.logkv_mean('not_done',  not_done.mean().item())
