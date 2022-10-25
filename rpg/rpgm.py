@@ -14,16 +14,8 @@ from .models import MLPDynamics
 from typing import Union
 from .env_base import GymVecEnv, TorchEnv
 from nn.distributions import DistHead
+from .utils import done_rewards_values, lmbda_decay_weight, compute_value_prefix
 
-def compute_value_prefix(rewards, gamma):
-    v = 0
-    discount = 1
-    value_prefix = []
-    for i in range(len(rewards)):
-        v = v + rewards[i] * discount
-        value_prefix.append(v)
-        discount = discount * gamma
-    return torch.stack(value_prefix)
 
 class GeneralizedQ(Network):
     def __init__(
@@ -39,13 +31,11 @@ class GeneralizedQ(Network):
         cfg=None,
         gamma=0.99,
         lmbda=0.97,
-        done_weight=1.,
 
         lmbda_last=False,
 
 
         horizon=1,
-        reward_prefix=False,
     ) -> None:
         super().__init__()
 
@@ -68,20 +58,8 @@ class GeneralizedQ(Network):
         self.value_nets = torch.nn.ModuleList(v_nets)
         self.dynamics = torch.nn.ModuleList(d_nets)
 
-
-        weights = []
-        lmbda = 1
-        sum_lmbda = 0.
-        for _ in range(horizon):
-            weights.append(lmbda)
-            sum_lmbda += lmbda
-            lmbda *= self._cfg.lmbda
-        weights = torch.tensor(weights, dtype=torch.float32)
-
-        if lmbda_last:
-            weights[-1] += (1./(1-self._cfg.lmbda) - sum_lmbda) 
-        weights = weights / weights.sum()
-        self._weights = torch.nn.Parameter(np.log(weights), requires_grad=True)
+        weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
+        self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
 
     @property
     def weights(self):
@@ -94,11 +72,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs)
         return self.pi_a(s, self.enc_z(z))
 
-    def value_from_obs(self, obs, z):
-        s = self.enc_s(obs)
-        return self.value_fn(s, self.enc_z(z))
-
-    def inference(self, obs, z, step, a_seq=None, pi=None):
+    def inference(self, obs, z, step, z_seq=None, a_seq=None, extra_rewards_fn=None):
         """
         s      a_1    a_2    ...
         |      |      |
@@ -110,100 +84,93 @@ class GeneralizedQ(Network):
             |
             v1
         """
-        z_embed = self.enc_z(z)
-        assert z_embed is None
+        sample_z = (z_seq is None)
+        if sample_z:
+            z_seq = []
+            logp_z = []
+        
+        sample_a = (a_seq is None)
+        if sample_a:
+            a_seq = []
+            logp_a = []
+        hidden = []
+        rewards = []
+        states = []
+
         s = self.enc_s(obs)
+        z_embed = self.enc_z(z)
+
+        # for dynamics part ..
         h = self.init_h(s)
         h = h.reshape(len(s), self.dynamic_fn.layer, -1).permute(1, 0, 2).contiguous() # GRU of layer 2
-        if pi is None: pi = self.pi_a
-
-        hidden, logp_a, actions, states = [], [], [], []
-
-        vpreifx = []
+        pi = self.pi_a
         for idx in range(step):
             assert self.pi_z is None, "this means that we will not update z, anyway.."
 
-            if a_seq is None:
+            if len(z_seq) < idx:
+                z, logp = pi(s, z_embed).sample()
+                logp_z.append(logp[..., None])
+                z_embed = self.enc_z(z)
+
+            if len(a_seq) < idx:
                 a, logp = pi(s, z_embed).rsample()
-            else:
-                a, logp = a_seq[idx], torch.zeros((len(obs),), device=self.device)
+                logp_a.append(logp[..., None])
 
             old_s = s
             a_embed = self.enc_a(a)
             o, h = self.dynamic_fn(a_embed[None, :].expand_as(h), h)
-        
-
             o = o[-1]
             assert o.shape[0] == a.shape[0] 
             s = self.state_dec(o) # predict the next hidden state ..
 
-            if not self._cfg.reward_prefix:
-                vpreifx.append(self.value_prefix(old_s, a_embed, s))
-
             hidden.append(o)
-            actions.append(a)
-            logp_a.append(logp[..., None])
             states.append(s)
 
-        ss = torch.stack
-        out = dict(hidden=ss(hidden), actions=ss(actions), logp_a=ss(logp_a), states=ss(states), z_embed=None, init_s=s)
-        out['value_prefix'] = ss(vpreifx) if not self._cfg.reward_prefix else None
-        return out
+        stack = torch.stack
+        hidden = stack[hidden]
+        states = stack(states)
+        out = dict(hidden=stack(hidden), states=stack(states))
 
-    def predict_values(self, ss, hidden, z_embed, rewards=None, value_prefix=None):
-        if value_prefix is None:
-            value_prefix = prefix = self.value_prefix(hidden) # predict reward prefix
-        else:
-            prefix = compute_value_prefix(value_prefix, self._cfg.gamma)
+        if sample_a:
+            out['a'] = stack(a_seq)
+            out['logp_a'] = stack(logp_a)
 
-        if rewards is not None and (rewards is not 0):
-            prefix = prefix + compute_value_prefix(rewards, self._cfg.gamma)
-        values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
+        if sample_z:
+            z_seq = out['z'] = stack(z_seq)
+            out['logp_z'] = stack(logp_z)
 
-        weights = self.weights
-        expected_values = values
-        if self.done_fn is not None:
-            dones = torch.sigmoid(self.done_fn(hidden)) #TODO: predict done based on states for better generalization?
-            assert dones.shape == prefix.shape
-            not_done = 1 - dones * self._cfg.done_weight
+        out['value_prefix'] = value_prefix
+        value_prefix = self.value_prefix(hidden)
 
-            alive = torch.cumprod(not_done, 0)
-            assert (alive <= 1.).all()
 
-            r = prefix.clone()
-            r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
+        prefix = value_prefix
+        if extra_rewards_fn is not None:
+            extra_rewards, infos = extra_rewards_fn(**locals())
+            out.update(infos)
+            prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
-            alive_r = torch.ones_like(alive)
-            alive_r[1:] = alive[:-1]
-            prefix = (r * alive_r).cumsum(0)
+        values = self.value_fn(states, self.enc_z(z_seq)) # use the invariant of the value function ..
 
-            expected_values = expected_values * alive
-            from tools.utils import logger
-            logger.logkv_mean('not_done',  not_done.mean().item())
-        else:
-            dones = None
-            #alive = torch.ones((len(hidden),), device=self.device)[:, None, None]
+        out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
+        expected_values, expected_prefix = done_rewards_values(values, prefix, dones)
 
         gamma = 1
         vpreds = []
         for i in range(len(hidden)):
-            vpred = (prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
-
+            vpred = (expected_prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
             vpreds.append(vpred)
             gamma *= self._cfg.gamma
 
-        vpreds = torch.stack(vpreds)
-        v = (vpreds * weights[:, None, None]).sum(axis=0)
-        return dict(value=v, next_values=values, value_prefix=value_prefix, vpreds=vpreds, dones=dones)
+        vpreds = stack(vpreds)
+        out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
+        out['next_values'] = values
+        return out
 
-    def value(self, obs, z, horizon, alpha=0, pi=None):
-        traj = self.inference(obs, z, horizon, pi=pi)
-        entropy_term = -traj['logp_a']
+
+    def entropy_rewards(self, logp_a, alpha=0.):
+        entropy_term = -logp_a
         entropy = entropy_term * alpha if alpha > 0 else 0
-        extra_reward = entropy
-        values = self.predict_values(traj['states'], traj['hidden'], traj['z_embed'], extra_reward, value_prefix=traj['value_prefix'])
-        values['entropy_term'] = entropy_term
-        return values
+        return entropy, {'entropy_term': entropy_term}
 
 
 class Trainer(Configurable, RLAlgo):
@@ -237,19 +204,12 @@ class Trainer(Configurable, RLAlgo):
         norm_s_enc=False,
         update_train_step=1,
 
-
-        # reward_norm=False,  # normalize the reward
         adv_norm = False,  # if adv_norm is True, normalize the values..
-        rew_norm = False,
-
-        reward_prefix=True,
-
-        use_target_net=True,
         have_done=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
-        self.rew_norm = RunningMeanStd(clip_max=10.) if rew_norm else None
+        # self.rew_norm = RunningMeanStd(clip_max=10.) if rew_norm else None
 
         obs_space = env.observation_space
         action_dim = env.action_space.shape[0]
@@ -309,16 +269,20 @@ class Trainer(Configurable, RLAlgo):
         ) #layer norm, if necesssary
         done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None
 
-        value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1)) if self._cfg.reward_prefix else Seq(mlp(latent_dim+latent_dim+hidden_dim, hidden_dim, 1))
+        value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim, hidden_dim, head.get_input_dim()), head)
         network = GeneralizedQ(
             enc_s, enc_a, enc_z, pi_a, None, init_h, dynamics, state_dec, value_prefix, value, done_fn, cfg=self._cfg.qnet,
-            horizon=self._cfg.horizon, reward_prefix=self._cfg.reward_prefix)
+            horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network
+
+    def sample_hidden_z(obs, action, next_obs):
+        # estimate the probaility of init z ..
+        pass
         
     def update(self):
         with torch.no_grad():
@@ -326,45 +290,45 @@ class Trainer(Configurable, RLAlgo):
 
         supervised_horizon = self.horizon # not +1 yet
 
+
         obs, next_obs, action, reward, done_gt, truncated = self.buffer.sample(self._cfg.batch_size)
         batch_size = obs.shape[0]
-
-        with torch.no_grad():
-            pi = None if self._cfg.use_target_net else self.nets.pi_a
-            vtarg = self.target_nets.value(next_obs.reshape(-1, *obs.shape[1:]), None,
-                self.horizon, alpha=alpha, pi=pi)['value'].reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
-            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon] # use the current model ..
-
-            if self._cfg.reward_prefix:
-                vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
-            else:
-                vprefix_gt = reward[:supervised_horizon] 
-            assert torch.allclose(reward[0], vprefix_gt[0])
-
-
-            if self.rew_norm is not None:
-                # vtarg = vtarg * self.rew_norm.std # denormalize it.
-                self.rew_norm.update(vprefix_gt) # 'normalize reward during update ..'
-                vprefix_gt = vprefix_gt / self.rew_norm.std
-
-            assert vprefix_gt.shape[-1] == 1
-
-            assert vprefix_gt.shape[-1] == 1
-            vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
-            vprefix_gt = vprefix_gt * (1 - done_gt[:supervised_horizon].float()) #TODO: not sure if this is correct
-        
-
-        # update the dynamics model ..
-        traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
-        states = traj['states']
-        out = self.nets.predict_values(states, traj['hidden'], None, None, value_prefix=traj['value_prefix'])
-        vpred, value_prefix = out['next_values'], out['value_prefix']
-
         horizon_weights = torch.ones_like(self.nets.weights.detach())[:, None]
         horizon_weights = horizon_weights / horizon_weights.sum()
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
         assert truncated_mask.shape[-1] == 1
+
+        # update the dynamics model ..
+
+        init_z = self.sample_hidden_z(obs)
+        traj = self.nets.inference(obs, init_z, self.horizon, action) # by default, just rollout for horizon steps ..
+
+        states = traj['states']
+        vpred = traj['next_values']
+        vprefix_pred = traj['value_prefix']
+        done_pred = traj['dones']
+        z_seq = traj['z_seq']
+
+        with torch.no_grad():
+            vtarg = self.target_nets.inference(
+                next_obs.reshape(-1, *obs.shape[1:]),
+                z_seq.reshape(-1, z_seq.shape[-1]),
+                self.horizon, alpha=alpha
+            )['value']
+
+            vtarg = vtarg.reshape(next_obs.shape[0], batch_size, -1)[:supervised_horizon]
+            state_gt = self.nets.enc_s(next_obs[:supervised_horizon]) # use the current model ..
+
+            vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
+            # if self.rew_norm is not None:
+            #     # vtarg = vtarg * self.rew_norm.std # denormalize it.
+            #     self.rew_norm.update(vprefix_gt) # 'normalize reward during update ..'
+            #     vprefix_gt = vprefix_gt / self.rew_norm.std
+            assert vprefix_gt.shape[-1] == 1
+            vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
+            vprefix_gt = vprefix_gt * (1 - done_gt[:supervised_horizon].float()) #TODO: not sure if this is correct
+        
 
         def hmse(a, b):
             assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
@@ -375,14 +339,18 @@ class Trainer(Configurable, RLAlgo):
             assert difference.shape == h.shape
             return (difference * h).sum(axis=0)
         
-        dyna_loss = {'state': hmse(states, state_gt), 'value': hmse(vpred, vtarg), 'prefix': hmse(value_prefix, vprefix_gt)}
-
+        dyna_loss = {
+            'state': hmse(states, state_gt),
+            'value': hmse(vpred, vtarg),
+            'prefix': hmse(vprefix_pred, vprefix_gt)
+        }
         if self._cfg.have_done:
             loss = torch.nn.functional.binary_cross_entropy(
-                out['dones'], done_gt, reduction='none'
+                done_pred, done_gt, reduction='none'
             ).mean(axis=-1) # predict done all the way ..
             dyna_loss['done'] = (loss * truncated_mask[..., 0] * horizon_weights[:len(done_gt)]).sum(axis=0)
-            logger.logkv_mean('done_acc', ((out['dones'] > 0.5) == done_gt).float().mean())
+            logger.logkv_mean('done_acc', ((done_pred > 0.5) == done_gt).float().mean())
+
 
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         dyna_loss_total = loss.mean(axis=0)

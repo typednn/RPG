@@ -36,6 +36,52 @@ def create_hidden_space(z_dim, z_cont_dim):
     return z_space
 
 
+def done_rewards_values(values, prefix, dones):
+    if dones is not None:
+        assert dones.shape == prefix.shape
+        not_done = 1 - dones
+
+        alive = torch.cumprod(not_done, 0)
+        assert (alive <= 1.).all()
+
+        r = prefix.clone()
+        r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
+
+        alive_r = torch.ones_like(alive)
+        alive_r[1:] = alive[:-1]
+        prefix = (r * alive_r).cumsum(0)
+
+        values = values * alive
+        from tools.utils import logger
+        logger.logkv_mean('not_done',  not_done.mean().item())
+    return values, prefix
+
+
+def lmbda_decay_weight(lmbda, horizon, lmbda_last):
+    weights = []
+    lmbda = 1
+    sum_lmbda = 0.
+    for _ in range(horizon):
+        weights.append(lmbda)
+        sum_lmbda += lmbda
+        lmbda *= lmbda
+    weights = torch.tensor(weights, dtype=torch.float32)
+    if lmbda_last:
+        weights[-1] += (1./(1-lmbda) - sum_lmbda) 
+    weights = weights / weights.sum()
+    return weights
+
+def compute_value_prefix(rewards, gamma):
+    v = 0
+    discount = 1
+    value_prefix = []
+    for i in range(len(rewards)):
+        v = v + rewards[i] * discount
+        value_prefix.append(v)
+        discount = discount * gamma
+    return torch.stack(value_prefix)
+
+
 def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda, mode='approx', return_sum_weight_value=False):
 
     reward = reward.to(torch.float64)
