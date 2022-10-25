@@ -81,6 +81,14 @@ def compute_value_prefix(rewards, gamma):
         discount = discount * gamma
     return torch.stack(value_prefix)
 
+def masked_temporal_mse(a, b, mask):
+    assert a.shape[:-1] == b.shape[:-1], f'{a.shape} vs {b.shape}'
+    if a.shape[-1] != b.shape[-1]:
+        assert b.shape[-1] == 1 and (a.shape[-1] in [1, 2]), f'{a.shape} vs {b.shape}'
+    difference = ((a-b)**2).mean(axis=-1)
+    assert difference.shape == mask.shape
+    return (difference * mask).sum(axis=0)
+
 
 def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda, mode='approx', return_sum_weight_value=False):
 
