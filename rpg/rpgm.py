@@ -40,7 +40,6 @@ class GeneralizedQ(Network):
         gamma=0.99,
         lmbda=0.97,
         done_weight=1.,
-        predict_q=False,
 
         lmbda_last=False,
 
@@ -96,7 +95,6 @@ class GeneralizedQ(Network):
         return self.pi_a(s, self.enc_z(z))
 
     def value_from_obs(self, obs, z):
-        assert not self._cfg.predict_q
         s = self.enc_s(obs)
         return self.value_fn(s, self.enc_z(z))
 
@@ -158,20 +156,13 @@ class GeneralizedQ(Network):
         else:
             prefix = compute_value_prefix(value_prefix, self._cfg.gamma)
 
-        if self._cfg.predict_q:
-            prefix = torch.zeros_like(value_prefix)
         if rewards is not None and (rewards is not 0):
             prefix = prefix + compute_value_prefix(rewards, self._cfg.gamma)
-
-        if self._cfg.predict_q:
-            values = self.value_fn(hidden, z_embed) # predict V(s, z_{t-1})
-        else:
-            values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
+        values = self.value_fn(ss, z_embed) # use the invariant of the value function ..
 
         weights = self.weights
         expected_values = values
         if self.done_fn is not None:
-            assert not self._cfg.predict_q
             dones = torch.sigmoid(self.done_fn(hidden)) #TODO: predict done based on states for better generalization?
             assert dones.shape == prefix.shape
             not_done = 1 - dones * self._cfg.done_weight
@@ -196,10 +187,7 @@ class GeneralizedQ(Network):
         gamma = 1
         vpreds = []
         for i in range(len(hidden)):
-            if self._cfg.predict_q:
-                vpred = expected_values[i] + prefix[i] # add the additional rewards like entropies 
-            else:
-                vpred = (prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
+            vpred = (prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
 
             vpreds.append(vpred)
             gamma *= self._cfg.gamma
@@ -256,8 +244,6 @@ class Trainer(Configurable, RLAlgo):
 
         reward_prefix=True,
 
-
-        selfsupervised=False,
         use_target_net=True,
         have_done=False,
     ):
@@ -316,7 +302,7 @@ class Trainer(Configurable, RLAlgo):
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
         dynamics.layer = layer
         # dynamics = MLPDynamics(hidden_dim)
-        v_in = hidden_dim if self._cfg.qnet.predict_q else latent_dim
+        v_in = latent_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
             Seq(mlp(v_in, hidden_dim, 1)),
@@ -352,7 +338,6 @@ class Trainer(Configurable, RLAlgo):
             if self._cfg.reward_prefix:
                 vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)[:supervised_horizon]
             else:
-                assert not self.nets._cfg.predict_q
                 vprefix_gt = reward[:supervised_horizon] 
             assert torch.allclose(reward[0], vprefix_gt[0])
 
@@ -364,18 +349,10 @@ class Trainer(Configurable, RLAlgo):
 
             assert vprefix_gt.shape[-1] == 1
 
-            if self.nets._cfg.predict_q:
-                for i in range(self.horizon):
-                    vtarg[i] = vtarg[i] * (self.nets._cfg.gamma ** (i+1)) + vprefix_gt[i].mean(axis=-1, keepdim=True)
-                vprefix_gt = torch.zeros_like(vprefix_gt) # do not predit vprefix
-
             assert vprefix_gt.shape[-1] == 1
             vtarg = vtarg.min(axis=-1, keepdims=True)[0] # predict value
-
             vprefix_gt = vprefix_gt * (1 - done_gt[:supervised_horizon].float()) #TODO: not sure if this is correct
         
-        if self._cfg.selfsupervised:
-            state_gt = self.nets.enc_s(next_obs)[:supervised_horizon] # pass grad
 
         # update the dynamics model ..
         traj = self.nets.inference(obs, None, self.horizon, action) # by default, just rollout for horizon steps ..
@@ -409,18 +386,6 @@ class Trainer(Configurable, RLAlgo):
 
         loss = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss])
         dyna_loss_total = loss.mean(axis=0)
-
-        # # value
-        # if self._cfg.critic_weight > 0.:
-        #     with torch.no_grad():
-        #         value = self.target_nets.value(obs, None, self.horizon, alpha=alpha)['value'].min(axis=-1, keepdims=True)[0]
-        #         vtarg = torch.cat((value[None,:], vtarg), axis=0) # add the value of the first state ..
-        #     vpred = self.nets.value_from_obs(torch.cat((obs[None,:], next_obs[:supervised_horizon]), axis=0), z=None)
-        #     critic_loss = ((vpred - vtarg) ** 2).mean(axis=-1).mean(axis=0) # do not weight it again ..
-        #     critic_loss = (critic_loss * weights).sum(axis=0)/weights.sum(axis=0)
-        #     #self.value_optim.optimize(critic_loss)
-        #     logger.logkv_mean('critic', float(critic_loss))
-        #     dyna_loss_total += self._cfg.critic_weight * critic_loss # additional value predict .. 
 
         self.dyna_optim.optimize(dyna_loss_total)
         logger.logkvs_mean({k: float(v.mean()) for k, v in dyna_loss.items()}, prefix='dyna/')
