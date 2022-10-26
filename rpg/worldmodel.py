@@ -40,7 +40,6 @@ class GeneralizedQ(Network):
 
         self.pi_a, self.pi_z = pi_a, pi_z
         self.enc_s, self.enc_z, self.enc_a = enc_s, enc_z, enc_a
-        assert self.pi_z is None
 
         self.init_h = init_h
         self.dynamic_fn: torch.nn.GRU = dynamic_fn
@@ -54,7 +53,9 @@ class GeneralizedQ(Network):
 
         v_nets = [enc_s, enc_z, value_fn]
         d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
+
         self.dynamics = torch.nn.ModuleList(d_nets + v_nets)
+        self.policies = torch.nn.ModuleList([pi_a, pi_z])
 
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
         self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
@@ -66,8 +67,12 @@ class GeneralizedQ(Network):
 
     def policy(self, obs, z):
         obs = totensor(obs, self.device)
+        z = totensor(z, self.device, dtype=None)
+        z_embed = self.enc_z(z)
         s = self.enc_s(obs)
-        return self.pi_a(s, self.enc_z(z))
+
+        z = self.pi_z(s, z_embed).sample()[0]
+        return self.pi_a(s, self.enc_z(z)), z
 
     def value(self, obs, z):
         obs = totensor(obs, self.device)
@@ -75,7 +80,7 @@ class GeneralizedQ(Network):
         return self.value_fn(s, self.enc_z(z))
 
 
-    def inference(self, obs, z, step, z_seq=None, a_seq=None, extra_rewards_fn=None):
+    def inference(self, obs, z, step, z_seq=None, a_seq=None, alpha=0.):
         sample_z = (z_seq is None)
         if sample_z:
             z_seq, logp_z = [], []
@@ -93,8 +98,6 @@ class GeneralizedQ(Network):
         h = self.init_h(s)
         h = h.reshape(len(s), self.dynamic_fn.layer, -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
-            assert self.pi_z is None, "this means that we will not update z, anyway.."
-
             if len(z_seq) <= idx:
                 z, logp = self.pi_z(s, z_embed).sample()
                 logp_z.append(logp[..., None])
@@ -115,29 +118,25 @@ class GeneralizedQ(Network):
             states.append(s)
 
         stack = torch.stack
-        hidden = stack[hidden]
+        hidden = stack(hidden)
         states = stack(states)
-        out = dict(hidden=stack(hidden), states=stack(states))
 
+        out = dict(hidden=hidden, states=states)
         if sample_a:
             out['a'] = stack(a_seq)
             out['logp_a'] = stack(logp_a)
-
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
             out['logp_z'] = stack(logp_z)
+        prefix = out['value_prefix'] = self.value_prefix(hidden)
 
-        out['value_prefix'] = value_prefix
-        value_prefix = self.value_prefix(hidden)
-
-
-        prefix = value_prefix
-        if extra_rewards_fn is not None:
-            extra_rewards, infos = extra_rewards_fn(**locals())
+        if 'logp_a' in out:
+            extra_rewards, infos = self.entropy_rewards(out['logp_a'], alpha)
             out.update(infos)
             prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
-        values = self.value_fn(states, self.enc_z(z_seq)) # use the invariant of the value function ..
+
+        values = self.value_fn(states, self.enc_z(z_seq))
 
         out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
         expected_values, expected_prefix = done_rewards_values(values, prefix, dones)

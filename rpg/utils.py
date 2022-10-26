@@ -24,16 +24,47 @@ def minibatch_gen(traj, index, batch_size, KEY_LIST=None, verbose=False):
             for key in KEY_LIST
         }
 
-
-
 def create_hidden_space(z_dim, z_cont_dim):
     if z_cont_dim == 0:
         z_space = Discrete(z_dim)
+        z_space.inp_shape = (z_dim,)
     elif z_dim == 0:
         z_space = Box(-1, 1, (z_cont_dim,))
+        z_space.inp_shape = (z_cont_dim,)
     else:
         z_space = MixtureSpace(Discrete(z_dim), Box(-1, 1, (z_cont_dim,)))
+        z_space.inp_shape = (z_dim + z_cont_dim,)
+        raise NotImplementedError("The Z Transform is not implemented ..")
     return z_space
+
+import torch
+class ZTransform(torch.nn.Module):
+    def __init__(self, z_space) -> None:
+        super().__init__()
+        self.z_space = z_space
+
+    def forward(self, x):
+        if isinstance(self.z_space, Discrete):
+            from tools.utils import myround
+            return torch.nn.functional.one_hot(x, self.z_space.n).float()
+        else:
+            return x
+
+
+def config_hidden(hidden, hidden_space):
+    from gym.spaces import Box, Discrete as Categorical
+    from tools.config import merge_inputs, CN
+    if isinstance(hidden_space, Box):
+        default_hidden_head = dict(TYPE='Normal', linear=True, std_scale=0.2)
+    elif isinstance(hidden_space, Categorical):
+        default_hidden_head = dict(TYPE='Discrete')
+    else:
+        raise NotImplementedError
+    if hidden is not None:
+        hidden_head = merge_inputs(CN(default_hidden_head), **hidden)
+    else:
+        hidden_head = default_hidden_head
+    return hidden_head
 
 
 def done_rewards_values(values, prefix, dones):
