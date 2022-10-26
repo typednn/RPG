@@ -120,16 +120,16 @@ class Trainer(Configurable, RLAlgo):
             next_obs = next_obs.reshape(-1, *obs.shape[1:])
             seq_z = pred_traj['z'].reshape(next_obs.shape[0], *init_z.shape[1:])
 
-            vtarg = self.target_nets.inference(next_obs, seq_z, self.horizon, alpha=alpha)['value']
+            # making target nets to nets does not help
+            vtarg = self.target_nets.inference(next_obs, seq_z, self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn)['value']
 
-            #TODO: make the value to be zero in the end ..
+            done_mask = (1 - (done_gt.cumsum(0) > 0).float())
             vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
+            vtarg = vtarg * done_mask #not sure if this will help ..
 
         dyna_loss['value'] = masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
 
         return dyna_loss
-
-
 
     def update_actor(self, obs, init_z, alpha):
         samples = self.nets.inference(obs, init_z, self.horizon, alpha=alpha)
@@ -175,7 +175,7 @@ class Trainer(Configurable, RLAlgo):
             ema(self.nets, self.target_nets, self._cfg.tau)
         logger.logkvs_mean(info)
 
-    def inference(self, n_step, mode='sample'):
+    def inference(self, n_step, mode='training'):
         with torch.no_grad():
             obs, timestep = self.start(self.env)
             transitions = []
@@ -190,7 +190,7 @@ class Trainer(Configurable, RLAlgo):
 
                 scale = pd.dist.scale
                 logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-                if mode == 'sample':
+                if mode == 'training':
                     a, _ = pd.rsample()
                 else:
                     a = pd.dist.loc.detach().cpu().numpy()
@@ -199,7 +199,7 @@ class Trainer(Configurable, RLAlgo):
                 transition.update(**data, a=a)
                 transitions.append(transition)
 
-            if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'sample':
+            if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
                     self.update()
 
@@ -234,7 +234,7 @@ class Trainer(Configurable, RLAlgo):
     def evaluate(self, env, steps):
         with torch.no_grad():
             self.start(self.env, reset=True)
-            out = self.inference(steps, mode='not_sample')
+            out = self.inference(steps * 10, mode='evaluate')
             self.start(self.env, reset=True)
             return out
 
@@ -252,9 +252,8 @@ class Trainer(Configurable, RLAlgo):
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
         layer = 1
-        init_h = mlp(latent_dim, hidden_dim, hidden_dim * layer)
+        init_h = mlp(latent_dim, hidden_dim, hidden_dim)
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
-        dynamics.layer = layer
         # dynamics = MLPDynamics(hidden_dim)
 
         value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
@@ -270,8 +269,8 @@ class Trainer(Configurable, RLAlgo):
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
 
-        zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
-        pi_z = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
+        # override it if we want to use different network 
+        pi_z = self.make_option_network(z_space, latent_z_dim, latent_dim, hidden_dim)
 
         network = GeneralizedQ(
             enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn,
@@ -279,3 +278,7 @@ class Trainer(Configurable, RLAlgo):
             horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network
+
+    def make_option_network(self, z_space, latent_z_dim, latent_dim, hidden_dim):
+        zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
+        return Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)

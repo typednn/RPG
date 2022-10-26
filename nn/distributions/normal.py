@@ -108,5 +108,7 @@ class Normal(DistHead):
 
         if self._cfg.nocenter:
             means = means * 0
-        return NormalAction(means, action_std,
-                            tanh=tanh, act_scale=self.action_scale)
+        return NormalAction(
+            means, action_std,
+            tanh=tanh, act_scale=self.action_scale
+        )

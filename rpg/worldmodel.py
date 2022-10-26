@@ -78,7 +78,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs)
         return self.value_fn(s, self.enc_z(z))
 
-    def inference(self, obs, z, step, z_seq=None, a_seq=None, alpha=0.):
+    def inference(self, obs, z, step, z_seq=None, a_seq=None, alpha=0., value_fn=None):
         sample_z = (z_seq is None)
         if sample_z:
             z_seq, logp_z = [], []
@@ -93,8 +93,8 @@ class GeneralizedQ(Network):
         z_embed = self.enc_z(z)
 
         # for dynamics part ..
-        h = self.init_h(s)
-        h = h.reshape(len(s), self.dynamic_fn.layer, -1).permute(1, 0, 2).contiguous() # GRU of layer 2
+        h = self.init_h(s)[None,:]
+        #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
                 z, logp = self.pi_z(s, z_embed).sample()
@@ -108,11 +108,11 @@ class GeneralizedQ(Network):
                 a_seq.append(a)
 
             a_embed = self.enc_a(a_seq[idx])
-            o, h = self.dynamic_fn(a_embed[None, :].expand_as(h), h)
-            o = o[-1]
-            s = self.state_dec(o) # predict the next hidden state ..
+            o, h = self.dynamic_fn(a_embed[None, :], h)
+            assert torch.allclose(o[-1], h)
+            s = self.state_dec(h[-1]) # predict the next hidden state ..
 
-            hidden.append(o)
+            hidden.append(h[-1])
             states.append(s)
 
         stack = torch.stack
@@ -135,7 +135,7 @@ class GeneralizedQ(Network):
             prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
 
-        values = self.value_fn(states, self.enc_z(z_seq))
+        values = (self.value_fn if value_fn is None else value_fn)(states, self.enc_z(z_seq))
 
         out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
         expected_values, expected_prefix = done_rewards_values(values, prefix, dones)
