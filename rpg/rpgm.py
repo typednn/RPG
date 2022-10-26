@@ -157,7 +157,7 @@ class Trainer(Configurable, RLAlgo):
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.dyna_optim.optimize(dyna_loss_total)
 
-        info = {k: float(v.mean()) for k, v in dyna_loss.items()}
+        info = {k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         info['alpha'] = float(alpha.mean())
 
         actor_updates = self.update_actor(obs, init_z, alpha)
@@ -259,16 +259,16 @@ class Trainer(Configurable, RLAlgo):
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 
 
-        v_in = latent_dim + z_dim
+        v_in = latent_dim + latent_z_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
             Seq(mlp(v_in, hidden_dim, 1)),
         ) #layer norm, if necesssary
         head = DistHead.build(action_space, cfg=self._cfg.head)
-        pi_a = Seq(mlp(latent_dim + z_dim, hidden_dim, head.get_input_dim()), head)
+        pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
 
         zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
-        pi_z = Seq(mlp(latent_dim + z_dim, hidden_dim, zhead.get_input_dim()), zhead)
+        pi_z = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
 
         network = GeneralizedQ(
             enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn, cfg=self._cfg.qnet,
