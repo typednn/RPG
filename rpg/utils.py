@@ -45,7 +45,6 @@ class ZTransform(torch.nn.Module):
 
     def forward(self, x):
         if isinstance(self.z_space, Discrete):
-            from tools.utils import myround
             return torch.nn.functional.one_hot(x, self.z_space.n).float()
         else:
             return x

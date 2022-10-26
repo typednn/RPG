@@ -99,7 +99,8 @@ class Trainer(Configurable, RLAlgo):
         #return None
         return totensor([self.z_space.sample()] * len(obs), device=self.device, dtype=None)
 
-    def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask):
+
+    def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask, alpha):
         pred_traj = self.nets.inference(obs, init_z, self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
         with torch.no_grad():
             state_gt = self.nets.enc_s(next_obs) # use the current model ..
@@ -113,14 +114,22 @@ class Trainer(Configurable, RLAlgo):
             loss = bce(pred_traj['dones'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
             dyna_loss['done'] = (loss * mask).sum(axis=0)
             logger.logkv_mean('done_acc', ((pred_traj['dones'] > 0.5) == done_gt).float().mean())
+
+        batch_size = len(obs)
+        with torch.no_grad():
+            next_obs = next_obs.reshape(-1, *obs.shape[1:])
+            seq_z = pred_traj['z'].reshape(next_obs.shape[0], *init_z.shape[1:])
+
+            vtarg = self.target_nets.inference(next_obs, seq_z, self.horizon, alpha=alpha)['value']
+
+            #TODO: make the value to be zero in the end ..
+            vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
+
+        dyna_loss['value'] = masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
+
         return dyna_loss
 
-    def critic_loss(self, obs, init_z, alpha):
-        # TODO: supervise the value function for rollouted values if necessary ..
-        with torch.no_grad():
-            vtarg = self.target_nets.inference(obs, init_z, self.horizon, alpha=alpha)['value']
-        loss = ((self.nets.value(obs, init_z) - vtarg)**2).mean(axis=-1)
-        return dict(value=loss)
+
 
     def update_actor(self, obs, init_z, alpha):
         samples = self.nets.inference(obs, init_z, self.horizon, alpha=alpha)
@@ -137,7 +146,7 @@ class Trainer(Configurable, RLAlgo):
             'actor_loss': float(actor_loss),
             'entropy': float(entropy_term.mean()),
         }
-        
+
     def update(self):
         obs, next_obs, action, reward, done_gt, truncated = self.buffer.sample(self._cfg.batch_size)
         assert len(next_obs) == self.horizon
@@ -146,14 +155,12 @@ class Trainer(Configurable, RLAlgo):
 
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
-        mask = truncated_mask[..., 0] / self.horizon 
+        mask = truncated_mask[..., 0] / self.horizon
 
         with torch.no_grad():
             init_z = self.sample_hidden_z(obs, action, next_obs)
 
-        dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask)
-        dyna_loss.update(self.critic_loss(obs, init_z, alpha))
-
+        dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha)
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.dyna_optim.optimize(dyna_loss_total)
 
@@ -163,13 +170,10 @@ class Trainer(Configurable, RLAlgo):
         actor_updates = self.update_actor(obs, init_z, alpha)
         info.update(actor_updates)
 
-
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
         logger.logkvs_mean(info)
-
-
 
     def inference(self, n_step, mode='sample'):
         with torch.no_grad():
@@ -227,7 +231,6 @@ class Trainer(Configurable, RLAlgo):
 
             logger.dumpkvs()
 
-
     def evaluate(self, env, steps):
         with torch.no_grad():
             self.start(self.env, reset=True)
@@ -271,7 +274,8 @@ class Trainer(Configurable, RLAlgo):
         pi_z = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
 
         network = GeneralizedQ(
-            enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn, cfg=self._cfg.qnet,
+            enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn,
+            cfg=self._cfg.qnet,
             horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network

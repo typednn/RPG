@@ -70,7 +70,6 @@ class GeneralizedQ(Network):
         z = totensor(z, self.device, dtype=None)
         z_embed = self.enc_z(z)
         s = self.enc_s(obs)
-
         z = self.pi_z(s, z_embed).sample()[0]
         return self.pi_a(s, self.enc_z(z)), z
 
@@ -78,7 +77,6 @@ class GeneralizedQ(Network):
         obs = totensor(obs, self.device)
         s = self.enc_s(obs)
         return self.value_fn(s, self.enc_z(z))
-
 
     def inference(self, obs, z, step, z_seq=None, a_seq=None, alpha=0.):
         sample_z = (z_seq is None)
@@ -102,13 +100,13 @@ class GeneralizedQ(Network):
                 z, logp = self.pi_z(s, z_embed).sample()
                 logp_z.append(logp[..., None])
                 z_seq.append(z)
+            z_embed = self.enc_z(z_seq[idx])
 
             if len(a_seq) <= idx:
                 a, logp = self.pi_a(s, z_embed).rsample()
                 logp_a.append(logp[..., None])
                 a_seq.append(a)
 
-            z_embed = self.enc_z(z_seq[idx])
             a_embed = self.enc_a(a_seq[idx])
             o, h = self.dynamic_fn(a_embed[None, :].expand_as(h), h)
             o = o[-1]
@@ -128,6 +126,7 @@ class GeneralizedQ(Network):
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
             out['logp_z'] = stack(logp_z)
+            assert (z_seq == 0).all()
         prefix = out['value_prefix'] = self.value_prefix(hidden)
 
         if 'logp_a' in out:
@@ -150,6 +149,7 @@ class GeneralizedQ(Network):
 
         vpreds = stack(vpreds)
         out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
+        out['next_values'] = values
         return out
 
 
