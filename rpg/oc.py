@@ -122,7 +122,7 @@ class OptionCritic(Trainer):
         self, env,
         cfg=None,
         z_dim=10,
-        ir=IntrinsicReward.to_build(TYPE=IntrinsicReward),
+        ir=IntrinsicReward.dc,
 
         done_target=1./10, # control the entropy of done.
         entz_target = None, # control the target entropies.
