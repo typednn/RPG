@@ -27,6 +27,8 @@ class GeneralizedQ(Network):
 
         done_fn,
 
+        intrinsic_reward,
+
         cfg=None,
         gamma=0.99,
         lmbda=0.97,
@@ -56,6 +58,8 @@ class GeneralizedQ(Network):
 
         self.dynamics = torch.nn.ModuleList(d_nets + v_nets)
         self.policies = torch.nn.ModuleList([pi_a, pi_z])
+
+        self.intrinsic_reward = intrinsic_reward
 
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
         self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
@@ -89,7 +93,7 @@ class GeneralizedQ(Network):
         hidden = []
         states = []
 
-        s = self.enc_s(obs)
+        init_s = s = self.enc_s(obs)
         z_embed = self.enc_z(z)
 
         # for dynamics part ..
@@ -122,16 +126,24 @@ class GeneralizedQ(Network):
         out = dict(hidden=hidden, states=states)
         if sample_a:
             out['a'] = stack(a_seq)
-            out['logp_a'] = stack(logp_a)
+            logp_a = out['logp_a'] = stack(logp_a)
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
-            out['logp_z'] = stack(logp_z)
+            logp_z = out['logp_z'] = stack(logp_z)
             assert (z_seq == 0).all()
         prefix = out['value_prefix'] = self.value_prefix(hidden)
+
 
         if 'logp_a' in out:
             extra_rewards, infos = self.entropy_rewards(out['logp_a'], alpha)
             out.update(infos)
+
+            #if hasattr(self, 'intrinsic_rewards'):
+            if self.intrinsic_reward is not None:
+                elbo, infos = self.intrinsic_reward.compute(*locals())
+                extra_rewards += elbo
+                out.update(infos)
+
             prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
 
@@ -154,6 +166,6 @@ class GeneralizedQ(Network):
 
 
     def entropy_rewards(self, logp_a, alpha=0.):
-        entropy_term = -logp_a
+        entropy_term = -logp_a.sum(axis=-1, keepdims=True)
         entropy = entropy_term * alpha if alpha > 0 else 0
         return entropy, {'entropy_term': entropy_term}

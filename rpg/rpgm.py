@@ -270,15 +270,12 @@ class Trainer(Configurable, RLAlgo):
         pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
 
         # override it if we want to use different network 
-        pi_z = self.make_option_network(z_space, latent_z_dim, latent_dim, hidden_dim)
+        zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
+        pi_z =  Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
 
         network = GeneralizedQ(
-            enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn,
+            enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn, None,
             cfg=self._cfg.qnet,
             horizon=self._cfg.horizon)
         network.apply(orthogonal_init)
         return network
-
-    def make_option_network(self, z_space, latent_z_dim, latent_dim, hidden_dim):
-        zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
-        return Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)

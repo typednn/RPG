@@ -7,5 +7,5 @@ from rpg.rpgm import Trainer
 #env = GymVecEnv('Humanoid-v3', 1, ignore_truncated_done=True)
 env = GymVecEnv('Hopper-v3', 1, ignore_truncated_done=True)
 
-trainer = Trainer.parse(env, max_update_step=0, buffer=dict(), head=dict(std_mode='statewise', std_scale=1., squash=True), entropy_coef=1., entropy_target=-3, actor_optim=dict(max_grad_norm=10.), dyna_optim=dict(max_grad_norm=1.), update_train_step=1, have_done=False, hooks=dict(evaluate_pi=dict()), horizon=6, qnet=dict(gamma=0.99)) # do not know if we need max_grad_norm
+trainer = Trainer.parse(env, max_update_step=0, buffer=dict(), head=dict(std_mode='statewise', std_scale=1., squash=True), entropy_coef=1., entropy_target=-3, actor_optim=dict(max_grad_norm=1.), dyna_optim=dict(max_grad_norm=1.), update_train_step=1, have_done=False, hooks=dict(evaluate_pi=dict()), horizon=2, qnet=dict(gamma=0.99)) # do not know if we need max_grad_norm
 trainer.run_rpgm()

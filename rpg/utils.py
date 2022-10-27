@@ -39,7 +39,7 @@ def create_hidden_space(z_dim, z_cont_dim):
 
 import torch
 class ZTransform(torch.nn.Module):
-    def __init__(self, z_space) -> None:
+    def __init__(self, z_space, zmode='zero') -> None:
         super().__init__()
         self.z_space = z_space
 
