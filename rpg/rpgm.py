@@ -94,7 +94,7 @@ class Trainer(Configurable, RLAlgo):
         self.update_step = 0
 
 
-    def sample_hidden_z(self, obs, action, next_obs):
+    def sample_hidden_z(self, obs, timestep, action, next_obs):
         # estimate the probaility of init z ..
         #return None
         return totensor([self.z_space.sample()] * len(obs), device=self.device, dtype=None)
@@ -161,7 +161,7 @@ class Trainer(Configurable, RLAlgo):
         mask = truncated_mask[..., 0] / self.horizon
 
         with torch.no_grad():
-            init_z = self.sample_hidden_z(obs, action, next_obs)
+            init_z = self.sample_hidden_z(obs, timesteps[0], action, next_obs)
 
         dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps=timesteps)
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)

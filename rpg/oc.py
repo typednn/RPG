@@ -4,16 +4,15 @@ from .utils import config_hidden
 from .rpgm import Trainer
 
 from nn.space import  Box, Discrete, MixtureSpace
-#from nn.distributions.option import OptionNet
-from nn.distributions import CategoricalAction, MixtureAction, NormalAction, DistHead, ActionDistr
+# from nn.distributions.option import OptionNet
+# from nn.distributions import CategoricalAction, MixtureAction, NormalAction, DistHead, ActionDistr
+from nn.distributions import DistHead, ActionDistr
 from nn.distributions.compositional import where
 
 from .worldmodel import GeneralizedQ
-from tools.utils import CatNet, orthogonal_init, batch_input, totensor, TimedSeq
+from tools.utils import CatNet, orthogonal_init, TimedSeq
 
-import numpy as np
 from tools.utils import logger
-from tools.config import Configurable
 from tools.optim import LossOptimizer
 from .models import BaseNet, Network
 
@@ -44,7 +43,7 @@ class Option(ActionDistr):
         return self.rsample(detach=True)
 
 class OptionNet(Network):
-    def __init__(self, zhead, backbone, cfg=None) -> None:
+    def __init__(self, zhead, backbone, cfg=None, done_mode='sample_first') -> None:
         super().__init__()
 
         self.zhead = zhead
@@ -56,7 +55,11 @@ class OptionNet(Network):
 
     def forward(self, s, z, timestep):
         feature = self.backbone(s, z)
-        return Option(z, torch.sigmoid(self.done(feature)), self.zhead(self.option(feature)))
+        if self._cfg.done_mode == 'sample_first':
+            done = (timestep == 0).float()
+        else:
+            done = torch.sigmoid(self.done(feature))
+        return Option(z, done, self.zhead(self.option(feature)))
 
 class IntrinsicReward(Network):
     # should use a transformer instead ..
@@ -127,8 +130,8 @@ class OptionCritic(Trainer):
         super().__init__(env)
         self.info_net_optim = LossOptimizer(self.nets.intrinsic_reward, lr=3e-4) # info net
 
-    def sample_hidden_z(self, obs, action, next_obs):
-        s = self.net.enc_s(next_obs[0])
+    def sample_hidden_z(self, obs, timestep, action, next_obs):
+        s = self.net.enc_s(next_obs[0], timestep + 1)
         return self.info_net.net(s, action).sample()
 
     def update_actor(self, obs, init_z, alpha, timesteps):
@@ -138,7 +141,7 @@ class OptionCritic(Trainer):
         assert value.shape[-1] in [1, 2]
 
         estimated_value = value[..., 0]
-        pi_a_loss = -estimated_value.mean(axis=0)
+        pi_a_loss = - estimated_value.mean(axis=0)
 
         # optimize pi_z with policy gradient directly
         baseline = self.nets.value(obs, init_z)
@@ -152,7 +155,6 @@ class OptionCritic(Trainer):
         if self._cfg.entropy_target is not None:
             entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - entropy_term.detach()))
             self.entropy_optim.optimize(entropy_loss)
-
 
         # optimize the elbo loss and the z entropy
         #sampled_z = samples['z_seq'][0]

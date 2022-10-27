@@ -111,7 +111,7 @@ class GymVecEnv(VecEnv):
         
 
 class TorchEnv(VecEnv):
-    def __init__(self, env_name, n, ignore_truncated=False, **kwargs):
+    def __init__(self, env_name, n, ignore_truncated_done=False, **kwargs):
         # by default we do not have a truncated reward. 
         super().__init__()
         from solver.envs import GoalEnv
@@ -136,7 +136,7 @@ class TorchEnv(VecEnv):
         self.obs = None
         self.steps = None
         self.returns = None
-        self.ignore_truncated = ignore_truncated
+        self.ignore_truncated_done = ignore_truncated_done
 
         self.observation_space = self.goal_env.observation_space
         self.action_space = self.goal_env.action_space
@@ -184,6 +184,7 @@ class TorchEnv(VecEnv):
         self.steps += 1
         self.returns += reward
 
+
         episode = []
         if len(end_envs) > 0:
             assert len(end_envs) == self.nenv
@@ -194,6 +195,8 @@ class TorchEnv(VecEnv):
                 episode.append({'step': step, 'reward': total_reward})
             obs = self.goal_env.reset(**self.kwargs)
 
+        if self.ignore_truncated_done:
+            done[:] = False
         
         return {
             'obs': obs, # the current observation of the environment. 

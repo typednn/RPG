@@ -141,7 +141,8 @@ class GeneralizedQ(Network):
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
             logp_z = out['logp_z'] = stack(logp_z)
-            out['z_dones'] = stack(z_dones)
+            if len(z_dones) > 0:
+                out['z_dones'] = stack(z_dones)
             assert (z_seq == 0).all()
         prefix = out['value_prefix'] = self.value_prefix(hidden)
 
