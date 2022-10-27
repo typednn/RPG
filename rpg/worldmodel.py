@@ -75,7 +75,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs, timestep=timestep)
         if self.pi_z is not None:
             z_embed = self.enc_z(z)
-            z = self.pi_z(s, z_embed).sample()[0]
+            z = self.pi_z(s, z_embed, timestep).sample()[0]
         return self.pi_a(s, self.enc_z(z)), z
 
     def value(self, obs, z, timestep):
@@ -84,15 +84,19 @@ class GeneralizedQ(Network):
         return self.value_fn(s, self.enc_z(z))
 
     def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None):
+        assert timestep.shape == (len(obs),)
+
         sample_z = (z_seq is None)
         if sample_z:
             z_seq, logp_z = [], []
+
         sample_a = (a_seq is None)
         if sample_a:
             a_seq, logp_a = [], []
 
         hidden = []
         states = []
+        z_dones = []
 
         init_s = s = self.enc_s(obs, timestep=timestep)
         z_embed = self.enc_z(z)
@@ -103,7 +107,8 @@ class GeneralizedQ(Network):
         for idx in range(step):
             if len(z_seq) <= idx:
                 if self.pi_z is not None:
-                    z, logp = self.pi_z(s, z_embed, timestep=timestep).sample()
+                    z_done, z, logp = self.pi_z(s, z_embed, timestep=timestep).sample()
+                    z_dones.append(z_done)
                     logp_z.append(logp[..., None])
                 else:
                     logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
@@ -136,6 +141,7 @@ class GeneralizedQ(Network):
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
             logp_z = out['logp_z'] = stack(logp_z)
+            out['z_dones'] = stack(z_dones)
             assert (z_seq == 0).all()
         prefix = out['value_prefix'] = self.value_prefix(hidden)
 
@@ -169,7 +175,6 @@ class GeneralizedQ(Network):
         out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
         out['next_values'] = values
         return out
-
 
     def entropy_rewards(self, logp_a, alpha=0.):
         entropy_term = -logp_a.sum(axis=-1, keepdims=True)

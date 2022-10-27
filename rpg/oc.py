@@ -9,7 +9,7 @@ from nn.distributions import CategoricalAction, MixtureAction, NormalAction, Dis
 from nn.distributions.compositional import where
 
 from .worldmodel import GeneralizedQ
-from tools.utils import CatNet, orthogonal_init, batch_input, totensor
+from tools.utils import CatNet, orthogonal_init, batch_input, totensor, TimedSeq
 
 import numpy as np
 from tools.utils import logger
@@ -18,19 +18,6 @@ from tools.optim import LossOptimizer
 from .models import BaseNet, Network
 
 import torch
-class OptionExtractor(torch.nn.Module):
-    def __init__(self, z_space) -> None:
-        super().__init__()
-        self.z_space = z_space
-
-    def forward(self, x):
-        x = x[..., 1:]
-        if isinstance(self.z_space, Discrete):
-            assert x.shape[-1] == 1
-            return torch.nn.functional.one_hot(x[..., 0], self.z_space.n).float()
-        else:
-            return x
-
 
 class Option(ActionDistr):
     def __init__(self, old, done_prob, new_distr) -> None:
@@ -47,13 +34,8 @@ class Option(ActionDistr):
 
         a = where(d, a, self.old) # if done, use a
         logp_a = where(d, logp_a, 0)
-
         d = d.float()
-        if isinstance(a, torch.FloatTensor):
-            pass
-        else:
-            a = a.float()[..., None]
-        return torch.stack((d, a), dim=-1), torch.stack((logp_d, logp_a), dim=-1)
+        return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
     def entropy(self):
         raise NotImplementedError
@@ -72,7 +54,7 @@ class OptionNet(Network):
         self.option = torch.nn.Linear(inp, zhead.get_input_dim())
         self.done = torch.nn.Linear(inp, 1) # predict done probability
 
-    def forward(self, s, z):
+    def forward(self, s, z, timestep):
         feature = self.backbone(s, z)
         return Option(z, torch.sigmoid(self.done(feature)), self.zhead(self.option(feature)))
 
@@ -149,9 +131,9 @@ class OptionCritic(Trainer):
         s = self.net.enc_s(next_obs[0])
         return self.info_net.net(s, action).sample()
 
-    def update_actor(self, obs, init_z, alpha):
+    def update_actor(self, obs, init_z, alpha, timesteps):
         # optimize pi_a
-        samples = self.nets.inference(obs, init_z, self.horizon, alpha=alpha)
+        samples = self.nets.inference(obs, init_z, timesteps, self.horizon, alpha=alpha)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
 
@@ -174,8 +156,8 @@ class OptionCritic(Trainer):
 
         # optimize the elbo loss and the z entropy
         #sampled_z = samples['z_seq'][0]
-        mutual_info = self.info_net(samples['states'], samples['a_seq']
-                      ).log_prob(samples['z_seq']).mean(axis=0)
+        mutual_info = self.info_net(
+            samples['states'], samples['a_seq']).log_prob(samples['z_seq']).mean(axis=0)
         if self._cfg.entz_target is not None:
             z_entropy = -logp_z
             z_entropy_loss = -torch.mean(
@@ -204,8 +186,8 @@ class OptionCritic(Trainer):
         # TODO: layer norm?
         from .utils import ZTransform, config_hidden
         enc_s = mlp(obs_space.shape[0], hidden_dim, latent_dim) 
-        enc_z = OptionExtractor(z_space)
-        enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
+        enc_z = ZTransform(z_space)
+        enc_a = TimedSeq(mlp(action_space.shape[0], hidden_dim, hidden_dim))
 
         layer = 1
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)

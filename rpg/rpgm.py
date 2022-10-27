@@ -133,8 +133,8 @@ class Trainer(Configurable, RLAlgo):
 
         return dyna_loss
 
-    def update_actor(self, obs, init_z, alpha, timestep):
-        samples = self.nets.inference(obs, init_z, timestep, self.horizon, alpha=alpha)
+    def update_actor(self, obs, init_z, alpha, timesteps):
+        samples = self.nets.inference(obs, init_z, timesteps[0], self.horizon, alpha=alpha)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
@@ -170,7 +170,7 @@ class Trainer(Configurable, RLAlgo):
         info = {k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         info['alpha'] = float(alpha.mean())
 
-        actor_updates = self.update_actor(obs, init_z, alpha, timestep=timesteps)
+        actor_updates = self.update_actor(obs, init_z, alpha, timesteps=timesteps)
         info.update(actor_updates)
 
         self.update_step += 1
