@@ -28,6 +28,7 @@ class ReplayBuffer(Configurable):
         self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
+        self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
 
         self._eps = 1e-6
         self._full = False
@@ -45,6 +46,7 @@ class ReplayBuffer(Configurable):
         next_obs = traj.get_tensor('next_obs', self.device)
         actions = traj.get_tensor('a', self.device)
         rewards = traj.get_tensor('r', self.device)
+        timesteps = traj.get_tensor('timestep', self.device)
         dones, truncated = traj.get_truncated_done(self.device)
         assert truncated[-1].all()
 
@@ -55,6 +57,7 @@ class ReplayBuffer(Configurable):
             self._reward[self.idx:self.idx+self.episode_length] = rewards[:, i]
             self._dones[self.idx:self.idx+self.episode_length] = dones[:, i, None]
             self._truncated[self.idx:self.idx+self.episode_length] = truncated[:, i, None]
+            self._timesteps[self.idx:self.idx+self.episode_length] = timesteps[:, i]
 
             self.idx = (self.idx + self.episode_length) % self.capacity
             self._full = self._full or self.idx == 0
@@ -72,6 +75,7 @@ class ReplayBuffer(Configurable):
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         done = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
+        timesteps = torch.empty((self.horizon, batch_size), dtype=torch.float32, device=self.device)
 
         _done = None
         for t in range(self.horizon):
@@ -85,5 +89,6 @@ class ReplayBuffer(Configurable):
                 _done = torch.maximum(_done, self._dones[_idxs]) # once done, forever done
             done[t] = _done
             truncated[t] = self._truncated[_idxs]
+            timesteps[t] = self._timesteps[_idxs]
 
-        return obs, next_obs, action, reward, done, truncated
+        return obs, next_obs, action, reward, done, truncated, timesteps

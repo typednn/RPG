@@ -4,7 +4,7 @@ import copy
 import numpy as np
 import torch
 from tools.config import Configurable
-from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, logger, Identity, ema, CatNet, totensor
+from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, TimedSeq, logger, Identity, ema, CatNet, totensor
 from tools.optim import LossOptimizer
 from .common_hooks import RLAlgo, build_hooks
 from .buffer import ReplayBuffer
@@ -100,10 +100,12 @@ class Trainer(Configurable, RLAlgo):
         return totensor([self.z_space.sample()] * len(obs), device=self.device, dtype=None)
 
 
-    def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask, alpha):
-        pred_traj = self.nets.inference(obs, init_z, self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
+    def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps):
+        pred_traj = self.nets.inference(obs, init_z, timesteps[0], self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
+
+        next_timesteps = timesteps + 1
         with torch.no_grad():
-            state_gt = self.nets.enc_s(next_obs) # use the current model ..
+            state_gt = self.nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
             vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
 
         dyna_loss = {
@@ -120,8 +122,8 @@ class Trainer(Configurable, RLAlgo):
             next_obs = next_obs.reshape(-1, *obs.shape[1:])
             seq_z = pred_traj['z'].reshape(next_obs.shape[0], *init_z.shape[1:])
 
-            # making target nets to nets does not help
-            vtarg = self.target_nets.inference(next_obs, seq_z, self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn)['value']
+            vtarg = self.target_nets.inference(next_obs, seq_z, next_timesteps.reshape(-1),
+                self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn)['value']
 
             done_mask = (1 - (done_gt.cumsum(0) > 0).float())
             vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
@@ -131,8 +133,8 @@ class Trainer(Configurable, RLAlgo):
 
         return dyna_loss
 
-    def update_actor(self, obs, init_z, alpha):
-        samples = self.nets.inference(obs, init_z, self.horizon, alpha=alpha)
+    def update_actor(self, obs, init_z, alpha, timestep):
+        samples = self.nets.inference(obs, init_z, timestep, self.horizon, alpha=alpha)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
         actor_loss = -value[..., 0].mean(axis=0)
@@ -148,7 +150,8 @@ class Trainer(Configurable, RLAlgo):
         }
 
     def update(self):
-        obs, next_obs, action, reward, done_gt, truncated = self.buffer.sample(self._cfg.batch_size)
+        obs, next_obs, action, reward, done_gt, truncated, timesteps = self.buffer.sample(self._cfg.batch_size)
+
         assert len(next_obs) == self.horizon
         with torch.no_grad():
             alpha = self._cfg.entropy_coef * torch.exp(self.log_alpha).detach()
@@ -160,14 +163,14 @@ class Trainer(Configurable, RLAlgo):
         with torch.no_grad():
             init_z = self.sample_hidden_z(obs, action, next_obs)
 
-        dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha)
+        dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps=timesteps)
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.dyna_optim.optimize(dyna_loss_total)
 
         info = {k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         info['alpha'] = float(alpha.mean())
 
-        actor_updates = self.update_actor(obs, init_z, alpha)
+        actor_updates = self.update_actor(obs, init_z, alpha, timestep=timesteps)
         info.update(actor_updates)
 
         self.update_step += 1
@@ -175,18 +178,21 @@ class Trainer(Configurable, RLAlgo):
             ema(self.nets, self.target_nets, self._cfg.tau)
         logger.logkvs_mean(info)
 
+    def sample_init_z(self, obs):
+        return totensor([self.z_space.sample() * 0] * len(obs), device=self.device, dtype=torch.long)
+
     def inference(self, n_step, mode='training'):
         with torch.no_grad():
             obs, timestep = self.start(self.env)
             transitions = []
 
         r = tqdm.trange if self._cfg.update_train_step > 0 else range 
-        z = totensor([self.z_space.sample() * 0] * len(obs), device=self.device, dtype=torch.long)
+        z = self.sample_init_z(obs)
 
         for idx in r(n_step):
             with torch.no_grad():
-                transition = dict(obs = obs)
-                pd, z = self.nets.policy(obs, z)
+                transition = dict(obs = obs, timestep=timestep)
+                pd, z = self.nets.policy(obs, z, timestep)
 
                 scale = pd.dist.scale
                 logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
@@ -198,6 +204,7 @@ class Trainer(Configurable, RLAlgo):
 
                 transition.update(**data, a=a)
                 transitions.append(transition)
+                timestep = transition['next_timestep']
 
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
@@ -247,7 +254,7 @@ class Trainer(Configurable, RLAlgo):
 
         # TODO: layer norm?
         from .utils import ZTransform, config_hidden
-        enc_s = mlp(obs_space.shape[0], hidden_dim, latent_dim) 
+        enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim)) # encode state with time step ..
         enc_z = ZTransform(z_space)
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
@@ -270,11 +277,11 @@ class Trainer(Configurable, RLAlgo):
         pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
 
         # override it if we want to use different network 
-        zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
-        pi_z =  Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
+        pi_z =  None #Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
 
         network = GeneralizedQ(
-            enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn, None,
+            enc_s, enc_a, enc_z,
+            pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn, None,
             cfg=self._cfg.qnet,
             horizon=self._cfg.horizon)
         network.apply(orthogonal_init)

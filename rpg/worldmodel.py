@@ -69,20 +69,21 @@ class GeneralizedQ(Network):
         return torch.softmax(self._weights, 0)
 
 
-    def policy(self, obs, z):
+    def policy(self, obs, z, timestep):
         obs = totensor(obs, self.device)
         z = totensor(z, self.device, dtype=None)
-        z_embed = self.enc_z(z)
-        s = self.enc_s(obs)
-        z = self.pi_z(s, z_embed).sample()[0]
+        s = self.enc_s(obs, timestep=timestep)
+        if self.pi_z is not None:
+            z_embed = self.enc_z(z)
+            z = self.pi_z(s, z_embed).sample()[0]
         return self.pi_a(s, self.enc_z(z)), z
 
-    def value(self, obs, z):
+    def value(self, obs, z, timestep):
         obs = totensor(obs, self.device)
-        s = self.enc_s(obs)
+        s = self.enc_s(obs, timestep=timestep)
         return self.value_fn(s, self.enc_z(z))
 
-    def inference(self, obs, z, step, z_seq=None, a_seq=None, alpha=0., value_fn=None):
+    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None):
         sample_z = (z_seq is None)
         if sample_z:
             z_seq, logp_z = [], []
@@ -93,7 +94,7 @@ class GeneralizedQ(Network):
         hidden = []
         states = []
 
-        init_s = s = self.enc_s(obs)
+        init_s = s = self.enc_s(obs, timestep=timestep)
         z_embed = self.enc_z(z)
 
         # for dynamics part ..
@@ -101,8 +102,11 @@ class GeneralizedQ(Network):
         #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
-                z, logp = self.pi_z(s, z_embed).sample()
-                logp_z.append(logp[..., None])
+                if self.pi_z is not None:
+                    z, logp = self.pi_z(s, z_embed, timestep=timestep).sample()
+                    logp_z.append(logp[..., None])
+                else:
+                    logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
                 z_seq.append(z)
             z_embed = self.enc_z(z_seq[idx])
 
@@ -118,6 +122,8 @@ class GeneralizedQ(Network):
 
             hidden.append(h[-1])
             states.append(s)
+
+            timestep = timestep + 1
 
         stack = torch.stack
         hidden = stack(hidden)

@@ -4,8 +4,9 @@ from .utils import config_hidden
 from .rpgm import Trainer
 
 from nn.space import  Box, Discrete, MixtureSpace
-from nn.distributions.option import OptionNet
-from nn.distributions import CategoricalAction, MixtureAction, NormalAction, DistHead
+#from nn.distributions.option import OptionNet
+from nn.distributions import CategoricalAction, MixtureAction, NormalAction, DistHead, ActionDistr
+from nn.distributions.compositional import where
 
 from .worldmodel import GeneralizedQ
 from tools.utils import CatNet, orthogonal_init, batch_input, totensor
@@ -30,6 +31,50 @@ class OptionExtractor(torch.nn.Module):
         else:
             return x
 
+
+class Option(ActionDistr):
+    def __init__(self, old, done_prob, new_distr) -> None:
+        super().__init__()
+
+        self.old = old
+        self.done_prob = done_prob
+        self.new_distr = new_distr
+
+    def rsample(self, detach=False):
+        d = torch.bernoulli(self.done_prob)
+        logp_d = torch.log(self.done_prob) * d + torch.log(1 - self.done_prob) * (1 - d)
+        a, logp_a = self.new_distr.rsample(detach)
+
+        a = where(d, a, self.old) # if done, use a
+        logp_a = where(d, logp_a, 0)
+
+        d = d.float()
+        if isinstance(a, torch.FloatTensor):
+            pass
+        else:
+            a = a.float()[..., None]
+        return torch.stack((d, a), dim=-1), torch.stack((logp_d, logp_a), dim=-1)
+
+    def entropy(self):
+        raise NotImplementedError
+
+    def sample(self):
+        return self.rsample(detach=True)
+
+class OptionNet(Network):
+    def __init__(self, zhead, backbone, cfg=None) -> None:
+        super().__init__()
+
+        self.zhead = zhead
+        self.backbone = backbone
+
+        inp = backbone.output_shape[-1]
+        self.option = torch.nn.Linear(inp, zhead.get_input_dim())
+        self.done = torch.nn.Linear(inp, 1) # predict done probability
+
+    def forward(self, s, z):
+        feature = self.backbone(s, z)
+        return Option(z, torch.sigmoid(self.done(feature)), self.zhead(self.option(feature)))
 
 class IntrinsicReward(Network):
     # should use a transformer instead ..
@@ -57,12 +102,8 @@ class IntrinsicReward(Network):
             head=self.config_head(hidden_space)
         ).cuda()
         self.log_alpha = torch.nn.Parameter(
-            torch.zeros(1, requires_grad=True, device=self.device))
-        # if entropy_target is not None:
-        #     if entropy_target > 0:
-        #         self._cfg.defrost()
-        #         self._cfg.entropy_target = -action_dim
-        #     self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim, **kwargs) #TODO: change the optim ..
+            torch.zeros(1, requires_grad=True, device=self.device)
+        )
 
     def forward(self, states, a_seq):
         states = states * self._cfg.obs_weight
@@ -89,7 +130,6 @@ class IntrinsicReward(Network):
         if self._cfg.head is not None:
             head = merge_inputs(head, **self._cfg.head)
         return head
-
 
 
 class OptionCritic(Trainer):

@@ -470,10 +470,26 @@ class Seq(torch.nn.Module):
         super().__init__()
         self.main = torch.nn.ModuleList(main)
     def forward(self, *args):
+        # by default ignore the timestep, or the positional encoding ..
         x = torch.cat([i for i in args if i is not None], dim=-1)
         for m in self.main:
             x = m(x)
         return x
+
+
+class TimedSeq(torch.nn.Module):
+    def __init__(self, *main, positional_embed=False):
+        super().__init__()
+        self.main = Seq(*main)
+        assert not positional_embed
+        self.positional_embed = None
+
+    def forward(self, *args, timestep=None):
+        assert timestep is not None
+        if self.positional_embed:
+            args = args + [self.positional_embed(timestep)]
+        return self.main(*args)
+
 
 class CatNet(torch.nn.Module):
     def __init__(self, *args) -> None:
