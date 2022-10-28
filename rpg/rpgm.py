@@ -53,7 +53,7 @@ class Trainer(Configurable, RLAlgo):
         warmup_steps=1000,
         tau=0.005,
         max_update_step=200,
-        actor_delay=1,
+        actor_delay=2,
         weights=dict(state=1000., prefix=0.5, value=0.5, done=1.),
         qnet=GeneralizedQ.dc,
 
