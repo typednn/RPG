@@ -101,12 +101,16 @@ class Trainer(Configurable, RLAlgo):
     def enc_s(self, obs, timestep):
         return self.nets.enc_s(obs, timestep=timestep)
 
-    def sample_z_posterior(self, states):
-        return totensor([self.z_space.sample()] * len(states), device=self.device, dtype=None)
+    def get_posterior(self, states):
+        from nn.distributions import DeterminisiticAction
+        return DeterminisiticAction(totensor([self.z_space.sample()] * len(states), device=self.device, dtype=None))
 
+    def sample_z(self, obs, timestep):
+        return self.get_posterior(self.nets.enc_s(obs, timestep=timestep))
 
-    def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps):
-        pred_traj = self.nets.inference(obs, init_z, timesteps[0], self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
+    def dynamic_loss(self, obs, action, next_obs, reward, done_gt, mask, alpha, timesteps):
+        t = timesteps[0]
+        pred_traj = self.nets.inference(obs, self.sample_z(obs, t).sample()[0], t, self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
 
         next_timesteps = timesteps + 1
         with torch.no_grad():
@@ -131,9 +135,10 @@ class Trainer(Configurable, RLAlgo):
         batch_size = len(obs)
         with torch.no_grad():
             next_obs = next_obs.reshape(-1, *obs.shape[1:])
-            seq_z = pred_traj['z'].reshape(next_obs.shape[0], *init_z.shape[1:])
+            next_timesteps = next_timesteps.reshape(-1)
+            seq_z = self.sample_z(next_obs, next_timesteps).sample()[0]
 
-            vtarg = self.target_nets.inference(next_obs, seq_z, next_timesteps.reshape(-1),
+            vtarg = self.target_nets.inference(next_obs, seq_z, next_timesteps,
                 self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn,
                 # pi_a=self.target_nets.pi_a, pi_z=self.target_nets.pi_z
             )['value']
@@ -146,8 +151,9 @@ class Trainer(Configurable, RLAlgo):
 
         return dyna_loss
 
-    def update_actor(self, obs, init_z, alpha, timesteps):
+    def update_actor(self, obs, alpha, timesteps):
         t = timesteps[0]
+        init_z = self.sample_z(obs, t).sample()[0]
         samples = self.nets.inference(obs, init_z, t, self.horizon, alpha=alpha, pg=self._cfg.pg)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
@@ -187,18 +193,15 @@ class Trainer(Configurable, RLAlgo):
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
         mask = truncated_mask[..., 0] / self.horizon
 
-        with torch.no_grad():
-            init_z = self.sample_z_posterior(obs, timesteps[0])
-
-        dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps=timesteps)
+        dyna_loss = self.dynamic_loss(obs, action, next_obs, reward, done_gt, mask, alpha, timesteps=timesteps)
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.dyna_optim.optimize(dyna_loss_total)
 
-        info = {k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
-        info['alpha'] = float(alpha.mean())
+        info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
+        info['a_alpha'] = float(alpha.mean())
 
         if self.update_step % self._cfg.actor_delay == 0:
-            actor_updates = self.update_actor(obs, init_z, alpha, timesteps=timesteps)
+            actor_updates = self.update_actor(obs, alpha, timesteps=timesteps)
             info.update(actor_updates)
 
         self.update_step += 1

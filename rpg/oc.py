@@ -43,7 +43,7 @@ class Option(ActionDistr):
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
 class OptionNet(Network):
-    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='sample_first') -> None:
+    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='sample_first', uniform=True) -> None:
         super().__init__()
 
         self.zhead = zhead
@@ -60,7 +60,11 @@ class OptionNet(Network):
             done = (timestep == 0).float()
         else:
             done = torch.sigmoid(self.done(feature)[..., 0])
-        return Option(z, done, self.zhead(self.option(feature)))
+
+        prob = self.option(feature)
+        if self._cfg.uniform:
+            prob = prob
+        return Option(z, done, self.zhead(prob))
 
 
 class IntrinsicReward(Network):
@@ -136,20 +140,17 @@ class OptionCritic(Trainer):
         super().__init__(env)
         self.info_net_optim = LossOptimizer(self.nets.intrinsic_reward, lr=3e-4) # info net
 
-    def sample_z_posterior(self, states):
-        return self.info_net.p_z_s(states).sample()[0]
+    def get_posterior(self, states):
+        return self.info_net.posterior_z(states)
 
-    def update_actor(self, obs, init_z, alpha, timesteps):
-        init_z = None
-
-
+    def update_actor(self, obs, alpha, timesteps):
         t = timesteps[0]
+        init_z = self.sample_z(obs, t).sample()[0]
 
-        # optimize pi_a
+        # rollout to get trajectories and values
         samples = self.nets.inference(obs, init_z, t, self.horizon, alpha=alpha, pg=self._cfg.pg)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
-
         estimated_value = value[..., 0]
 
         # optimize pi_z with policy gradient directly
@@ -162,6 +163,7 @@ class OptionCritic(Trainer):
         pi_z_loss = - (logp_z * adv).mean(axis=0) # not sure how to regularize the entropy ..
 
 
+        # optimize pi_a
         if not self._cfg.pg:
             pi_a_loss = -estimated_value.mean(axis=0)
         else:
@@ -174,10 +176,10 @@ class OptionCritic(Trainer):
             entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - entropy_term.detach()))
             self.entropy_optim.optimize(entropy_loss)
 
-        # optimize the elbo loss and the z entropy
-        #sampled_z = samples['z_seq'][0]
+        # optimize auxilary losses 
         mutual_info = self.info_net(
             samples['states'].detach(), samples['a'].detach()).log_prob(samples['z'].detach()).mean()
+        posterior = self.get_posterior(samples['states'].detach()).log_prob(samples['z'].detach()).mean()
 
         z_entropy = -logp_z.mean()
         if self._cfg.entz_target is not None:
@@ -187,17 +189,17 @@ class OptionCritic(Trainer):
             )
         else:
             z_entropy_loss = 0
-        self.info_net_optim.optimize(z_entropy_loss + mutual_info)
+        self.info_net_optim.optimize(z_entropy_loss - mutual_info - posterior)
 
 
         return {
-            'pi_a_loss': float(pi_a_loss),
-            'pi_z_loss': float(pi_z_loss),
-            'entropy': float(entropy_term.mean()),
+            'a_entropy': float(entropy_term.mean()),
+            'a_pi_loss': float(pi_a_loss),
+            'z_pi_loss': float(pi_z_loss),
             'z_alpha_loss': float(z_entropy_loss),
             'z_entropy': float(z_entropy),
+            'z_posterior': float(posterior),
         }
-
 
     def make_network(self, obs_space, action_space, z_space):
         hidden_dim = 256
