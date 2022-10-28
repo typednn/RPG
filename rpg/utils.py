@@ -39,11 +39,12 @@ def create_hidden_space(z_dim, z_cont_dim):
 
 import torch
 class ZTransform(torch.nn.Module):
-    def __init__(self, z_space, zmode='zero') -> None:
+    def __init__(self, z_space) -> None:
         super().__init__()
         self.z_space = z_space
 
     def forward(self, x):
+        assert x.max() < self.z_space.n, f"{x.max()} < {self.z_space.n}"
         if isinstance(self.z_space, Discrete):
             return torch.nn.functional.one_hot(x, self.z_space.n).float()
         else:

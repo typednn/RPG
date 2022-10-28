@@ -41,7 +41,8 @@ class ReplayBuffer(Configurable):
 
     @torch.no_grad()
     def add(self, traj: Trajectory):
-        assert self.episode_length == traj.timesteps, "episode length mismatch"
+        # assert self.episode_length == traj.timesteps, "episode length mismatch"
+        length = traj.timesteps
         cur_obs = traj.get_tensor('obs', self.device)
         next_obs = traj.get_tensor('next_obs', self.device)
         actions = traj.get_tensor('a', self.device)
@@ -51,15 +52,18 @@ class ReplayBuffer(Configurable):
         assert truncated[-1].all()
 
         for i in range(traj.nenv):
-            self._obs[self.idx:self.idx+self.episode_length] = cur_obs[:, i]
-            self._next_obs[self.idx:self.idx+self.episode_length] = next_obs[:, i]
-            self._action[self.idx:self.idx+self.episode_length] = actions[:, i]
-            self._reward[self.idx:self.idx+self.episode_length] = rewards[:, i]
-            self._dones[self.idx:self.idx+self.episode_length] = dones[:, i, None]
-            self._truncated[self.idx:self.idx+self.episode_length] = truncated[:, i, None]
-            self._timesteps[self.idx:self.idx+self.episode_length] = timesteps[:, i]
+            l = min(length, self.capacity - self.idx)
 
-            self.idx = (self.idx + self.episode_length) % self.capacity
+
+            self._obs[self.idx:self.idx+l] = cur_obs[:l, i]
+            self._next_obs[self.idx:self.idx+l] = next_obs[:l, i]
+            self._action[self.idx:self.idx+l] = actions[:l, i]
+            self._reward[self.idx:self.idx+l] = rewards[:l, i]
+            self._dones[self.idx:self.idx+l] = dones[:l, i, None]
+            self._truncated[self.idx:self.idx+l] = truncated[:l, i, None]
+            self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
+
+            self.idx = (self.idx + l) % self.capacity
             self._full = self._full or self.idx == 0
 
     @torch.no_grad()

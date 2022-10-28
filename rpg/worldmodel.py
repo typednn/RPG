@@ -75,7 +75,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs, timestep=timestep)
         if self.pi_z is not None:
             z_embed = self.enc_z(z)
-            z = self.pi_z(s, z_embed, timestep).sample()[0]
+            z = self.pi_z(s, z, z_embed, timestep).sample()[1]
         return self.pi_a(s, self.enc_z(z)), z
 
     def value(self, obs, z, timestep):
@@ -111,9 +111,9 @@ class GeneralizedQ(Network):
         for idx in range(step):
             if len(z_seq) <= idx:
                 if pi_z is not None:
-                    z_done, z, logp = pi_z(s, z_embed, timestep=timestep).sample()
+                    z_done, z, logp = pi_z(s, z, z_embed, timestep=timestep).sample()
                     z_dones.append(z_done)
-                    logp_z.append(logp[..., None])
+                    logp_z.append(logp)
                 else:
                     logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
                 z_seq.append(z)
@@ -151,7 +151,6 @@ class GeneralizedQ(Network):
             logp_z = out['logp_z'] = stack(logp_z)
             if len(z_dones) > 0:
                 out['z_dones'] = stack(z_dones)
-            assert (z_seq == 0).all()
 
         #prefix = out['value_prefix'] = self.value_prefix(hidden)
         out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds))
@@ -164,7 +163,7 @@ class GeneralizedQ(Network):
 
             #if hasattr(self, 'intrinsic_rewards'):
             if self.intrinsic_reward is not None:
-                elbo, infos = self.intrinsic_reward.compute(*locals())
+                elbo, infos = self.intrinsic_reward.compute_reward(out)
                 extra_rewards = extra_rewards + elbo
                 out.update(infos)
             

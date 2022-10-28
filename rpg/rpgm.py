@@ -51,6 +51,7 @@ class Trainer(Configurable, RLAlgo):
         update_target_freq=2,
         update_train_step=1,
         warmup_steps=1000,
+        steps_per_epoch=None,
         tau=0.005,
         max_update_step=200,
         actor_delay=2,
@@ -162,7 +163,7 @@ class Trainer(Configurable, RLAlgo):
             # adv = estimated_value.detach()
             #assert adv.shape[-1] == logp_a.shape[-1]
             assert adv.shape == logp_a.shape
-            actor_loss = - (logp_a * (adv - alpha)).mean(axis=0)
+            actor_loss = - (logp_a * adv).mean(axis=0) - alpha * (-logp_a).mean(axis=0)
             # actor_loss = samples['logp_a'] * (-value[..., 0].detach())
         self.actor_optim.optimize(actor_loss)
 
@@ -243,7 +244,7 @@ class Trainer(Configurable, RLAlgo):
         logger.configure(dir=self._cfg.path, format_strs=["stdout", "log", "csv", 'tensorboard'])
         env = self.env
 
-        steps = self.env.max_time_steps
+        steps = self._cfg.steps_per_epoch or self.env.max_time_steps
         epoch_id = 0
         while True:
             if max_epoch is not None and epoch_id >= max_epoch:
