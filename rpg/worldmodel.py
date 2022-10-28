@@ -83,7 +83,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs, timestep=timestep)
         return self.value_fn(s, self.enc_z(z))
 
-    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None, pi_a=None, pi_z=None):
+    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None, pi_a=None, pi_z=None, pg=False):
         assert timestep.shape == (len(obs),)
 
         sample_z = (z_seq is None)
@@ -120,7 +120,10 @@ class GeneralizedQ(Network):
             z_embed = self.enc_z(z_seq[idx])
 
             if len(a_seq) <= idx:
-                a, logp = pi_a(s, z_embed).rsample()
+                if pg:
+                    a, logp = pi_a(s, z_embed).sample()
+                else:
+                    a, logp = pi_a(s, z_embed).rsample()
                 logp_a.append(logp[..., None])
                 a_seq.append(a)
 

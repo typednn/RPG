@@ -59,6 +59,9 @@ class Trainer(Configurable, RLAlgo):
 
         entropy_coef=0.,
         entropy_target=None,
+
+        
+        pg=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -143,10 +146,24 @@ class Trainer(Configurable, RLAlgo):
         return dyna_loss
 
     def update_actor(self, obs, init_z, alpha, timesteps):
-        samples = self.nets.inference(obs, init_z, timesteps[0], self.horizon, alpha=alpha)
+        t = timesteps[0]
+        samples = self.nets.inference(obs, init_z, t, self.horizon, alpha=alpha, pg=self._cfg.pg)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
-        actor_loss = -value[..., 0].mean(axis=0)
+        if not self._cfg.pg:
+            actor_loss = -value[..., 0].mean(axis=0)
+        else:
+            estimated_value = value[..., 0]
+            baseline = self.nets.value(obs, init_z, timestep=t)[..., 0]
+            logp_a = samples['logp_a'][0].sum(axis=-1)
+
+            adv = (estimated_value -  baseline).detach()
+            adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8)
+            # adv = estimated_value.detach()
+            #assert adv.shape[-1] == logp_a.shape[-1]
+            assert adv.shape == logp_a.shape
+            actor_loss = - (logp_a * (adv - alpha)).mean(axis=0)
+            # actor_loss = samples['logp_a'] * (-value[..., 0].detach())
         self.actor_optim.optimize(actor_loss)
 
         if self._cfg.entropy_target is not None:
