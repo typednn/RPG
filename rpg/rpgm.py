@@ -53,6 +53,7 @@ class Trainer(Configurable, RLAlgo):
         warmup_steps=1000,
         tau=0.005,
         max_update_step=200,
+        actor_delay=1,
         weights=dict(state=1000., prefix=0.5, value=0.5, done=1.),
         qnet=GeneralizedQ.dc,
 
@@ -105,12 +106,18 @@ class Trainer(Configurable, RLAlgo):
 
         next_timesteps = timesteps + 1
         with torch.no_grad():
-            state_gt = self.nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
-            vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
+            state_gt = self.target_nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
+            if 'value_prefix' in pred_traj:
+                rewards = pred_traj['value_prefix']
+                vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
+                raise NotImplementedError
+            else:
+                rewards = pred_traj['rewards']
+                vprefix_gt = reward
 
         dyna_loss = {
             'state': masked_temporal_mse(pred_traj['states'], state_gt, mask),
-            'prefix': masked_temporal_mse(pred_traj['value_prefix'], vprefix_gt, mask)
+            'prefix': masked_temporal_mse(rewards, vprefix_gt, mask)
         }
         if self._cfg.have_done:
             loss = bce(pred_traj['dones'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
@@ -123,7 +130,9 @@ class Trainer(Configurable, RLAlgo):
             seq_z = pred_traj['z'].reshape(next_obs.shape[0], *init_z.shape[1:])
 
             vtarg = self.target_nets.inference(next_obs, seq_z, next_timesteps.reshape(-1),
-                self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn)['value']
+                self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn,
+                # pi_a=self.target_nets.pi_a, pi_z=self.target_nets.pi_z
+            )['value']
 
             done_mask = (1 - (done_gt.cumsum(0) > 0).float())
             vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
@@ -170,8 +179,9 @@ class Trainer(Configurable, RLAlgo):
         info = {k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         info['alpha'] = float(alpha.mean())
 
-        actor_updates = self.update_actor(obs, init_z, alpha, timesteps=timesteps)
-        info.update(actor_updates)
+        if self.update_step % self._cfg.actor_delay == 0:
+            actor_updates = self.update_actor(obs, init_z, alpha, timesteps=timesteps)
+            info.update(actor_updates)
 
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
@@ -179,7 +189,10 @@ class Trainer(Configurable, RLAlgo):
         logger.logkvs_mean(info)
 
     def sample_init_z(self, obs):
-        return totensor([self.z_space.sample() * 0] * len(obs), device=self.device, dtype=torch.long)
+        return totensor(
+            [self.z_space.sample() * 0] * len(obs),
+            device=self.device, dtype=torch.long
+        )
 
     def inference(self, n_step, mode='training'):
         with torch.no_grad():
@@ -196,10 +209,7 @@ class Trainer(Configurable, RLAlgo):
 
                 scale = pd.dist.scale
                 logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-                if mode == 'training':
-                    a, _ = pd.rsample()
-                else:
-                    a = pd.dist.loc.detach().cpu().numpy()
+                a, _ = pd.rsample()
                 data, obs = self.step(self.env, a)
 
                 transition.update(**data, a=a)
@@ -263,7 +273,8 @@ class Trainer(Configurable, RLAlgo):
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
         # dynamics = MLPDynamics(hidden_dim)
 
-        value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
+        #value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
+        value_prefix = Seq(mlp(hidden_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
         done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 

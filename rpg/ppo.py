@@ -105,6 +105,7 @@ class PPO(RLAlgo):
         if self.rnd is not None:
             self.rnd.learn(data, batch_size=self.batch_size, logger_scope='rnd')
 
+        print(traj.summarize_epsidoe_info())
         self.call_hooks(locals())
 
 

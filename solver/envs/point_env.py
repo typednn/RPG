@@ -31,7 +31,7 @@ class StateEnv(GoalEnv):
 class PointEnv(StateEnv):
     # let's consider the penalty based version, to ensure the environment is continuous  
 
-    def __init__(self, cfg=None, low_steps=15, num_stages=1, with_dt=False, penalty=False, boundary=True, clamp_action=True, save_traj=False, action_scale=0.1):
+    def __init__(self, cfg=None, low_steps=15, num_stages=1, with_dt=False, penalty=False, boundary=True, clamp_action=True, save_traj=False, action_scale=0.1, action_penalty=1.):
         super().__init__()
         self.action_scale = action_scale
         self.observation_space = gym.spaces.Box(-1, 1, (3,))
@@ -85,7 +85,8 @@ class PointEnv(StateEnv):
         info = {}
 
         # receive very large penalty if |action| > 1
-        self.action_penalty = self.penalty((torch.abs(action)-0.9)/2.).sum(axis=-1) 
+        self.action_penalty = self.penalty((torch.abs(action)-0.9)/2.).sum(axis=-1)  * self._cfg.action_penalty
+
         info['action_penalty'] = self.action_penalty.mean().item()
         if self._cfg.penalty:
             self.get_obstacles()

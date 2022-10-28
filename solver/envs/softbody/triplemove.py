@@ -5,7 +5,7 @@ import cv2
 from solver.envs.point_env import PointEnv2
 
 class TripleMove(PointEnv2):
-    def __init__(self, cfg=None, n_goals=3, reward_weight=0.1):
+    def __init__(self, cfg=None, n_goals=3, reward_weight=0.1, action_penalty=0.):
         super().__init__()
 
         self.goals = totensor(

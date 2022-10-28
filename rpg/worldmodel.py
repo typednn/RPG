@@ -83,7 +83,7 @@ class GeneralizedQ(Network):
         s = self.enc_s(obs, timestep=timestep)
         return self.value_fn(s, self.enc_z(z))
 
-    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None):
+    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None, pi_a=None, pi_z=None):
         assert timestep.shape == (len(obs),)
 
         sample_z = (z_seq is None)
@@ -103,11 +103,15 @@ class GeneralizedQ(Network):
 
         # for dynamics part ..
         h = self.init_h(s)[None,:]
+        a_embeds = []
+
+        if pi_a is None: pi_a = self.pi_a
+        if pi_z is None: pi_z = self.pi_z
         #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
-                if self.pi_z is not None:
-                    z_done, z, logp = self.pi_z(s, z_embed, timestep=timestep).sample()
+                if pi_z is not None:
+                    z_done, z, logp = pi_z(s, z_embed, timestep=timestep).sample()
                     z_dones.append(z_done)
                     logp_z.append(logp[..., None])
                 else:
@@ -116,11 +120,12 @@ class GeneralizedQ(Network):
             z_embed = self.enc_z(z_seq[idx])
 
             if len(a_seq) <= idx:
-                a, logp = self.pi_a(s, z_embed).rsample()
+                a, logp = pi_a(s, z_embed).rsample()
                 logp_a.append(logp[..., None])
                 a_seq.append(a)
 
             a_embed = self.enc_a(a_seq[idx])
+            a_embeds.append(a_embed)
             o, h = self.dynamic_fn(a_embed[None, :], h)
             assert torch.allclose(o[-1], h)
             s = self.state_dec(h[-1]) # predict the next hidden state ..
@@ -144,7 +149,10 @@ class GeneralizedQ(Network):
             if len(z_dones) > 0:
                 out['z_dones'] = stack(z_dones)
             assert (z_seq == 0).all()
-        prefix = out['value_prefix'] = self.value_prefix(hidden)
+
+        #prefix = out['value_prefix'] = self.value_prefix(hidden)
+        out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds))
+        prefix = compute_value_prefix(rewards, self._cfg.gamma)
 
 
         if 'logp_a' in out:
@@ -154,10 +162,11 @@ class GeneralizedQ(Network):
             #if hasattr(self, 'intrinsic_rewards'):
             if self.intrinsic_reward is not None:
                 elbo, infos = self.intrinsic_reward.compute(*locals())
-                extra_rewards += elbo
+                extra_rewards = extra_rewards + elbo
                 out.update(infos)
-
-            prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
+            
+            if isinstance(extra_rewards, torch.Tensor):
+                prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
 
         values = (self.value_fn if value_fn is None else value_fn)(states, self.enc_z(z_seq))
