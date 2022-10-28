@@ -81,6 +81,11 @@ class IntrinsicReward(Network):
             torch.zeros(1, requires_grad=True, device=self.device)
         )
 
+
+        zhead2 = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
+        backbone = Seq(mlp(state_dim, hidden_dim, zhead2.get_input_dim()))
+        self.posterior_z = Seq(backbone, zhead) # the posterior of p(z|s), for off-policy training..
+
     def forward(self, states, a_seq):
         states = states * self._cfg.obs_weight
         a_seq = (a_seq + torch.randn_like(a_seq) * self._cfg.noise)
@@ -124,16 +129,20 @@ class OptionCritic(Trainer):
         ir=IntrinsicReward.dc,
 
         done_target=1./10, # control the entropy of done.
+
+        entz_coef=1.,
         entz_target = None, # control the target entropies.
     ):
         super().__init__(env)
         self.info_net_optim = LossOptimizer(self.nets.intrinsic_reward, lr=3e-4) # info net
 
-    def sample_hidden_z(self, obs, timestep, action, next_obs):
-        s = self.nets.enc_s(next_obs[0], timestep=timestep + 1)
-        return self.info_net(s, action[0]).sample()[0]
+    def sample_z_posterior(self, states):
+        return self.info_net.p_z_s(states).sample()[0]
 
     def update_actor(self, obs, init_z, alpha, timesteps):
+        init_z = None
+
+
         t = timesteps[0]
 
         # optimize pi_a
@@ -185,7 +194,7 @@ class OptionCritic(Trainer):
             'pi_a_loss': float(pi_a_loss),
             'pi_z_loss': float(pi_z_loss),
             'entropy': float(entropy_term.mean()),
-            'z_entropy_loss': float(z_entropy_loss),
+            'z_alpha_loss': float(z_entropy_loss),
             'z_entropy': float(z_entropy),
         }
 
@@ -228,7 +237,7 @@ class OptionCritic(Trainer):
         pi_z = OptionNet(zhead, backbone, hidden_dim)
 
 
-        self.info_net = IntrinsicReward(latent_dim, action_dim, hidden_dim, self.z_space)
+        self.info_net = IntrinsicReward(latent_dim, action_dim, hidden_dim, self.z_space, entropy_coef=self._cfg.entz_coef)
 
         network = GeneralizedQ(
             enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn,

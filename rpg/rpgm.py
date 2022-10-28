@@ -98,11 +98,11 @@ class Trainer(Configurable, RLAlgo):
             self.entropy_optim = LossOptimizer(self.log_alpha, cfg=actor_optim, **kwargs) #TODO: change the optim ..
         self.update_step = 0
 
+    def enc_s(self, obs, timestep):
+        return self.nets.enc_s(obs, timestep=timestep)
 
-    def sample_hidden_z(self, obs, timestep, action, next_obs):
-        # estimate the probaility of init z ..
-        #return None
-        return totensor([self.z_space.sample()] * len(obs), device=self.device, dtype=None)
+    def sample_z_posterior(self, states):
+        return totensor([self.z_space.sample()] * len(states), device=self.device, dtype=None)
 
 
     def dynamic_loss(self, obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps):
@@ -188,7 +188,7 @@ class Trainer(Configurable, RLAlgo):
         mask = truncated_mask[..., 0] / self.horizon
 
         with torch.no_grad():
-            init_z = self.sample_hidden_z(obs, timesteps[0], action, next_obs)
+            init_z = self.sample_z_posterior(obs, timesteps[0])
 
         dyna_loss = self.dynamic_loss(obs, init_z, action, next_obs, reward, done_gt, mask, alpha, timesteps=timesteps)
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)

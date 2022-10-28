@@ -30,6 +30,8 @@ trainer = OptionCritic.parse(
     hooks=dict(save_traj=dict(n_epoch=4)),
     path='tmp/oc',
     weights=dict(prefix=1.),
-    pg=True
+    pg=False,
+
+    entz_coef = 100.
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
