@@ -60,6 +60,7 @@ class Trainer(Configurable, RLAlgo):
 
         entropy_coef=0.,
         entropy_target=None,
+        eval_episode=10,
 
         
         pg=False,
@@ -272,7 +273,7 @@ class Trainer(Configurable, RLAlgo):
     def evaluate(self, env, steps):
         with torch.no_grad():
             self.start(self.env, reset=True)
-            out = self.inference(steps * 10, mode='evaluate')
+            out = self.inference(steps * self._cfg.eval_episode, mode='evaluate')
             self.start(self.env, reset=True)
             return out
 

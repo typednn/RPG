@@ -38,12 +38,13 @@ class Option(ActionDistr):
 
         mask = d.bool()
         logp_d = where(mask, torch.log(self.done_prob), torch.log(1 - self.done_prob))
+
         a = where(mask, a, self.old) # if done, use a
         logp_a = where(mask, logp_a, 0)
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
 class OptionNet(Network):
-    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='sample_first') -> None:
+    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='samplefirst') -> None:
         super().__init__()
 
         self.zhead = zhead
@@ -56,10 +57,14 @@ class OptionNet(Network):
 
     def forward(self, s, z, z_embed, timestep):
         feature = self.backbone(s, z_embed)
-        if self._cfg.done_mode == 'sample_first':
+        if self._cfg.done_mode == 'samplefirst':
             done = (timestep == 0).float()
-        else:
+        elif self._cfg.done_mode == 'everystep':
+            done = torch.ones_like(timestep).float()
+        elif self._cfg.done_mode == 'option':
             done = torch.sigmoid(self.done(feature)[..., 0])
+        else:
+            raise NotImplementedError
 
         prob = self.option(feature)
         return Option(z, done, self.zhead(prob))
@@ -73,6 +78,8 @@ class IntrinsicReward(Network):
         cfg=None,
         backbone=None,  action_weight=1., noise=0.0, obs_weight=1., head=None,
         entropy_coef=1.,
+        mutual_info_weight=1.,
+        use_next_state=False,
     ):
         super().__init__()
 
@@ -94,18 +101,27 @@ class IntrinsicReward(Network):
         a_seq = a_seq * self._cfg.action_weight
         return self.info_net(states, a_seq)
 
+    def get_state_seq(self, traj):
+        if self._cfg.use_next_state:
+            return traj['states']
+
+        init_s = traj['init_s']
+        states = traj['states']
+        states = torch.cat((init_s[None,:], states[:-1]), dim=0)
+        return states
+
     def compute_reward(self, traj):
         # states, a_seq, z_seq, logp_z, **kwargs
-        states = traj['states']
+        states = self.get_state_seq(traj)
+
         a_seq = traj['a']
         z_seq = traj['z']
         logp_z = traj['logp_z']
 
-        info =  self(states, a_seq).log_prob(z_seq) # in case of discrete ..
+        info =  self(states, a_seq).log_prob(z_seq) * self._cfg.mutual_info_weight # in case of discrete ..
         alpha = self.log_alpha.exp().detach() * self._cfg.entropy_coef
-        return (info - logp_z.sum(axis=-1) * alpha).unsqueeze(-1), {
-            'info_reward': float(info.mean())
-        }
+        logger.logkvs_mean({'reward_info': float(info.mean()), 'z_alpha': float(alpha), 'reward_z': float(-alpha * logp_z.sum(axis=-1).mean())})
+        return (info - logp_z.sum(axis=-1) * alpha).unsqueeze(-1), {}
 
     def config_head(self, hidden_space):
         from tools.config import merge_inputs
@@ -134,6 +150,7 @@ class OptionCritic(Trainer):
 
         entz_coef=1.,
         entz_target = None, # control the target entropies.
+        option_mode='everystep',
     ):
         super().__init__(env)
         self.info_net_optim = LossOptimizer(self.nets.intrinsic_reward, lr=3e-4) # info net
@@ -156,7 +173,9 @@ class OptionCritic(Trainer):
         logp_z = samples['logp_z'][0].sum(axis=-1)
 
         adv = (estimated_value -  baseline).detach()
-        adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8) # normalize the advatnage ..
+        # adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8) # normalize the advatnage ..
+        # mask = (logp_z < 0)
+        # print(logp_z[mask], baseline[mask])
         assert adv.shape == logp_z.shape
         pi_z_loss = - (logp_z * adv).mean(axis=0) # not sure how to regularize the entropy ..
 
@@ -177,9 +196,10 @@ class OptionCritic(Trainer):
             self.entropy_optim.optimize(entropy_loss)
 
         # optimize auxilary losses 
-        mutual_info = self.info_net(
-            samples['states'].detach(), samples['a'].detach()).log_prob(samples['z'].detach()).mean()
-        posterior = self.get_posterior(samples['states'].detach()).log_prob(samples['z'].detach()).mean()
+        s_seq = self.info_net.get_state_seq(samples).detach()
+        z_detach = samples['z'].detach()
+        mutual_info = self.info_net(s_seq, samples['a'].detach()).log_prob(z_detach).mean()
+        posterior = self.get_posterior(samples['states'].detach()).log_prob(z_detach).mean()
 
         z_entropy = -logp_z.mean()
         if self._cfg.entz_target is not None:
@@ -237,10 +257,10 @@ class OptionCritic(Trainer):
 
         zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
         backbone = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, hidden_dim))
-        pi_z = OptionNet(zhead, backbone, hidden_dim)
+        pi_z = OptionNet(zhead, backbone, hidden_dim, done_mode=self._cfg.option_mode)
 
 
-        self.info_net = IntrinsicReward(latent_dim, action_dim, hidden_dim, self.z_space, entropy_coef=self._cfg.entz_coef)
+        self.info_net = IntrinsicReward(latent_dim, action_dim, hidden_dim, self.z_space, entropy_coef=self._cfg.entz_coef, cfg=self._cfg.ir)
 
         network = GeneralizedQ(
             enc_s, enc_a, enc_z, pi_a, pi_z, init_h, dynamics, state_dec, value_prefix, value, done_fn,

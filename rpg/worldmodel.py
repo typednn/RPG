@@ -153,6 +153,7 @@ class GeneralizedQ(Network):
                 out['z_dones'] = stack(z_dones)
 
         #prefix = out['value_prefix'] = self.value_prefix(hidden)
+        out['init_s'] = init_s
         out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds))
         prefix = compute_value_prefix(rewards, self._cfg.gamma)
 
@@ -165,7 +166,7 @@ class GeneralizedQ(Network):
             if self.intrinsic_reward is not None:
                 elbo, infos = self.intrinsic_reward.compute_reward(out)
                 extra_rewards = extra_rewards + elbo
-                out.update(infos)
+                # out.update(infos)
             
             if isinstance(extra_rewards, torch.Tensor):
                 prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
