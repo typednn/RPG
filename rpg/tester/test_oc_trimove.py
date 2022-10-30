@@ -33,6 +33,6 @@ trainer = OptionCritic.parse(
     pg=False,
 
     #entz_coef = 100.
-    entz_coef=0.2,
+    entz_coef=0.3,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
