@@ -62,6 +62,9 @@ class Trainer(Configurable, RLAlgo):
         entropy_target=None,
         eval_episode=10,
 
+        zero_done_value=True,
+        done_penalty=0.,
+
         
         pg=False,
     ):
@@ -114,6 +117,11 @@ class Trainer(Configurable, RLAlgo):
         pred_traj = self.nets.inference(obs, self.sample_z(obs, t).sample()[0], t, self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
 
         next_timesteps = timesteps + 1
+
+        if self._cfg.done_penalty > 0:
+            assert done_gt.shape == reward.shape
+            reward = reward - self._cfg.done_penalty * done_gt
+
         with torch.no_grad():
             state_gt = self.target_nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
             if 'value_prefix' in pred_traj:
@@ -146,7 +154,8 @@ class Trainer(Configurable, RLAlgo):
 
             done_mask = (1 - (done_gt.cumsum(0) > 0).float())
             vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
-            vtarg = vtarg * done_mask #not sure if this will help ..
+            if self._cfg.zero_done_value:
+                vtarg = vtarg * done_mask #not sure if this will help ..
 
         dyna_loss['value'] = masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
 
