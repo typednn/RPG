@@ -19,7 +19,7 @@ trainer = OptionCritic.parse(
         std_scale=1.,
         squash=True
     ),
-    entropy_coef=0.001,
+    entropy_coef=0.01,
     entropy_target=-2.,
     actor_optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=5,
@@ -27,11 +27,12 @@ trainer = OptionCritic.parse(
     # tau = 0.001,
     #tau=0.001,
     update_train_step=1,
-    hooks=dict(save_traj=dict(n_epoch=4)),
+    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=1)),
     path='tmp/oc',
     weights=dict(prefix=1.),
     pg=False,
 
-    entz_coef = 100.
+    #entz_coef = 100.
+    entz_coef=0.2,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

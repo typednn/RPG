@@ -233,7 +233,7 @@ class Trainer(Configurable, RLAlgo):
                 a, _ = pd.rsample()
                 data, obs = self.step(self.env, a)
 
-                transition.update(**data, a=a)
+                transition.update(**data, a=a, z=z)
                 transitions.append(transition)
                 timestep = transition['next_timestep']
 

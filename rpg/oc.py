@@ -43,7 +43,7 @@ class Option(ActionDistr):
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
 class OptionNet(Network):
-    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='sample_first', uniform=True) -> None:
+    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='sample_first') -> None:
         super().__init__()
 
         self.zhead = zhead
@@ -62,8 +62,6 @@ class OptionNet(Network):
             done = torch.sigmoid(self.done(feature)[..., 0])
 
         prob = self.option(feature)
-        if self._cfg.uniform:
-            prob = prob
         return Option(z, done, self.zhead(prob))
 
 
@@ -170,10 +168,12 @@ class OptionCritic(Trainer):
             logp_a = samples['logp_a'][0].sum(axis=-1)
             assert logp_a.shape == adv.shape
             pi_a_loss = - (logp_a * adv).mean(axis=0) - alpha * (-logp_a).mean(axis=0)
+            raise NotImplementedError
 
         self.actor_optim.optimize(pi_a_loss + pi_z_loss)
         if self._cfg.entropy_target is not None:
-            entropy_loss = -torch.mean(self.log_alpha.exp() * (self._cfg.entropy_target - entropy_term.detach()))
+            entropy_loss = -torch.mean(
+                self.log_alpha.exp() * (self._cfg.entropy_target - entropy_term.detach()))
             self.entropy_optim.optimize(entropy_loss)
 
         # optimize auxilary losses 
@@ -199,6 +199,7 @@ class OptionCritic(Trainer):
             'z_alpha_loss': float(z_entropy_loss),
             'z_entropy': float(z_entropy),
             'z_posterior': float(posterior),
+            'info_loss': float(mutual_info),
         }
 
     def make_network(self, obs_space, action_space, z_space):
