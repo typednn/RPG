@@ -37,6 +37,7 @@ class GeneralizedQ(Network):
 
 
         horizon=1,
+        markovian=False,
     ) -> None:
         super().__init__()
 
@@ -64,6 +65,8 @@ class GeneralizedQ(Network):
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
         self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
 
+        self.markovian = markovian
+
     @property
     def weights(self):
         return torch.softmax(self._weights, 0)
@@ -71,16 +74,21 @@ class GeneralizedQ(Network):
 
     def policy(self, obs, z, timestep):
         obs = totensor(obs, self.device)
-        z = totensor(z, self.device, dtype=None)
         s = self.enc_s(obs, timestep=timestep)
         if self.pi_z is not None:
-            z_embed = self.enc_z(z)
-            z = self.pi_z(s, z, z_embed, timestep).sample()[1]
+            if self.markovian:
+                z = self.pi_z(s, None, None, timestep).sample()[1]
+            else:
+                z = totensor(z, self.device, dtype=None)
+                z_embed = self.enc_z(z)
+                z = self.pi_z(s, z, z_embed, timestep).sample()[1]
         return self.pi_a(s, self.enc_z(z)), z
 
     def value(self, obs, z, timestep):
         obs = totensor(obs, self.device)
         s = self.enc_s(obs, timestep=timestep)
+        if self.markovian:
+            return self.value_fn(s)
         return self.value_fn(s, self.enc_z(z))
 
     def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None, pi_a=None, pi_z=None, pg=False):
@@ -154,7 +162,7 @@ class GeneralizedQ(Network):
 
         #prefix = out['value_prefix'] = self.value_prefix(hidden)
         out['init_s'] = init_s
-        out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds))
+        out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds)) # estimate rewards by the target states and the actions ..
         prefix = compute_value_prefix(rewards, self._cfg.gamma)
 
 
@@ -172,7 +180,11 @@ class GeneralizedQ(Network):
                 prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
 
 
-        values = (self.value_fn if value_fn is None else value_fn)(states, self.enc_z(z_seq))
+        value_fn = (self.value_fn if value_fn is None else value_fn)
+        if self.markovian:
+            values = value_fn(states)
+        else:
+            values = value_fn(states, self.enc_z(z_seq))
 
         out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
         expected_values, expected_prefix = done_rewards_values(values, prefix, dones)

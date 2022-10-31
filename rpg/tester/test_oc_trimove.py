@@ -33,7 +33,7 @@ trainer = OptionCritic.parse(
     pg=False,
 
     #entz_coef = 100.
-    entz_coef=0.2,
+    entz_coef=0.05,
     ir=dict(mutual_info_weight=1., action_weight=1., obs_weight=1.),
     #option_mode='samplefirst',
     #option_mode='option',

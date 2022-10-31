@@ -37,10 +37,13 @@ class Option(ActionDistr):
         a, logp_a = self.new_distr.sample()
 
         mask = d.bool()
-        logp_d = where(mask, torch.log(self.done_prob), torch.log(1 - self.done_prob))
+        if not mask.all():
+            logp_d = where(mask, torch.log(self.done_prob), torch.log(1 - self.done_prob))
+            a = where(mask, a, self.old) # if done, use a
+            logp_a = where(mask, logp_a, 0)
+        else:
+            logp_d = torch.zeros_like(logp_a)
 
-        a = where(mask, a, self.old) # if done, use a
-        logp_a = where(mask, logp_a, 0)
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
 class OptionNet(Network):
@@ -56,7 +59,11 @@ class OptionNet(Network):
         self.done = torch.nn.Linear(inp, 1) # predict done probability
 
     def forward(self, s, z, z_embed, timestep):
-        feature = self.backbone(s, z_embed)
+        if self._cfg.done_mode == 'everystep':
+            feature = self.backbone(s)
+        else:
+            feature = self.backbone(s, z_embed)
+
         if self._cfg.done_mode == 'samplefirst':
             done = (timestep == 0).float()
         elif self._cfg.done_mode == 'everystep':
@@ -225,6 +232,7 @@ class OptionCritic(Trainer):
     def make_network(self, obs_space, action_space, z_space):
         hidden_dim = 256
         latent_dim = 100
+        option_mode = self._cfg.option_mode
 
         z_dim = z_space.inp_shape[0]
         latent_z_dim = z_dim
@@ -246,7 +254,7 @@ class OptionCritic(Trainer):
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
 
 
-        v_in = latent_dim + latent_z_dim
+        v_in = latent_dim + latent_z_dim if option_mode != 'everystep' else latent_dim
         value = CatNet(
             Seq(mlp(v_in, hidden_dim, 1)),
             Seq(mlp(v_in, hidden_dim, 1)),
@@ -256,7 +264,7 @@ class OptionCritic(Trainer):
 
 
         zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
-        backbone = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, hidden_dim))
+        backbone = Seq(mlp(v_in, hidden_dim, hidden_dim))
         pi_z = OptionNet(zhead, backbone, hidden_dim, done_mode=self._cfg.option_mode)
 
 
@@ -267,7 +275,8 @@ class OptionCritic(Trainer):
             self.info_net,
 
             cfg=self._cfg.qnet,
-            horizon=self._cfg.horizon
+            horizon=self._cfg.horizon,
+            markovian= (option_mode == 'everystep'),
         )
         network.apply(orthogonal_init)
         return network
