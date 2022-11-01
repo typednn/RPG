@@ -127,13 +127,13 @@ class IntrinsicReward(Network):
 
         info =  self(states, a_seq).log_prob(z_seq) * self._cfg.mutual_info_weight # in case of discrete ..
         alpha = self.log_alpha.exp().detach() * self._cfg.entropy_coef
-        logger.logkvs_mean({'reward_info': float(info.mean()), 'z_alpha': float(alpha), 'reward_z': float(-alpha * logp_z.sum(axis=-1).mean())})
+        logger.logkvs_mean({'reward_info': float(info.mean()), 'z_alpha': float(alpha), 'reward_entz': float(-alpha * logp_z.sum(axis=-1).mean())})
         return (info - logp_z.sum(axis=-1) * alpha).unsqueeze(-1), {}
 
     def config_head(self, hidden_space):
         from tools.config import merge_inputs
         discrete = dict(TYPE='Discrete', epsilon=0.0)  # 0.2 epsilon
-        continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=1.)
+        continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=0.3989)
 
         if isinstance(hidden_space, Discrete):
             head = discrete
@@ -160,7 +160,8 @@ class OptionCritic(Trainer):
         option_mode='everystep',
     ):
         super().__init__(env)
-        self.info_net_optim = LossOptimizer(self.nets.intrinsic_reward, lr=3e-4) # info net
+        assert self.nets.intrinsic_reward is self.info_net
+        self.info_net_optim = LossOptimizer(self.info_net, lr=3e-4) # info net
 
     def get_posterior(self, states):
         return self.info_net.posterior_z(states)
@@ -205,7 +206,17 @@ class OptionCritic(Trainer):
         # optimize auxilary losses 
         s_seq = self.info_net.get_state_seq(samples).detach()
         z_detach = samples['z'].detach()
-        mutual_info = self.info_net(s_seq, samples['a'].detach()).log_prob(z_detach).mean()
+
+        dist = self.info_net(s_seq, samples['a'].detach())
+        mutual_info = dist.log_prob(z_detach)
+        #print(samples['a'][0][10], self.info_net(s_seq, samples['a'].detach()).dist.mean[0, 10], z_detach[0, 10], mutual_info[0, 10])
+        #print(dist.dist.scale[0, 10])
+        # import numpy as np
+        # def log_prob(z, loc, scale):
+        #     return -0.5 * np.log(2 * np.pi) - torch.log(scale) - 0.5 * ((z - loc) / scale) ** 2
+        # print(np.exp(0.5 * np.log(2*np.pi)))
+        # exit(0)
+        mutual_info = mutual_info.mean()
         posterior = self.get_posterior(samples['states'].detach()).log_prob(z_detach).mean()
 
         z_entropy = -logp_z.mean()

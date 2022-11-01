@@ -11,7 +11,7 @@ from .buffer import ReplayBuffer
 from .traj import Trajectory
 from typing import Union
 from .env_base import GymVecEnv, TorchEnv
-from nn.distributions import DistHead
+from nn.distributions import DistHead, NormalAction
 from torch.nn.functional import binary_cross_entropy as bce
 from .utils import compute_value_prefix, masked_temporal_mse, create_hidden_space, config_hidden
 from .worldmodel import GeneralizedQ
@@ -65,8 +65,10 @@ class Trainer(Configurable, RLAlgo):
         zero_done_value=True,
         done_penalty=0.,
 
-        
         pg=False,
+
+        
+        learn_obs_value=False,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -107,16 +109,26 @@ class Trainer(Configurable, RLAlgo):
 
     def get_posterior(self, states):
         from nn.distributions import DeterminisiticAction
-        return DeterminisiticAction(totensor([self.z_space.sample()] * len(states), device=self.device, dtype=None))
+        z = totensor([self.z_space.sample()], device=self.device, dtype=None)# * len(states)
+        s = z.shape[1:]
+        while z.dim() - len(s) < states.dim() - 1:
+            z = z.unsqueeze(0)
+        z = z.expand(*states.shape[:-1], *s)
+        return DeterminisiticAction(z)
 
     def sample_z(self, obs, timestep):
         return self.get_posterior(self.nets.enc_s(obs, timestep=timestep))
 
     def dynamic_loss(self, obs, action, next_obs, reward, done_gt, mask, alpha, timesteps):
         t = timesteps[0]
-        pred_traj = self.nets.inference(obs, self.sample_z(obs, t).sample()[0], t, self.horizon, a_seq=action) # by default, just rollout for horizon steps ..
-
         next_timesteps = timesteps + 1
+        init_z = self.sample_z(obs, t).sample()[0]
+        z_seq = self.sample_z(next_obs, next_timesteps)
+        z_seq = z_seq.sample()[0]
+
+        # by default, just rollout for horizon steps ..
+
+        pred_traj = self.nets.inference(obs, init_z, t, self.horizon, a_seq=action, z_seq=z_seq) 
 
         if self._cfg.done_penalty > 0:
             assert done_gt.shape == reward.shape
@@ -141,23 +153,37 @@ class Trainer(Configurable, RLAlgo):
             dyna_loss['done'] = (loss * mask).sum(axis=0)
             logger.logkv_mean('done_acc', ((pred_traj['dones'] > 0.5) == done_gt).float().mean())
 
+        if self._cfg.learn_obs_value:
+            next_obs = torch.cat((obs[None,:], next_obs), axis=0)
+            z_seq = torch.cat((init_z[None,:], z_seq), axis=0)
+            next_timesteps = torch.cat((t[None,:], next_timesteps), axis=0)
+            done_gt = torch.cat((torch.zeros_like(done_gt[:1,:]), done_gt), axis=0)
+
+
         batch_size = len(obs)
         with torch.no_grad():
             next_obs = next_obs.reshape(-1, *obs.shape[1:])
+            z_seq = z_seq.reshape(-1, *z_seq.shape[2:])
             next_timesteps = next_timesteps.reshape(-1)
-            seq_z = self.sample_z(next_obs, next_timesteps).sample()[0]
 
-            vtarg = self.target_nets.inference(next_obs, seq_z, next_timesteps,
-                self.horizon, alpha=alpha, value_fn=self.target_nets.value_fn,
-                # pi_a=self.target_nets.pi_a, pi_z=self.target_nets.pi_z
+            vtarg = self.target_nets.inference(next_obs, z_seq, next_timesteps,
+                self.horizon, alpha=alpha,  # pi_a=self.target_nets.pi_a, pi_z=self.target_nets.pi_z
             )['value']
 
-            done_mask = (1 - (done_gt.cumsum(0) > 0).float())
-            vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(self.horizon, batch_size, -1)
+            vtarg = vtarg.min(axis=-1, keepdims=True)[0].reshape(-1, batch_size, 1)
             if self._cfg.zero_done_value:
+                done_mask = (1 - (done_gt.cumsum(0) > 0).float())
                 vtarg = vtarg * done_mask #not sure if this will help ..
 
-        dyna_loss['value'] = masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
+        if self._cfg.learn_obs_value:
+            value_loss = self.nets.value(obs, init_z, t)
+            dyna_loss['value'] = ((vtarg[0] - value_loss) ** 2).mean(axis=-1)
+
+            vtarg = vtarg[1:]
+        else:
+            dyna_loss['value'] = 0.
+
+        dyna_loss['value'] = dyna_loss['value'] +  masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
 
         return dyna_loss
 
@@ -238,8 +264,9 @@ class Trainer(Configurable, RLAlgo):
                 transition = dict(obs = obs, timestep=timestep)
                 pd, z = self.nets.policy(obs, z, timestep)
 
-                scale = pd.dist.scale
-                logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
+                if isinstance(pd, NormalAction):
+                    scale = pd.dist.scale
+                    logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
                 a, _ = pd.rsample()
                 data, obs = self.step(self.env, a)
 
@@ -302,9 +329,7 @@ class Trainer(Configurable, RLAlgo):
         layer = 1
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
-        # dynamics = MLPDynamics(hidden_dim)
 
-        #value_prefix = Seq(mlp(hidden_dim, hidden_dim, 1))
         value_prefix = Seq(mlp(hidden_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
         done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
@@ -317,9 +342,7 @@ class Trainer(Configurable, RLAlgo):
         ) #layer norm, if necesssary
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
-
-        # override it if we want to use different network 
-        pi_z =  None #Seq(mlp(latent_dim + latent_z_dim, hidden_dim, zhead.get_input_dim()), zhead)
+        pi_z =  None
 
         network = GeneralizedQ(
             enc_s, enc_a, enc_z,

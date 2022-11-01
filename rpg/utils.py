@@ -44,8 +44,8 @@ class ZTransform(torch.nn.Module):
         self.z_space = z_space
 
     def forward(self, x):
-        assert x.max() < self.z_space.n, f"{x.max()} < {self.z_space.n}"
         if isinstance(self.z_space, Discrete):
+            assert x.max() < self.z_space.n, f"{x.max()} < {self.z_space.n}"
             return torch.nn.functional.one_hot(x, self.z_space.n).float()
         else:
             return x
