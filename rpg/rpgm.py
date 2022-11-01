@@ -176,8 +176,8 @@ class Trainer(Configurable, RLAlgo):
                 vtarg = vtarg * done_mask #not sure if this will help ..
 
         if self._cfg.learn_obs_value:
-            value_loss = self.nets.value(obs, init_z, t)
-            dyna_loss['value'] = ((vtarg[0] - value_loss) ** 2).mean(axis=-1)
+            now_value = self.nets.value(obs, init_z, t, detach=True) #TODO: detach if necessary..
+            dyna_loss['value'] = ((vtarg[0] - now_value) ** 2).mean(axis=-1) / self.horizon
 
             vtarg = vtarg[1:]
         else:
@@ -197,7 +197,7 @@ class Trainer(Configurable, RLAlgo):
             actor_loss = -value[..., 0].mean(axis=0)
         else:
             estimated_value = value[..., 0]
-            baseline = self.nets.value(obs, init_z, timestep=t)[..., 0]
+            baseline = self.target_nets.value(obs, init_z, timestep=t)[..., 0]
             logp_a = samples['logp_a'][0].sum(axis=-1)
 
             adv = (estimated_value -  baseline).detach()

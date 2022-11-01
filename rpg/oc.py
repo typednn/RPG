@@ -19,12 +19,13 @@ from .models import BaseNet, Network
 import torch
 
 class Option(ActionDistr):
-    def __init__(self, old, done_prob, new_distr) -> None:
+    def __init__(self, old, done_prob, new_distr, detach=True) -> None:
         super().__init__()
 
         self.old = old
         self.done_prob = done_prob
         self.new_distr = new_distr
+        self.detach = detach
 
     def rsample(self, detach=False):
         raise NotImplementedError
@@ -34,20 +35,27 @@ class Option(ActionDistr):
 
     def sample(self):
         d = torch.bernoulli(self.done_prob)
-        a, logp_a = self.new_distr.sample()
+        if self.detach:
+            a, logp_a = self.new_distr.sample()
+            # raise NotImplementedError
+        else:
+            a, logp_a = self.new_distr.rsample()
+            raise NotImplementedError
 
         mask = d.bool()
         if not mask.all():
             logp_d = where(mask, torch.log(self.done_prob), torch.log(1 - self.done_prob))
             a = where(mask, a, self.old) # if done, use a
             logp_a = where(mask, logp_a, 0)
+            # raise NotImplementedError
         else:
             logp_d = torch.zeros_like(logp_a)
 
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
+
 class OptionNet(Network):
-    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='samplefirst') -> None:
+    def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='samplefirst', detach=True) -> None:
         super().__init__()
 
         self.zhead = zhead
@@ -74,7 +82,7 @@ class OptionNet(Network):
             raise NotImplementedError
 
         prob = self.option(feature)
-        return Option(z, done, self.zhead(prob))
+        return Option(z, done, self.zhead(prob), detach=self._cfg.detach)
 
 
 class IntrinsicReward(Network):
@@ -158,10 +166,14 @@ class OptionCritic(Trainer):
         entz_coef=1.,
         entz_target = None, # control the target entropies.
         option_mode='everystep',
+        z_grad=False,
     ):
         super().__init__(env)
         assert self.nets.intrinsic_reward is self.info_net
         self.info_net_optim = LossOptimizer(self.info_net, lr=3e-4) # info net
+
+        from tools.utils import RunningMeanStd
+        self.adv_norm = RunningMeanStd(clip_max=10.)
 
     def get_posterior(self, states):
         return self.info_net.posterior_z(states)
@@ -175,17 +187,23 @@ class OptionCritic(Trainer):
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
         estimated_value = value[..., 0]
-
-        # optimize pi_z with policy gradient directly
-        baseline = self.nets.value(obs, init_z, timestep=t)[..., 0]
         logp_z = samples['logp_z'][0].sum(axis=-1)
 
-        adv = (estimated_value -  baseline).detach()
-        # adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8) # normalize the advatnage ..
-        # mask = (logp_z < 0)
-        # print(logp_z[mask], baseline[mask])
-        assert adv.shape == logp_z.shape
-        pi_z_loss = - (logp_z * adv).mean(axis=0) # not sure how to regularize the entropy ..
+        with torch.no_grad():
+            baseline = self.target_nets.value(obs, init_z, timestep=t)[..., 0]
+            adv = (estimated_value -  baseline).detach()
+            with torch.no_grad():
+                self.adv_norm.normalize(adv.view(-1))
+            adv = adv / self.adv_norm.std
+            # adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8) # normalize the advatnage ..
+
+        if not self._cfg.z_grad:
+            # mask = (logp_z < 0)
+            # print(logp_z[mask], baseline[mask])
+            assert adv.shape == logp_z.shape
+            pi_z_loss = - (logp_z * adv).mean(axis=0) # not sure how to regularize the entropy ..
+        else:
+            pi_z_loss = 0. # joint optimize with a..
 
 
         # optimize pi_a
@@ -234,6 +252,7 @@ class OptionCritic(Trainer):
             'a_entropy': float(entropy_term.mean()),
             'a_pi_loss': float(pi_a_loss),
             'z_pi_loss': float(pi_z_loss),
+            'adv_abs': float(adv.abs().mean()),
             'z_alpha_loss': float(z_entropy_loss),
             'z_entropy': float(z_entropy),
             'z_posterior': float(posterior),
@@ -276,7 +295,7 @@ class OptionCritic(Trainer):
 
         zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
         backbone = Seq(mlp(v_in, hidden_dim, hidden_dim))
-        pi_z = OptionNet(zhead, backbone, hidden_dim, done_mode=self._cfg.option_mode)
+        pi_z = OptionNet(zhead, backbone, hidden_dim, done_mode=self._cfg.option_mode, detach=not self._cfg.z_grad)
 
 
         self.info_net = IntrinsicReward(latent_dim, action_dim, hidden_dim, self.z_space, entropy_coef=self._cfg.entz_coef, cfg=self._cfg.ir)

@@ -42,6 +42,6 @@ trainer = OptionCritic.parse(
     eval_episode=1,
     batch_size=2048,
 
-    learn_obs_value=True,
+    learn_obs_value=False,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

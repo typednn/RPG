@@ -84,9 +84,11 @@ class GeneralizedQ(Network):
                 z = self.pi_z(s, z, z_embed, timestep).sample()[1]
         return self.pi_a(s, self.enc_z(z)), z
 
-    def value(self, obs, z, timestep):
+    def value(self, obs, z, timestep, detach=False):
         obs = totensor(obs, self.device)
         s = self.enc_s(obs, timestep=timestep)
+        if detach:
+            s = s.detach()
         if self.markovian:
             return self.value_fn(s)
         return self.value_fn(s, self.enc_z(z))
@@ -115,24 +117,27 @@ class GeneralizedQ(Network):
 
         if pi_a is None: pi_a = self.pi_a
         if pi_z is None: pi_z = self.pi_z
+
         #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
                 if pi_z is not None:
-                    z_done, z, logp = pi_z(s, z, z_embed, timestep=timestep).sample()
+                    z_done, z, _logp_z = pi_z(s, z, z_embed, timestep=timestep).sample()
                     z_dones.append(z_done)
-                    logp_z.append(logp)
+                    logp_z.append(_logp_z)
+
                 else:
                     logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
                 z_seq.append(z)
+                # print(idx, z[0], s[0])
             z_embed = self.enc_z(z_seq[idx])
 
             if len(a_seq) <= idx:
                 if pg:
-                    a, logp = pi_a(s, z_embed).sample()
+                    a, _logp_a = pi_a(s, z_embed).sample()
                 else:
-                    a, logp = pi_a(s, z_embed).rsample()
-                logp_a.append(logp[..., None])
+                    a, _logp_a = pi_a(s, z_embed).rsample()
+                logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
 
             a_embed = self.enc_a(a_seq[idx])
@@ -185,6 +190,7 @@ class GeneralizedQ(Network):
             values = value_fn(states)
         else:
             values = value_fn(states, self.enc_z(z_seq))
+            # raise NotImplementedError
 
         out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
         expected_values, expected_prefix = done_rewards_values(values, prefix, dones)
