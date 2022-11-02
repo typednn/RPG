@@ -176,10 +176,12 @@ class OptionCritic(Trainer):
         optim_horizon = None,
 
         ppo=0,
+
+        info_lr=3e-4,
     ):
         super().__init__(env)
         assert self.nets.intrinsic_reward is self.info_net
-        self.info_net_optim = LossOptimizer(self.info_net, lr=3e-4) # info net
+        self.info_net_optim = LossOptimizer(self.info_net, lr=info_lr) # info net
 
         from tools.utils import RunningMeanStd
         self.adv_norm = RunningMeanStd(clip_max=10.)
