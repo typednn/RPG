@@ -176,7 +176,7 @@ class OptionCritic(Trainer):
         option_mode='everystep',
         z_grad=False,
 
-        ppo=False,
+        ppo=0,
     ):
         super().__init__(env)
         assert self.nets.intrinsic_reward is self.info_net
@@ -218,12 +218,16 @@ class OptionCritic(Trainer):
                 assert self._cfg.option_mode == 'everystep'
                 newlogp = logp_z
                 with torch.no_grad():
-                    logp = self.old_pi.policy(obs, init_z, t, return_z_dist=True).log_prob(samples['z'][0])
-                    logp = logp * 0
-
+                    import numpy as np
+                    logp = self.old_pi.policy(obs, init_z, t, return_z_dist=True).log_prob(samples['z'][0]) # 1e-10 for numerical stability
+                    logp = logp.clamp(np.log(1e-20), np.inf) # 1e-10 for numerical stability
                 
                 logratio = newlogp - logp
                 ratio = torch.exp(logratio)
+                # print(ratio.min(), torch.exp(logp).min(), adv.min(), adv.max())
+                #if ratio.min() < 0.1:
+                #    return {} # don't do the optimization ..
+                # mask = torch.exp(logp) > 1e-10 # when it's zero, there should be no grad ..
                 assert newlogp.shape == logp.shape
                 assert adv.shape == ratio.shape, f"Adv shape is {adv.shape}, and ratio shape is {ratio.shape}"
                 pg_losses = -adv * ratio
@@ -232,6 +236,7 @@ class OptionCritic(Trainer):
                 pg_losses2 = -adv * clipped_ratio
                 pg_losses = torch.max(pg_losses, pg_losses2)
 
+                # pg_losses = (pg_losses * mask.float())
                 pi_z_loss = pg_losses.mean(axis=0)
         else:
             pi_z_loss = 0. # joint optimize with a..
@@ -341,10 +346,3 @@ class OptionCritic(Trainer):
         )
         network.apply(orthogonal_init)
         return network
-
-    def run_rpgm(self, max_epoch=None):
-        if self._cfg.ppo:
-            import copy
-            self.old_pi = copy.deepcopy(self.nets)
-
-        super().run_rpgm(max_epoch)

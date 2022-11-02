@@ -72,6 +72,7 @@ class MultiModal(OptionCritic):
             zhead = DistHead.build(action_space, cfg=self._cfg.head)
             import numpy as np
             zhead.LOG_STD_MAX = np.log(1.)
+            zhead.LOG_STD_MIN = np.log(0.01)
         else:
             raise NotImplementedError
 

@@ -69,6 +69,9 @@ class Trainer(Configurable, RLAlgo):
 
         
         learn_obs_value=False,
+
+
+        ppo=0,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, (RunningMeanStd(clip_max=10.) if obs_norm else None), build_hooks(hooks))
@@ -219,6 +222,8 @@ class Trainer(Configurable, RLAlgo):
         }
 
     def update(self):
+        if self._cfg.ppo > 0 and (self.update_step % (self._cfg.ppo) == 0):
+            self.old_pi = copy.deepcopy(self.nets)
         obs, next_obs, action, reward, done_gt, truncated, timesteps = self.buffer.sample(self._cfg.batch_size)
 
         assert len(next_obs) == self.horizon
