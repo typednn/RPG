@@ -38,8 +38,8 @@ trainer = MultiModal.parse(
     #entz_coef=0.05,
     #entz_coef=0.0,
     # entz_coef=0.01,
-    entz_coef = 0.,
-    entz_target = -2.,
+    # entz_coef = 1.,
+    #entz_target = -2.,
     ir=dict(mutual_info_weight=1., action_weight=1., obs_weight=1.),
     weights=dict(prefix=1000.),
 
@@ -47,6 +47,6 @@ trainer = MultiModal.parse(
     batch_size=512,
     z_grad=False,
 
-    ppo = 200.,
+    ppo = 200,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

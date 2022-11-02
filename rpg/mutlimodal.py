@@ -1,4 +1,5 @@
 # multimodal actor
+import numpy as np
 from .oc import OptionCritic
 from .oc import *
 from tools.utils import Identity
@@ -12,6 +13,23 @@ class IdentityActor(torch.nn.Module):
     def forward(self, x, z):
         return DeterminisiticAction(z)
 
+class DiscreteActor(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, x, z):
+        idx = z.argmax(dim=-1)
+        idx = idx.float() / z.shape[-1] * np.pi * 2
+        a = torch.stack((torch.cos(idx), torch.sin(idx)), dim=-1)
+        return DeterminisiticAction(a)
+
+class TanhActor(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, z):
+        return DeterminisiticAction(torch.tanh(z))
+
 
 
 class MultiModal(OptionCritic):
@@ -20,8 +38,9 @@ class MultiModal(OptionCritic):
         cfg=None,
         z_dim=0,
         z_cont_dim=10,
+        z_head=None,
         option_mode='everystep',
-        actor_mode = 'identify',
+        actor_mode ='identify',
     ):
         """
         Actor: 
@@ -67,15 +86,32 @@ class MultiModal(OptionCritic):
             Seq(mlp(v_in, hidden_dim, 1)),
         ) #layer norm, if necesssary
 
+        from rpg.utils import config_hidden
+        zhead_cfg = config_hidden(self._cfg.z_head, z_space)
         if self._cfg.actor_mode == 'identify':
             pi_a = IdentityActor()
             zhead = DistHead.build(action_space, cfg=self._cfg.head)
             import numpy as np
             zhead.LOG_STD_MAX = np.log(1.)
             zhead.LOG_STD_MIN = np.log(0.01)
+        elif self._cfg.actor_mode == 'discrete':
+            zhead = DistHead.build(z_space, cfg=zhead_cfg)
+            pi_a = DiscreteActor()
         else:
-            zhead = DistHead.build(z_space, cfg=self._cfg.head)
-            # raise NotImplementedError
+            zhead = DistHead.build(z_space, cfg=zhead_cfg)
+
+            z_dim = z_space.inp_shape[0]
+            latent_z_dim = z_dim
+
+            if self._cfg.actor_mode == 'determinstic':
+                pi_a = Seq(
+                    mlp(v_in + latent_z_dim, hidden_dim, action_space.shape[0]),
+                    TanhActor(),
+                )
+            else:
+                head = DistHead.build(action_space, cfg=self._cfg.head)
+                pi_a = Seq(mlp(latent_dim + latent_z_dim, hidden_dim, head.get_input_dim()), head)
+
 
         #zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
         backbone = Seq(mlp(v_in, hidden_dim, hidden_dim))

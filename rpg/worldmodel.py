@@ -120,12 +120,16 @@ class GeneralizedQ(Network):
 
         if pi_a is None: pi_a = self.pi_a
         if pi_z is None: pi_z = self.pi_z
+        out = {}
 
         #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
                 if pi_z is not None:
-                    z_done, z, _logp_z = pi_z(s, z, z_embed, timestep=timestep).sample()
+                    z_dist = pi_z(s, z, z_embed, timestep=timestep)
+                    if idx == 0:
+                        out['init_z_dist'] = z_dist
+                    z_done, z, _logp_z = z_dist.sample()
                     z_dones.append(z_done)
                     logp_z.append(_logp_z)
 
@@ -158,7 +162,7 @@ class GeneralizedQ(Network):
         hidden = stack(hidden)
         states = stack(states)
 
-        out = dict(hidden=hidden, states=states)
+        out.update(dict(hidden=hidden, states=states))
         if sample_a:
             out['a'] = stack(a_seq)
             logp_a = out['logp_a'] = stack(logp_a)

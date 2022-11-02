@@ -12,10 +12,9 @@ class CategoricalAction(ActionDistr):
         self.kwargs = {'epsilon': epsilon}
         self.epsilon = epsilon
         if self.epsilon > 0:
-            #logits = torch.log(torch.softmax(logits, -1) * (1-self.epsilon) + self.epsilon/logits.shape[-1])
-            #assert epsilon == 0.
-            #logits = torch.log_softmax(logits)
-            raise NotImplementedError
+            logits = torch.log(torch.softmax(logits, -1) * (1-self.epsilon) + self.epsilon/logits.shape[-1])
+            logits = torch.log_softmax(logits, -1)
+            # raise NotImplementedError
         self.dist = Categorical(logits=logits)
 
     def rsample(self, *args, **kwargs):

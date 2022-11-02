@@ -211,7 +211,17 @@ class OptionCritic(Trainer):
             # print(logp_z[mask], baseline[mask])
             if not self._cfg.ppo:
                 assert adv.shape == logp_z.shape
-                pi_z_loss = - (logp_z * adv).mean(axis=0) # - self.info_net.get_alpha() * (-logp_z).mean(axis=0) # not sure how to regularize the entropy ..
+                zdist = samples['init_z_dist'].new_distr
+                from nn.distributions import NormalAction
+                if isinstance(zdist, NormalAction) or True:
+                    pi_z_loss = - (logp_z * adv).mean(axis=0) # - self.info_net.get_alpha() * (-logp_z).mean(axis=0) # not sure how to regularize the entropy ..
+                else:
+                    v = value[..., 0] / self.info_net.get_alpha() #TODO: instead of using the value, we can use the alpha to control the policy directly...
+                    logits = samples['init_z_dist'].new_distr.logits
+                    z0 = samples['z'][0]
+                    weight = logits.gather(1, z0[:, None])[..., 0]
+                    assert weight[2] == logits[2, z0[2]], (weight[2], logits[2, z0[2]])
+                    pi_z_loss = ((weight - v)**2).mean()
             else:
                 # prob ratio for KL / clipping based on a (possibly) recomputed logp
                 assert self._cfg.option_mode == 'everystep'
