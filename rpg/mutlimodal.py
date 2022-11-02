@@ -45,17 +45,16 @@ class MultiModal(OptionCritic):
         action_dim = action_space.shape[0]
 
         # TODO: layer norm?
-        from .utils import ZTransform, config_hidden
-        #enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim))
-        latent_dim = obs_space.shape[0]
-        enc_s = TimedSeq(Identity())
+        from .utils import ZTransform
+        enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim))
+        # latent_dim = obs_space.shape[0]
+        # enc_s = TimedSeq(Identity())
         enc_z = ZTransform(z_space)
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 
         layer = 1
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
-        # dynamics = MLPDynamics(hidden_dim)
 
         value_prefix = Seq(mlp(latent_dim + hidden_dim, hidden_dim, 1))
         done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None

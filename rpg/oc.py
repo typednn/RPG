@@ -193,8 +193,8 @@ class OptionCritic(Trainer):
             baseline = self.target_nets.value(obs, init_z, timestep=t)[..., 0]
             adv = (estimated_value -  baseline).detach()
             with torch.no_grad():
-                self.adv_norm.normalize(adv.view(-1))
-            adv = adv / self.adv_norm.std
+                self.adv_norm.update(adv.view(-1))
+            adv = (adv - self.adv_norm.mean)/ self.adv_norm.std
             # adv = (adv - adv.mean(axis=0))/(adv.std(axis=0) + 1e-8) # normalize the advatnage ..
 
         if not self._cfg.z_grad:
