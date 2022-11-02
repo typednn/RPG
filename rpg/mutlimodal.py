@@ -74,7 +74,8 @@ class MultiModal(OptionCritic):
             zhead.LOG_STD_MAX = np.log(1.)
             zhead.LOG_STD_MIN = np.log(0.01)
         else:
-            raise NotImplementedError
+            zhead = DistHead.build(z_space, cfg=self._cfg.head)
+            # raise NotImplementedError
 
         #zhead = DistHead.build(z_space, cfg=config_hidden(self._cfg.z_head, z_space))
         backbone = Seq(mlp(v_in, hidden_dim, hidden_dim))

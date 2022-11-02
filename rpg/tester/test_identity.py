@@ -8,7 +8,7 @@ from rpg.mutlimodal import MultiModal
 
 # max_grad_norm=1.
 N = 10
-env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=1, boundary=False)
+env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3, boundary=False)
 
 trainer = MultiModal.parse(
     env, max_update_step=0,
@@ -18,12 +18,13 @@ trainer = MultiModal.parse(
         # std_mode='statewise',
         #std_mode = 'statewise',
         std_mode='fix_no_grad',
-        std_scale=0.3,
+        std_scale=0.2,
         squash=False,
     ),
     entropy_coef=0.0,
     entropy_target=-2.,
-    actor_optim=dict(max_grad_norm=None, lr=0.0003),
+    actor_optim=dict(max_grad_norm=1., lr=0.0003),
+    #horizon=3,
     horizon=3,
     actor_delay=2, #10,
     # tau = 0.001,
@@ -39,13 +40,13 @@ trainer = MultiModal.parse(
     # entz_coef=0.01,
     entz_coef = 0.,
     entz_target = -2.,
-    ir=dict(mutual_info_weight=0., action_weight=1., obs_weight=1.),
+    ir=dict(mutual_info_weight=1., action_weight=1., obs_weight=1.),
     weights=dict(prefix=1000.),
 
     eval_episode=1,
     batch_size=512,
     z_grad=False,
 
-    ppo = 100,
+    ppo = 200.,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

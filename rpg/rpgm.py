@@ -223,6 +223,7 @@ class Trainer(Configurable, RLAlgo):
 
     def update(self):
         if self._cfg.ppo > 0 and (self.update_step % (self._cfg.ppo) == 0):
+            print('copy')
             self.old_pi = copy.deepcopy(self.nets)
         obs, next_obs, action, reward, done_gt, truncated, timesteps = self.buffer.sample(self._cfg.batch_size)
 

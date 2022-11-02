@@ -37,10 +37,8 @@ class Option(ActionDistr):
         d = torch.bernoulli(self.done_prob)
         if self.detach:
             a, logp_a = self.new_distr.sample()
-            # raise NotImplementedError
         else:
             a, logp_a = self.new_distr.rsample()
-            raise NotImplementedError
 
         mask = d.bool()
         if not mask.all():
@@ -175,6 +173,7 @@ class OptionCritic(Trainer):
         entz_target = None, # control the target entropies.
         option_mode='everystep',
         z_grad=False,
+        optim_horizon = None,
 
         ppo=0,
     ):
@@ -193,7 +192,7 @@ class OptionCritic(Trainer):
         init_z = self.sample_z(obs, t).sample()[0]
 
         # rollout to get trajectories and values
-        samples = self.nets.inference(obs, init_z, t, self.horizon, alpha=alpha, pg=self._cfg.pg)
+        samples = self.nets.inference(obs, init_z, t, self._cfg.optim_horizon or self.horizon, alpha=alpha, pg=self._cfg.pg)
         value, entropy_term = samples['value'], samples['entropy_term']
         assert value.shape[-1] in [1, 2]
         estimated_value = value[..., 0]
