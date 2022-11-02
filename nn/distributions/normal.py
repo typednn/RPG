@@ -90,11 +90,16 @@ class Normal(DistHead):
         else:  # 'tanh',
             means, log_stds = torch.chunk(means, 2, dim=-1)
 
+        # if self._cfg.std_mode != 'statewise':
         from tools.utils import clamp
         log_stds = clamp(
             log_stds, minval=max(self.LOG_STD_MIN, self.minimal_std_val), maxval=self.LOG_STD_MAX)
-
         action_std = torch.exp(log_stds) * self.std_scale
+        # else:
+        #     log_stds = torch.tanh(log_stds)
+        #     log_stds = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (log_stds + 1) + np.log(self.std_scale)
+        #     action_std = torch.exp(log_stds)
+                                                                    
         assert not torch.isnan(means).any()
 
         if not self._cfg.linear:

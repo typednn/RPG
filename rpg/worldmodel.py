@@ -72,16 +72,19 @@ class GeneralizedQ(Network):
         return torch.softmax(self._weights, 0)
 
 
-    def policy(self, obs, z, timestep):
+    def policy(self, obs, z, timestep, return_z_dist=False):
         obs = totensor(obs, self.device)
         s = self.enc_s(obs, timestep=timestep)
         if self.pi_z is not None:
             if self.markovian:
-                z = self.pi_z(s, None, None, timestep).sample()[1]
+                z_dist = self.pi_z(s, None, None, timestep)
             else:
                 z = totensor(z, self.device, dtype=None)
                 z_embed = self.enc_z(z)
-                z = self.pi_z(s, z, z_embed, timestep).sample()[1]
+                z_dist = self.pi_z(s, z, z_embed, timestep)
+            if return_z_dist:
+                return z_dist
+            z =  z_dist.sample()[1]
         return self.pi_a(s, self.enc_z(z)), z
 
     def value(self, obs, z, timestep, detach=False):

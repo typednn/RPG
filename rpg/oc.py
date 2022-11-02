@@ -53,6 +53,9 @@ class Option(ActionDistr):
 
         return d, a, torch.stack((logp_d, logp_a), dim=-1)
 
+    def log_prob(self, action, sum=True):
+        return self.new_distr.log_prob(action)
+
 
 class OptionNet(Network):
     def __init__(self, zhead, backbone, backbone_dim, cfg=None, done_mode='samplefirst', detach=True) -> None:
@@ -110,6 +113,10 @@ class IntrinsicReward(Network):
         backbone = Seq(mlp(state_dim, hidden_dim, zhead2.get_input_dim()))
         self.posterior_z = Seq(backbone, zhead) # the posterior of p(z|s), for off-policy training..
 
+    def get_alpha(self):
+        return self.log_alpha.exp() * self._cfg.entropy_coef
+
+
     def forward(self, states, a_seq):
         states = states * self._cfg.obs_weight
         a_seq = (a_seq + torch.randn_like(a_seq) * self._cfg.noise)
@@ -134,7 +141,8 @@ class IntrinsicReward(Network):
         logp_z = traj['logp_z']
 
         info =  self(states, a_seq).log_prob(z_seq) * self._cfg.mutual_info_weight # in case of discrete ..
-        alpha = self.log_alpha.exp().detach() * self._cfg.entropy_coef
+        #alpha = self.log_alpha.exp().detach() * self._cfg.entropy_coef
+        alpha = self.get_alpha()
         logger.logkvs_mean({'reward_info': float(info.mean()), 'z_alpha': float(alpha), 'reward_entz': float(-alpha * logp_z.sum(axis=-1).mean())})
         return (info - logp_z.sum(axis=-1) * alpha).unsqueeze(-1), {}
 
@@ -167,6 +175,8 @@ class OptionCritic(Trainer):
         entz_target = None, # control the target entropies.
         option_mode='everystep',
         z_grad=False,
+
+        ppo=False,
     ):
         super().__init__(env)
         assert self.nets.intrinsic_reward is self.info_net
@@ -200,8 +210,29 @@ class OptionCritic(Trainer):
         if not self._cfg.z_grad:
             # mask = (logp_z < 0)
             # print(logp_z[mask], baseline[mask])
-            assert adv.shape == logp_z.shape
-            pi_z_loss = - (logp_z * adv).mean(axis=0) # not sure how to regularize the entropy ..
+            if not self._cfg.ppo:
+                assert adv.shape == logp_z.shape
+                pi_z_loss = - (logp_z * adv).mean(axis=0) # - self.info_net.get_alpha() * (-logp_z).mean(axis=0) # not sure how to regularize the entropy ..
+            else:
+                # prob ratio for KL / clipping based on a (possibly) recomputed logp
+                assert self._cfg.option_mode == 'everystep'
+                newlogp = logp_z
+                with torch.no_grad():
+                    logp = self.old_pi.policy(obs, init_z, t, return_z_dist=True).log_prob(samples['z'][0])
+                    logp = logp * 0
+
+                
+                logratio = newlogp - logp
+                ratio = torch.exp(logratio)
+                assert newlogp.shape == logp.shape
+                assert adv.shape == ratio.shape, f"Adv shape is {adv.shape}, and ratio shape is {ratio.shape}"
+                pg_losses = -adv * ratio
+                clip_param = 0.2
+                clipped_ratio = torch.clamp(ratio, 1.0 - clip_param, 1.0 + clip_param)
+                pg_losses2 = -adv * clipped_ratio
+                pg_losses = torch.max(pg_losses, pg_losses2)
+
+                pi_z_loss = pg_losses.mean(axis=0)
         else:
             pi_z_loss = 0. # joint optimize with a..
 
@@ -212,7 +243,7 @@ class OptionCritic(Trainer):
         else:
             logp_a = samples['logp_a'][0].sum(axis=-1)
             assert logp_a.shape == adv.shape
-            pi_a_loss = - (logp_a * adv).mean(axis=0) - alpha * (-logp_a).mean(axis=0)
+            pi_a_loss = - (logp_a * adv).mean(axis=0) - alpha * (-logp_a).mean(axis=0) / self.adv_norm.std
             raise NotImplementedError
 
         self.actor_optim.optimize(pi_a_loss + pi_z_loss)
@@ -310,3 +341,10 @@ class OptionCritic(Trainer):
         )
         network.apply(orthogonal_init)
         return network
+
+    def run_rpgm(self, max_epoch=None):
+        if self._cfg.ppo:
+            import copy
+            self.old_pi = copy.deepcopy(self.nets)
+
+        super().run_rpgm(max_epoch)

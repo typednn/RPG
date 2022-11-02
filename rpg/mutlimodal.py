@@ -70,6 +70,8 @@ class MultiModal(OptionCritic):
         if self._cfg.actor_mode == 'identify':
             pi_a = IdentityActor()
             zhead = DistHead.build(action_space, cfg=self._cfg.head)
+            import numpy as np
+            zhead.LOG_STD_MAX = np.log(1.)
         else:
             raise NotImplementedError
 
