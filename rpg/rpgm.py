@@ -63,7 +63,6 @@ class Trainer(Configurable, RLAlgo):
         eval_episode=10,
 
         zero_done_value=True,
-        done_penalty=0.,
 
         pg=False,
 
@@ -122,40 +121,8 @@ class Trainer(Configurable, RLAlgo):
     def sample_z(self, obs, timestep):
         return self.get_posterior(self.nets.enc_s(obs, timestep=timestep))
 
-    def dynamic_loss(self, obs, action, next_obs, reward, done_gt, mask, alpha, timesteps):
-        t = timesteps[0]
-        next_timesteps = timesteps + 1
-        init_z = self.sample_z(obs, t).sample()[0]
-        z_seq = self.sample_z(next_obs, next_timesteps)
-        z_seq = z_seq.sample()[0]
-
-        # by default, just rollout for horizon steps ..
-
-        pred_traj = self.nets.inference(obs, init_z, t, self.horizon, a_seq=action, z_seq=z_seq) 
-
-        if self._cfg.done_penalty > 0:
-            assert done_gt.shape == reward.shape
-            reward = reward - self._cfg.done_penalty * done_gt
-
-        with torch.no_grad():
-            state_gt = self.target_nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
-            if 'value_prefix' in pred_traj:
-                rewards = pred_traj['value_prefix']
-                vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
-                raise NotImplementedError
-            else:
-                rewards = pred_traj['rewards']
-                vprefix_gt = reward
-
-        dyna_loss = {
-            'state': masked_temporal_mse(pred_traj['states'], state_gt, mask),
-            'prefix': masked_temporal_mse(rewards, vprefix_gt, mask)
-        }
-        if self._cfg.have_done:
-            loss = bce(pred_traj['dones'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
-            dyna_loss['done'] = (loss * mask).sum(axis=0)
-            logger.logkv_mean('done_acc', ((pred_traj['dones'] > 0.5) == done_gt).float().mean())
-
+    def value_loss(self, obs, init_z, actions, next_obs, reward, mask, timesteps):
+        # estimate the values
         if self._cfg.learn_obs_value:
             next_obs = torch.cat((obs[None,:], next_obs), axis=0)
             z_seq = torch.cat((init_z[None,:], z_seq), axis=0)
@@ -187,6 +154,38 @@ class Trainer(Configurable, RLAlgo):
             dyna_loss['value'] = 0.
 
         dyna_loss['value'] = dyna_loss['value'] +  masked_temporal_mse(pred_traj['next_values'], vtarg, mask)
+
+    def dynamic_loss(self, obs, action, next_obs, reward, done_gt, mask, alpha, timesteps):
+        t = timesteps[0]
+        next_timesteps = timesteps + 1
+        init_z = self.sample_z(obs, t).sample()[0]
+        z_seq = self.sample_z(next_obs, next_timesteps)
+        z_seq = z_seq.sample()[0]
+
+        # by default, just rollout for horizon steps ..
+
+        pred_traj = self.nets.inference(obs, init_z, t, self.horizon, a_seq=action, z_seq=z_seq) 
+
+        with torch.no_grad():
+            state_gt = self.target_nets.enc_s(next_obs, timestep=next_timesteps) # use the current model ..
+            if 'value_prefix' in pred_traj:
+                rewards = pred_traj['value_prefix']
+                vprefix_gt = compute_value_prefix(reward, self.nets._cfg.gamma)
+                raise NotImplementedError
+            else:
+                rewards = pred_traj['rewards']
+                vprefix_gt = reward
+
+        dyna_loss = {
+            'state': masked_temporal_mse(pred_traj['states'], state_gt, mask),
+            'prefix': masked_temporal_mse(rewards, vprefix_gt, mask)
+        }
+        if self._cfg.have_done:
+            loss = bce(pred_traj['dones'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
+            dyna_loss['done'] = (loss * mask).sum(axis=0)
+            logger.logkv_mean('done_acc', ((pred_traj['dones'] > 0.5) == done_gt).float().mean())
+
+
 
         return dyna_loss
 

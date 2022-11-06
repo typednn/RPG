@@ -11,53 +11,37 @@ h_0 -> h_1 -> h_2 -> h_3 -> h_4
     v1
 """
 import torch
-from tools.nn_base import Network
 from tools.utils import totensor
-from .utils import done_rewards_values, lmbda_decay_weight, compute_value_prefix
+from tools.nn_base import Network
+
+from .utils import lmbda_decay_weight
 
 
 class GeneralizedQ(Network):
     def __init__(
         self,
-        enc_s, enc_a, enc_z,
-        pi_a, pi_z,
-
-        init_h, dynamic_fn,
-        state_dec, value_prefix, value_fn,
-
+        enc_s, enc_a, pi_a, pi_z,
+        init_h, dynamic_fn, state_dec, reward_predictor, q_fn,
         done_fn,
-
         intrinsic_reward,
-
-        cfg=None,
-        gamma=0.99,
-        lmbda=0.97,
-
-        lmbda_last=False,
-
-
-        horizon=1,
-        markovian=False,
+        gamma=0.99, lmbda=0.97, lmbda_last=False, horizon=1,
     ) -> None:
         super().__init__()
+        self.gamma = gamma
 
         self.pi_a, self.pi_z = pi_a, pi_z
-        self.enc_s, self.enc_z, self.enc_a = enc_s, enc_z, enc_a
+        self.enc_s, self.enc_a = enc_s, enc_a
 
         self.init_h = init_h
         self.dynamic_fn: torch.nn.GRU = dynamic_fn
 
         self.state_dec = state_dec
-        self.value_prefix = value_prefix
-        self.value_fn = value_fn
+        self.reward_predictor = reward_predictor
+        self.q_fn = q_fn
 
         self.done_fn = done_fn
             
-
-        v_nets = [enc_s, enc_z, value_fn]
-        d_nets = [enc_a, init_h, dynamic_fn, state_dec, value_prefix]
-
-        self.dynamics = torch.nn.ModuleList(d_nets + v_nets)
+        self.dynamics = torch.nn.ModuleList([enc_s, q_fn, enc_a, init_h, dynamic_fn, state_dec])
         self.policies = torch.nn.ModuleList([pi_a, pi_z])
 
         self.intrinsic_reward = intrinsic_reward
@@ -65,38 +49,43 @@ class GeneralizedQ(Network):
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
         self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
 
-        self.markovian = markovian
+    def set_alpha(self, alpha_a, alpha_z):
+        alpha_a = float(alpha_a)
+        alpha_z = float(alpha_z)
+        # alpha = torch.concat((alpha_a, ))
+        alpha = torch.tensor([alpha_a, alpha_z], self.device)
+        self.alpha = alpha
+
+        self.pi_a.set_alpha(alpha)
+        self.pi_z.set_alpha(alpha)
+        self.q_fn.set_alpha(alpha)
 
     @property
     def weights(self):
         return torch.softmax(self._weights, 0)
 
 
-    def policy(self, obs, z, timestep, return_z_dist=False):
+    def policy(self, obs, prevz, timestep):
         obs = totensor(obs, self.device)
+        prevz = totensor(prevz, self.device, dtype=None)
         s = self.enc_s(obs, timestep=timestep)
-        if self.pi_z is not None:
-            if self.markovian:
-                z_dist = self.pi_z(s, None, None, timestep)
-            else:
-                z = totensor(z, self.device, dtype=None)
-                z_embed = self.enc_z(z)
-                z_dist = self.pi_z(s, z, z_embed, timestep)
-            if return_z_dist:
-                return z_dist
-            z =  z_dist.sample()[1]
-        return self.pi_a(s, self.enc_z(z)), z
+        z = self.pi_z(s, prevz, timestep).z
+        return self.pi_a(s, z).a, z
 
-    def value(self, obs, z, timestep, detach=False):
+    def value(self, obs, prevz, timestep, z, a, detach=False):
         obs = totensor(obs, self.device)
+        prevz = totensor(prevz, self.device, dtype=None)
+        a = totensor(a, self.device)
+        z = totensor(z, self.device)
+
         s = self.enc_s(obs, timestep=timestep)
         if detach:
             s = s.detach()
-        if self.markovian:
-            return self.value_fn(s)
-        return self.value_fn(s, self.enc_z(z))
+        return self.value_fn(s, z, a)
 
-    def inference(self, obs, z, timestep, step, z_seq=None, a_seq=None, alpha=0., value_fn=None, pi_a=None, pi_z=None, pg=False):
+
+    def inference(
+        self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None, pg=False):
         assert timestep.shape == (len(obs),)
 
         sample_z = (z_seq is None)
@@ -108,11 +97,9 @@ class GeneralizedQ(Network):
             a_seq, logp_a = [], []
 
         hidden = []
-        states = []
-        z_dones = []
 
-        init_s = s = self.enc_s(obs, timestep=timestep)
-        z_embed = self.enc_z(z)
+        s = self.enc_s(obs, timestep=timestep)
+        states = [s]
 
         # for dynamics part ..
         h = self.init_h(s)[None,:]
@@ -120,30 +107,20 @@ class GeneralizedQ(Network):
 
         if pi_a is None: pi_a = self.pi_a
         if pi_z is None: pi_z = self.pi_z
-        out = {}
 
-        #h = h.reshape(1, len(s), -1).permute(1, 0, 2).contiguous() # GRU of layer 2
         for idx in range(step):
             if len(z_seq) <= idx:
                 if pi_z is not None:
-                    z_dist = pi_z(s, z, z_embed, timestep=timestep)
-                    if idx == 0:
-                        out['init_z_dist'] = z_dist
-                    z_done, z, _logp_z = z_dist.sample()
-                    z_dones.append(z_done)
-                    logp_z.append(_logp_z)
+                    z, _logp_z, z_done, logp_z_done = pi_z(s, z, timestep=timestep)
+                    logp_z.append(_logp_z[..., None])
 
                 else:
                     logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
                 z_seq.append(z)
-                # print(idx, z[0], s[0])
-            z_embed = self.enc_z(z_seq[idx])
+            z = z_seq[idx]
 
             if len(a_seq) <= idx:
-                if pg:
-                    a, _logp_a = pi_a(s, z_embed).sample()
-                else:
-                    a, _logp_a = pi_a(s, z_embed).rsample()
+                a, _logp_a = pi_a(s, z).sample()
                 logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
 
@@ -161,60 +138,43 @@ class GeneralizedQ(Network):
         stack = torch.stack
         hidden = stack(hidden)
         states = stack(states)
+        out = dict(hidden=hidden, state=states, reward=self.reward_predictor(states[1:], stack(a_embeds)))
 
-        out.update(dict(hidden=hidden, states=states))
         if sample_a:
             out['a'] = stack(a_seq)
             logp_a = out['logp_a'] = stack(logp_a)
+
         if sample_z:
             z_seq = out['z'] = stack(z_seq)
             logp_z = out['logp_z'] = stack(logp_z)
-            if len(z_dones) > 0:
-                out['z_dones'] = stack(z_dones)
 
-        #prefix = out['value_prefix'] = self.value_prefix(hidden)
-        out['init_s'] = init_s
-        out['rewards'] = rewards = self.value_prefix(states, stack(a_embeds)) # estimate rewards by the target states and the actions ..
-        prefix = compute_value_prefix(rewards, self._cfg.gamma)
-
-
-        if 'logp_a' in out:
-            extra_rewards, infos = self.entropy_rewards(out['logp_a'], alpha)
+        if sample_z:
+            rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
             out.update(infos)
+            q_values = self.q_fn(states[:-1], out['z'], out['a'], states[1:]) 
+            out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
 
-            #if hasattr(self, 'intrinsic_rewards'):
-            if self.intrinsic_reward is not None:
-                elbo, infos = self.intrinsic_reward.compute_reward(out)
-                extra_rewards = extra_rewards + elbo
-                # out.update(infos)
-            
-            if isinstance(extra_rewards, torch.Tensor):
-                prefix = prefix + compute_value_prefix(extra_rewards, self._cfg.gamma)
+            discount = 1
 
+            prefix = 0.
+            vpreds = []
+            for i in range(len(hidden)):
+                # add the entropies at the current steps ..
+                vpred = (prefix + (entropies[i].sum(axis=-1, keepdims=True) + q_values[i]) * discount)
+                vpreds.append(vpred)
 
-        value_fn = (self.value_fn if value_fn is None else value_fn)
-        if self.markovian:
-            values = value_fn(states)
-        else:
-            values = value_fn(states, self.enc_z(z_seq))
-            # raise NotImplementedError
+                prefix = prefix + rewards[i] * discount
 
-        out['dones'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
-        expected_values, expected_prefix = done_rewards_values(values, prefix, dones)
+                discount *= self.gamma
+                if dones is not None:
+                    assert dones.shape[-1] == 1
+                    discount = discount * (1 - dones[i]) # the probablity of not done ..
 
-        gamma = 1
-        vpreds = []
-        for i in range(len(hidden)):
-            vpred = (expected_prefix[i] + expected_values[i] * gamma * self._cfg.gamma)
-            vpreds.append(vpred)
-            gamma *= self._cfg.gamma
+            vpreds = stack(vpreds)
+            out['value'] = (vpreds * self.weights[:, None, None, None]).sum(axis=0)
+            out['q_value'] = q_values
+            out['entropy'] = entropies
 
-        vpreds = stack(vpreds)
-        out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
-        out['next_values'] = values
+        assert out['value'].shape[-1] == 2, "must be double q learning .."
+        # TODO: add total_value
         return out
-
-    def entropy_rewards(self, logp_a, alpha=0.):
-        entropy_term = -logp_a.sum(axis=-1, keepdims=True)
-        entropy = entropy_term * alpha if alpha > 0 else 0
-        return entropy, {'entropy_term': entropy_term}

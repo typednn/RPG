@@ -60,6 +60,8 @@ class ReplayBuffer(Configurable):
             self._action[self.idx:self.idx+l] = actions[:l, i]
             self._reward[self.idx:self.idx+l] = rewards[:l, i]
             self._dones[self.idx:self.idx+l] = dones[:l, i, None]
+
+            truncated[l-1, i] = True # last one is always truncated ..
             self._truncated[self.idx:self.idx+l] = truncated[:l, i, None]
             self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
 
@@ -72,20 +74,21 @@ class ReplayBuffer(Configurable):
         total = self.total_size()
         idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
 
-        #obs = self._get_obs(self._obs, idxs)
-        obs = self._obs[idxs]
-        next_obs = torch.empty((self.horizon, batch_size, *self.obs_shape), dtype=obs.dtype, device=obs.device)
+        obs_seq = torch.empty((self.horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
+        timesteps = torch.empty((self.horizon + 1, batch_size), dtype=torch.float32, device=self.device)
+
+        obs_seq[0] = self._obs[_idxs]
+        timesteps[0] = self._timesteps[_idxs]
+
         action = torch.empty((self.horizon, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         done = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
-        timesteps = torch.empty((self.horizon, batch_size), dtype=torch.float32, device=self.device)
 
         _done = None
         for t in range(self.horizon):
             _idxs = (idxs + t).clamp(0, self.capacity-1)
             action[t] = self._action[_idxs]
-            next_obs[t] = self._next_obs[_idxs]
             reward[t] = self._reward[_idxs]
             if _done is None:
                 _done = self._dones[_idxs]
@@ -93,6 +96,12 @@ class ReplayBuffer(Configurable):
                 _done = torch.maximum(_done, self._dones[_idxs]) # once done, forever done
             done[t] = _done
             truncated[t] = self._truncated[_idxs]
-            timesteps[t] = self._timesteps[_idxs]
 
-        return obs, next_obs, action, reward, done, truncated, timesteps
+            obs_seq[t+1] = self._next_obs[_idxs]
+            timesteps[t+1] = self._timesteps[_idxs]
+
+
+        truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
+        truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
+        # raise NotImplementedError("The truncation seems incorrect in the end, need to be fixed")
+        return obs_seq, timesteps, action, reward, done, truncated_mask[..., 0]

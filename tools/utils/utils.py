@@ -456,14 +456,27 @@ def ema(m, m_target, tau):
         for p, p_target in zip(m.parameters(), m_target.parameters()):
             p_target.data.lerp_(p.data, tau)
 
+class Reshape(torch.nn.Module):
+    def __init__(self, *args):
+        super().__init__()
+        self.shape = args
+
+    def forward(self, x):
+        return x.view(*x.shape[:-1], *self.shape)
+
 def mlp(in_dim, mlp_dim, out_dim, act_fn=torch.nn.ELU()):
     """Returns an MLP."""
     if isinstance(mlp_dim, int):
         mlp_dim = [mlp_dim, mlp_dim]
+    if isinstance(out_dim, int):
+        out_shape = (out_dim,)
+    else:
+        out_shape = out_dim
+        out_dim = int(np.prod(out_dim))
     return torch.nn.Sequential(
         torch.nn.Linear(in_dim, mlp_dim[0]), act_fn,
         torch.nn.Linear(mlp_dim[0], mlp_dim[1]), act_fn,
-        torch.nn.Linear(mlp_dim[1], out_dim))
+        torch.nn.Linear(mlp_dim[1], out_dim), Reshape(out_shape))
 
 class Seq(torch.nn.Module):
     def __init__(self, *main):

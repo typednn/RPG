@@ -42,6 +42,10 @@ class ZTransform(torch.nn.Module):
     def __init__(self, z_space) -> None:
         super().__init__()
         self.z_space = z_space
+        if isinstance(self.z_space, Discrete):
+            self.output_dim = self.z_space.n
+        else:
+            self.output_dim = self.z_space.shape[-1]
 
     def forward(self, x):
         if isinstance(self.z_space, Discrete):
