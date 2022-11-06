@@ -85,12 +85,19 @@ class PolicyA(AlphaPolicyBase):
     def forward(self, state_emebd, hidden):
         inp = self.add_alpha(state_emebd, self.enc_hidden(hidden))
         dist = self.head(self.backbone(inp))
+
+        from nn.distributions import NormalAction
+        if isinstance(dist, NormalAction):
+            scale = dist.dist.scale
+            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
+
         if self.mode == 'gd':
             return Aout(*dist.rsample())
         else:
             raise NotImplementedError
 
     def loss(self, rollout):
+        assert rollout['value'].shape[-1] == 2
         return -rollout['value'][..., 0].mean()
 
 
@@ -133,4 +140,5 @@ class SoftPolicyZ(AlphaPolicyBase):
         with torch.no_grad():
             q_target = q_value + entropies[..., 0:1]
         q_predict = batch_select(self.q_value(state), z)
-        return (q_predict - q_target).mean() # the $z$ selected should be consistent with the policy ..  
+        q_target = q_target.min(axis=-1, keepdims=True).values
+        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  

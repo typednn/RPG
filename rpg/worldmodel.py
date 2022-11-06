@@ -41,7 +41,10 @@ class GeneralizedQ(Network):
 
         self.done_fn = done_fn
             
-        self.dynamics = torch.nn.ModuleList([enc_s, q_fn, enc_a, init_h, dynamic_fn, state_dec])
+        dyna_net = [enc_s, enc_a, init_h, dynamic_fn, state_dec, reward_predictor, q_fn]
+        if self.done_fn is not None:
+            dyna_net.append(self.done_fn)
+        self.dynamics = torch.nn.ModuleList(dyna_net)
         self.policies = torch.nn.ModuleList([pi_a, pi_z])
 
         self.intrinsic_reward = intrinsic_reward
@@ -70,6 +73,7 @@ class GeneralizedQ(Network):
         timestep = totensor(timestep, self.device, dtype=None)
         s = self.enc_s(obs, timestep=timestep)
         z = self.pi_z(s, prevz, timestep).z
+
         return self.pi_a(s, z).a, z.detach().cpu().numpy()
 
     def value(self, obs, prevz, timestep, z, a, detach=False):
@@ -160,6 +164,7 @@ class GeneralizedQ(Network):
 
             prefix = 0.
             vpreds = []
+
             for i in range(len(hidden)):
                 vpred = (prefix + (entropies[i].sum(axis=-1, keepdims=True) + q_values[i]) * discount)
                 vpreds.append(vpred)
@@ -168,6 +173,7 @@ class GeneralizedQ(Network):
                 if dones is not None:
                     assert dones.shape[-1] == 1
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
+                    raise NotImplementedError
 
             vpreds = stack(vpreds)
             out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)

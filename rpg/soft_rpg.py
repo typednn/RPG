@@ -89,8 +89,7 @@ class Trainer(Configurable, RLAlgo):
         self.target_nets.intrinsic_reward = self.intrinsic_reward
 
         self.actor_optim = LossOptimizer(self.nets.policies, cfg=optim)
-        self.dyna_optim = LossOptimizer(
-            self.nets.dynamics, cfg=optim, **(dyna_optim or {}))
+        self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=optim, **(dyna_optim or {}))
 
         self.update_step = 0
         self.z = None
@@ -124,9 +123,11 @@ class Trainer(Configurable, RLAlgo):
 
             samples = self.target_nets.inference(next_obs, z_seq, next_timesteps, self.horizon)
             qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
+            assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
             gt['q_value'] = reward + (1-done_gt.float()) * self._cfg.gamma * qtarg
             gt['state'] = samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
-
+            logger.logkv_mean('q_value', float(gt['q_value'].mean()))
+            logger.logkv_mean('reward_step_mean', float(reward.mean()))
 
         output = dict(state=pred_traj['state'][1:], q_value=pred_traj['q_value'],  reward=pred_traj['reward'])
         for k in ['state', 'q_value', 'reward']:
@@ -141,14 +142,17 @@ class Trainer(Configurable, RLAlgo):
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.dyna_optim.optimize(dyna_loss_total)
         info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
+        logger.logkv_mean('dyna_total_loss', float(dyna_loss_total.mean()))
 
 
         # ---------------------- update actor ----------------------
         if self.update_step % self._cfg.actor_delay == 0:
             rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
             loss_a = self.nets.pi_a.loss(rollout)
-            loss_b = self.nets.pi_z.loss(rollout)
-            self.actor_optim.optimize(loss_a + loss_b)
+            loss_z = self.nets.pi_z.loss(rollout)
+
+            logger.logkvs_mean({'a_loss': float(loss_a.mean()), 'z_loss': float(loss_z.mean())})
+            self.actor_optim.optimize(loss_a + loss_z)
 
             self.intrinsic_reward.update(rollout)
 
