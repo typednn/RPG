@@ -91,13 +91,11 @@ class Trainer(Configurable, RLAlgo):
 
     def update(self):
         obs_seq, timesteps, action, reward, done_gt, truncated_mask = self.buffer.sample(self._cfg.batch_size)
-        dyna_loss = self.dynamic_loss(obs_seq, timesteps, action, reward, done_gt, truncated_mask)
-
         # ---------------------- update dynamics ----------------------
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
         batch_size = len(obs_seq[0])
 
-        prev_z = self.hidden.sample_posterior_z(obs_seq, timesteps)
+        prev_z = self.hidden.sample_posterior_z(self.net.enc_s, obs_seq, timesteps)
         pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
 
         gt = dict(reward=reward)
@@ -128,7 +126,7 @@ class Trainer(Configurable, RLAlgo):
 
         # ---------------------- update actor ----------------------
         if self.update_step % self._cfg.actor_delay == 0:
-            init_z = self.sample_posterior_z(obs_seq[0], timesteps[0]).sample()[0]
+            init_z = self.sample_posterior_z(self.net.enc_s, obs_seq[0], timesteps[0]).sample()[0]
             rollout = self.nets.inference(obs_seq[0], init_z, timesteps[0], self.horizon)
             loss_a = self.pi_a.loss(rollout)
             loss_b = self.pi_z.loss(rollout)

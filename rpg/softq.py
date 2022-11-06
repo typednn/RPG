@@ -73,7 +73,7 @@ class SoftQPolicy(AlphaPolicyBase):
 from tools.config import Configurable, as_builder
 from collections import namedtuple
 
-Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new'])
+Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
 Aout = namedtuple('Aout', ['a', 'logp_a'])
 
 class PolicyA(AlphaPolicyBase):
@@ -122,7 +122,9 @@ class SoftPolicyZ(AlphaPolicyBase):
 
         z = torch.where(new_action, prevz, z)
         logp_z = torch.where(new_action, new_action_prob, logp_z)
-        return Zout(z, logp_z, new_action, new_action_prob)
+        entropy = pi_z.entropy() * new_action.float()
+
+        return Zout(z, logp_z, new_action, new_action_prob, entropy)
 
     def loss(self, rollout):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 

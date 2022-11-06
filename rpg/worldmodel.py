@@ -90,7 +90,7 @@ class GeneralizedQ(Network):
 
         sample_z = (z_seq is None)
         if sample_z:
-            z_seq, logp_z = [], []
+            z_seq, logp_z, entz = [], [], []
 
         sample_a = (a_seq is None)
         if sample_a:
@@ -111,9 +111,9 @@ class GeneralizedQ(Network):
         for idx in range(step):
             if len(z_seq) <= idx:
                 if pi_z is not None:
-                    z, _logp_z, z_done, logp_z_done = pi_z(s, z, timestep=timestep)
+                    z, _logp_z, z_done, logp_z_done, _entz = pi_z(s, z, timestep=timestep)
                     logp_z.append(_logp_z[..., None])
-
+                    entz.append(_entz[..., None])
                 else:
                     logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
                 z_seq.append(z)
@@ -142,11 +142,12 @@ class GeneralizedQ(Network):
 
         if sample_a:
             out['a'] = stack(a_seq)
-            logp_a = out['logp_a'] = stack(logp_a)
+            out['logp_a'] = stack(logp_a)
 
         if sample_z:
-            z_seq = out['z'] = stack(z_seq)
-            logp_z = out['logp_z'] = stack(logp_z)
+            out['z'] = stack(z_seq)
+            out['logp_z'] = stack(logp_z)
+            out['ent_z'] = stack(entz)
 
         if sample_z:
             rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
