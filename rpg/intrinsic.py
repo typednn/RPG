@@ -10,18 +10,19 @@ from gym.spaces import Box
 
 
 class EntropyLearner(Configurable):
-    def __init__(self, space, cfg=None, coef=1., target_mode='auto', target=None, lr=3e-4):
+    def __init__(self, space, cfg=None, coef=1., target_mode='auto', target=None, lr=3e-4, device='cuda:0'):
         super().__init__(cfg)
 
         self.log_alpha = torch.nn.Parameter(
-            torch.zeros(1, requires_grad=(target is not None), device=self.device))
-        if target_mode is not None or target_mode == 'auto':
+            torch.zeros(1, requires_grad=(target is not None), device=device))
+        if target is not None or target_mode == 'auto':
             if target == None:
                 self._cfg.defrost()
                 if isinstance(space, Box):
                     target = -space.shape[0]
                 else:
-                    raise NotImplementedError
+                    #raise NotImplementedError
+                    target = space.n
                 self._cfg.target = target
             self.optim = LossOptimizer(self.log_alpha, lr=lr) #TODO: change the optim ..
         
@@ -39,7 +40,8 @@ class InfoNet(Network):
     def __init__(self, 
                 state_dim, action_dim, hidden_dim, hidden_space,
                 cfg=None,
-                mutual_info_weight=0., backbone=None,  action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False,
+                mutual_info_weight=0., backbone=None, 
+                action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False,
                 ):
         super().__init__(cfg)
 
@@ -74,7 +76,7 @@ class InfoNet(Network):
             z_seq = z_seq.detach()
         info =  self.compute_info_dist(
             states, a_seq).log_prob(z_seq) * self._cfg.mutual_info_weight # in case of discrete ..
-        return info
+        return info[..., None]
 
     def config_head(self, hidden_space):
         from tools.config import merge_inputs
@@ -99,23 +101,17 @@ class InfoNet(Network):
         return self.posterior_z(states)
 
 
-class IntrinsicReward(Network):
+class IntrinsicReward:
     def __init__(
-        self,
-        state_dim,
-        z_space,
-        action_space,
-        hidden_dim,
-        cfg=None,
-        optim=None,
-        enta = EntropyLearner.dc,
-        entz = EntropyLearner.dc,
-        info = InfoNet.dc,
+        self, enta, entz, info_net: InfoNet, optim_cfg,
     ):
-        self.enta = EntropyLearner(action_space, cfg=enta)
-        self.entz = EntropyLearner(z_space, cfg=enta)
-        self.info_net = InfoNet(state_dim, action_space.shape[0], hidden_dim, z_space, cfg=info)
-        self.info_optim = LossOptimizer(self.info_net, lr=3e-4, **({} if optim is None else optim))
+        self.enta = enta
+        self.entz = entz
+        self.info_net = info_net
+        self.info_optim = LossOptimizer(
+            info_net,
+            cfg = optim_cfg
+        )
 
 
     def get_ent_from_traj(self, traj):
@@ -140,8 +136,9 @@ class IntrinsicReward(Network):
         #s_seq = self.info_net.get_state_seq(samples).detach()
         z_detach = traj['z'].detach()
         mutual_info = self.info_net(traj, detach=True).mean()
-        posterior = self.get_posterior(traj['states'].detach()).log_prob(z_detach).mean()
+        posterior = self.info_net.get_posterior(traj['state'][1:].detach()).log_prob(z_detach).mean()
         self.info_optim.optimize(-mutual_info - posterior)
 
     def sample_posterior_z(self, enc_s, obs, timestep):
-        return self.info_net.get_posterior(enc_s(obs, timestep), timestep)
+        s = enc_s(obs, timestep=timestep)
+        return self.info_net.get_posterior(s).sample()[0]

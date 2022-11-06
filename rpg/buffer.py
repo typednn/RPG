@@ -77,8 +77,8 @@ class ReplayBuffer(Configurable):
         obs_seq = torch.empty((self.horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
         timesteps = torch.empty((self.horizon + 1, batch_size), dtype=torch.float32, device=self.device)
 
-        obs_seq[0] = self._obs[_idxs]
-        timesteps[0] = self._timesteps[_idxs]
+        obs_seq[0] = self._obs[idxs]
+        timesteps[0] = self._timesteps[idxs]
 
         action = torch.empty((self.horizon, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)

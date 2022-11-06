@@ -13,7 +13,6 @@ h_0 -> h_1 -> h_2 -> h_3 -> h_4
 import torch
 from tools.utils import totensor
 from tools.nn_base import Network
-
 from .utils import lmbda_decay_weight
 
 
@@ -24,6 +23,7 @@ class GeneralizedQ(Network):
         init_h, dynamic_fn, state_dec, reward_predictor, q_fn,
         done_fn,
         intrinsic_reward,
+        cfg=None,
         gamma=0.99, lmbda=0.97, lmbda_last=False, horizon=1,
     ) -> None:
         super().__init__()
@@ -53,7 +53,7 @@ class GeneralizedQ(Network):
         alpha_a = float(alpha_a)
         alpha_z = float(alpha_z)
         # alpha = torch.concat((alpha_a, ))
-        alpha = torch.tensor([alpha_a, alpha_z], self.device)
+        alpha = torch.tensor([alpha_a, alpha_z], device=self.device)
         self.alpha = alpha
 
         self.pi_a.set_alpha(alpha)
@@ -64,13 +64,13 @@ class GeneralizedQ(Network):
     def weights(self):
         return torch.softmax(self._weights, 0)
 
-
     def policy(self, obs, prevz, timestep):
         obs = totensor(obs, self.device)
         prevz = totensor(prevz, self.device, dtype=None)
+        timestep = totensor(timestep, self.device, dtype=None)
         s = self.enc_s(obs, timestep=timestep)
         z = self.pi_z(s, prevz, timestep).z
-        return self.pi_a(s, z).a, z
+        return self.pi_a(s, z).a, z.detach().cpu().numpy()
 
     def value(self, obs, prevz, timestep, z, a, detach=False):
         obs = totensor(obs, self.device)
@@ -82,7 +82,6 @@ class GeneralizedQ(Network):
         if detach:
             s = s.detach()
         return self.value_fn(s, z, a)
-
 
     def inference(
         self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None, pg=False):
@@ -120,7 +119,7 @@ class GeneralizedQ(Network):
             z = z_seq[idx]
 
             if len(a_seq) <= idx:
-                a, _logp_a = pi_a(s, z).sample()
+                a, _logp_a = pi_a(s, z)
                 logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
 
@@ -141,18 +140,20 @@ class GeneralizedQ(Network):
         out = dict(hidden=hidden, state=states, reward=self.reward_predictor(states[1:], stack(a_embeds)))
 
         if sample_a:
-            out['a'] = stack(a_seq)
+            a_seq = out['a'] = stack(a_seq)
             out['logp_a'] = stack(logp_a)
 
         if sample_z:
-            out['z'] = stack(z_seq)
+            z_seq = out['z'] = stack(z_seq)
             out['logp_z'] = stack(logp_z)
             out['ent_z'] = stack(entz)
+
+        q_values = self.q_fn(states[:-1], z_seq, a_seq) 
+        out['q_value'] = q_values
 
         if sample_z:
             rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
             out.update(infos)
-            q_values = self.q_fn(states[:-1], out['z'], out['a'], states[1:]) 
             out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
 
             discount = 1
@@ -160,22 +161,17 @@ class GeneralizedQ(Network):
             prefix = 0.
             vpreds = []
             for i in range(len(hidden)):
-                # add the entropies at the current steps ..
                 vpred = (prefix + (entropies[i].sum(axis=-1, keepdims=True) + q_values[i]) * discount)
                 vpreds.append(vpred)
-
                 prefix = prefix + rewards[i] * discount
-
                 discount *= self.gamma
                 if dones is not None:
                     assert dones.shape[-1] == 1
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
 
             vpreds = stack(vpreds)
-            out['value'] = (vpreds * self.weights[:, None, None, None]).sum(axis=0)
-            out['q_value'] = q_values
-            out['entropy'] = entropies
+            out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
+            out['entropies'] = entropies
+            assert out['value'].shape[-1] == 2, "must be double q learning .."
 
-        assert out['value'].shape[-1] == 2, "must be double q learning .."
-        # TODO: add total_value
         return out

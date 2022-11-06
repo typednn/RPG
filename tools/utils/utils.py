@@ -464,6 +464,9 @@ class Reshape(torch.nn.Module):
     def forward(self, x):
         return x.view(*x.shape[:-1], *self.shape)
 
+    def __repr__(self):
+        return super().__repr__() + f'(shape={self.shape})'
+
 def mlp(in_dim, mlp_dim, out_dim, act_fn=torch.nn.ELU()):
     """Returns an MLP."""
     if isinstance(mlp_dim, int):
@@ -476,7 +479,7 @@ def mlp(in_dim, mlp_dim, out_dim, act_fn=torch.nn.ELU()):
     return torch.nn.Sequential(
         torch.nn.Linear(in_dim, mlp_dim[0]), act_fn,
         torch.nn.Linear(mlp_dim[0], mlp_dim[1]), act_fn,
-        torch.nn.Linear(mlp_dim[1], out_dim), Reshape(out_shape))
+        torch.nn.Linear(mlp_dim[1], out_dim), Reshape(*out_shape))
 
 class Seq(torch.nn.Module):
     def __init__(self, *main):
