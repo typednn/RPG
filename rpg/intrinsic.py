@@ -137,7 +137,7 @@ class IntrinsicReward:
         z_detach = traj['z'].detach()
         mutual_info = self.info_net(traj, detach=True).mean()
         posterior = self.info_net.get_posterior(traj['state'][1:].detach()).log_prob(z_detach).mean()
-        self.info_optim.optimize(-mutual_info - posterior)
+        self.info_optim.optimize(- mutual_info - posterior)
 
     def sample_posterior_z(self, enc_s, obs, timestep):
         s = enc_s(obs, timestep=timestep)

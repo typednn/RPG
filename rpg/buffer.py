@@ -77,15 +77,15 @@ class ReplayBuffer(Configurable):
         obs_seq = torch.empty((self.horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
         timesteps = torch.empty((self.horizon + 1, batch_size), dtype=torch.float32, device=self.device)
 
-        obs_seq[0] = self._obs[idxs]
-        timesteps[0] = self._timesteps[idxs]
-
         action = torch.empty((self.horizon, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         done = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
 
         _done = None
+        obs_seq[0] = self._obs[idxs]
+        timesteps[0] = self._timesteps[idxs]
+
         for t in range(self.horizon):
             _idxs = (idxs + t).clamp(0, self.capacity-1)
             action[t] = self._action[_idxs]
@@ -98,7 +98,7 @@ class ReplayBuffer(Configurable):
             truncated[t] = self._truncated[_idxs]
 
             obs_seq[t+1] = self._next_obs[_idxs]
-            timesteps[t+1] = self._timesteps[_idxs]
+            timesteps[t+1] = self._timesteps[_idxs] + 1
 
 
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
