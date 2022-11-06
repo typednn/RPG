@@ -153,7 +153,7 @@ class GeneralizedQ(Network):
             out['ent_z'] = stack(entz)
 
         out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
-        q_values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=rewards, done=dones, gamma=self._cfg.gamma) 
+        q_values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
 
         if sample_z:
@@ -169,11 +169,10 @@ class GeneralizedQ(Network):
                 vpred = (prefix + (entropies[i].sum(axis=-1, keepdims=True) + q_values[i]) * discount)
                 vpreds.append(vpred)
                 prefix = prefix + rewards[i] * discount
-                discount *= self.gamma
+                discount = discount * self.gamma
                 if dones is not None:
                     assert dones.shape[-1] == 1
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
-                    raise NotImplementedError
 
             vpreds = stack(vpreds)
             out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)

@@ -111,12 +111,11 @@ class Trainer(Configurable, RLAlgo):
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
         batch_size = len(obs_seq[0])
 
-        prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, timesteps)
-        pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
-
-        gt = dict(reward=reward)
-        dyna_loss = dict()
         with torch.no_grad():
+            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, timesteps)
+            gt = dict(reward=reward)
+            dyna_loss = dict()
+
             next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
             z_seq = prev_z[1:].reshape(-1, *prev_z.shape[2:])
             next_timesteps = timesteps[1:].reshape(-1)
@@ -129,6 +128,7 @@ class Trainer(Configurable, RLAlgo):
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
 
+        pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
         output = dict(state=pred_traj['state'][1:], q_value=pred_traj['q_value'],  reward=pred_traj['reward'])
         for k in ['state', 'q_value', 'reward']:
             dyna_loss[k] = masked_temporal_mse(output[k], gt[k], truncated_mask) / self.horizon
