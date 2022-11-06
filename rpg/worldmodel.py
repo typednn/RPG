@@ -152,13 +152,13 @@ class GeneralizedQ(Network):
             out['logp_z'] = stack(logp_z)
             out['ent_z'] = stack(entz)
 
-        q_values = self.q_fn(states[:-1], z_seq, a_seq) 
+        out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
+        q_values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=rewards, done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
 
         if sample_z:
             rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
             out.update(infos)
-            out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
 
             discount = 1
 

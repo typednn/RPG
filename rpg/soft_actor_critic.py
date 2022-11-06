@@ -69,6 +69,33 @@ class SoftQPolicy(AlphaPolicyBase):
         value = torch.cat((q_values, q_values2), dim=-1)
         return value
 
+class ValuePolicy(AlphaPolicyBase):
+    def __init__(
+        self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
+    ) -> None:
+        #nn.Module.__init__(self)
+        AlphaPolicyBase.__init__(self)
+        self.z_space = z_space
+        self.enc_z = enc_z
+        assert isinstance(z_space, spaces.Discrete)
+        self.q = self.build_backbone(state_dim, hidden_dim, z_space.n)
+        self.q2 = self.build_backbone(state_dim, hidden_dim, z_space.n)
+
+    def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
+        """
+        Potential (Anyway, this is just different way of value estimate.)
+            V(s, prevz)
+            Q(s, z): and then use the average of Q(s, z) to estimate V(s, prevz)
+            Q(s, z, a): use pure sampling based method to estiamte
+            Note that the entropy of the current step is not included ..
+        """
+        # return the Q value .. if it's value, return self._cfg.gamma
+        mask = 1. if done is None else (1-done.float())
+        inp = self.add_alpha(new_s)
+        v1 = self.q(inp) * gamma * mask + r
+        v2 = self.q2(inp) * gamma * mask + r
+        return torch.cat((v1, v2), dim=-1)
+
 
 Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
 Aout = namedtuple('Aout', ['a', 'logp_a'])
