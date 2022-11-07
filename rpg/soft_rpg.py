@@ -66,6 +66,7 @@ class Trainer(Configurable, RLAlgo):
         hooks = None,
         path = None,
         qmode='Q',
+        zero_done_value=True,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -128,6 +129,8 @@ class Trainer(Configurable, RLAlgo):
             if self._cfg.qmode == 'Q':
                 gt['q_value'] = reward + (1-done_gt.float()) * self._cfg.gamma * qtarg
             else:
+                if self._cfg.zero_done_value:
+                    qtarg = qtarg * (1 - done_gt.float())
                 gt['q_value'] = qtarg
                 assert self._cfg.qmode == 'value'
 
