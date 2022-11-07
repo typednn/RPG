@@ -15,7 +15,7 @@ from .utils import masked_temporal_mse, create_hidden_space
 from .worldmodel import GeneralizedQ
 
 from .intrinsic import IntrinsicReward
-from .soft_actor_critic import SoftQPolicy, PolicyA, SoftPolicyZ
+from .soft_actor_critic import SoftQPolicy, PolicyA, SoftPolicyZ, ValuePolicy
 from .intrinsic import EntropyLearner, InfoNet
 
 
@@ -65,6 +65,7 @@ class Trainer(Configurable, RLAlgo):
         # trainer utils ..
         hooks = None,
         path = None,
+        qmode='value',
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -255,8 +256,11 @@ class Trainer(Configurable, RLAlgo):
         enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec = self.make_dynamic_network(
             obs_space, action_space, z_space, hidden_dim, state_dim)
 
+        if self._cfg.qmode == 'Q':
+            q_fn = SoftQPolicy(state_dim, action_dim, z_space, hidden_dim)
+        else:
+            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
 
-        q_fn = SoftQPolicy(state_dim, action_dim, z_space, hidden_dim)
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
         pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
