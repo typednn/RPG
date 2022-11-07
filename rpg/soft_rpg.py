@@ -124,13 +124,22 @@ class Trainer(Configurable, RLAlgo):
             samples = self.target_nets.inference(next_obs, z_seq, next_timesteps, self.horizon)
             qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
             assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
-            gt['q_value'] = reward + (1-done_gt.float()) * self._cfg.gamma * qtarg
+
+            if self._cfg.qmode == 'Q':
+                gt['q_value'] = reward + (1-done_gt.float()) * self._cfg.gamma * qtarg
+            else:
+                gt['q_value'] = qtarg
+                assert self._cfg.qmode == 'value'
+
             gt['state'] = samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
 
         pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
         output = dict(state=pred_traj['state'][1:], q_value=pred_traj['q_value'],  reward=pred_traj['reward'])
+        if self._cfg.qmode == 'value':
+            output['q_value'] = pred_traj['pred_values']
+
         for k in ['state', 'q_value', 'reward']:
             dyna_loss[k] = masked_temporal_mse(output[k], gt[k], truncated_mask) / self.horizon
 

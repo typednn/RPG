@@ -67,7 +67,7 @@ class SoftQPolicy(AlphaPolicyBase):
         q_values = batch_select(q1, z)
         q_values2 = batch_select(q2, z)
         value = torch.cat((q_values, q_values2), dim=-1)
-        return value
+        return value, None
 
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
@@ -78,8 +78,8 @@ class ValuePolicy(AlphaPolicyBase):
         self.z_space = z_space
         self.enc_z = enc_z
         assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim, hidden_dim, z_space.n)
-        self.q2 = self.build_backbone(state_dim, hidden_dim, z_space.n)
+        self.q = self.build_backbone(state_dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim, hidden_dim, 1)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         """
@@ -92,9 +92,12 @@ class ValuePolicy(AlphaPolicyBase):
         # return the Q value .. if it's value, return self._cfg.gamma
         mask = 1. if done is None else (1-done.float())
         inp = self.add_alpha(new_s)
-        v1 = self.q(inp) * gamma * mask + r
-        v2 = self.q2(inp) * gamma * mask + r
-        return torch.cat((v1, v2), dim=-1)
+
+        v1, v2 = self.q(inp), self.q2(inp)
+        values = torch.cat((v1, v2), dim=-1)
+        v1 = v1 * gamma * mask + r
+        v2 = v2 * gamma * mask + r
+        return torch.cat((v1, v2), dim=-1), values
 
 
 Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
