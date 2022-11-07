@@ -25,6 +25,8 @@ class GeneralizedQ(Network):
         intrinsic_reward,
         cfg=None,
         gamma=0.99, lmbda=0.97, lmbda_last=False, horizon=1,
+
+        detach_hidden=True,  # don't let the done to affect the hidden learning ..
     ) -> None:
         super().__init__()
         self.gamma = gamma
@@ -50,7 +52,7 @@ class GeneralizedQ(Network):
         self.intrinsic_reward = intrinsic_reward
 
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
-        self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=True)
+        self._weights = torch.nn.Parameter(torch.log(weights), requires_grad=False)
 
     def set_alpha(self, alpha_a, alpha_z):
         alpha_a = float(alpha_a)
@@ -151,8 +153,9 @@ class GeneralizedQ(Network):
             z_seq = out['z'] = stack(z_seq)
             out['logp_z'] = stack(logp_z)
             out['ent_z'] = stack(entz)
-
-        out['done'] = dones = torch.sigmoid(self.done_fn(hidden)) if self.done_fn is not None else None
+            
+        assert self._cfg.detach_hidden
+        out['done'] = dones = torch.sigmoid(self.done_fn(hidden if not self._cfg.detach_hidden else hidden.detach())) if self.done_fn is not None else None
         q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
         out['pred_values'] = values

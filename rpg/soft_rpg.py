@@ -157,6 +157,11 @@ class Trainer(Configurable, RLAlgo):
         info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         logger.logkv_mean('dyna_total_loss', float(dyna_loss_total.mean()))
 
+        s = output['state']
+        logger.logkv_mean('state_mean', float(s.mean()))
+        logger.logkv_mean('state_min', float(s.min()))
+        logger.logkv_mean('state_max', float(s.max()))
+
 
         # ---------------------- update actor ----------------------
         if self.update_step % self._cfg.actor_delay == 0:
@@ -253,8 +258,8 @@ class Trainer(Configurable, RLAlgo):
         return enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec
 
     def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
-        self.enta = EntropyLearner(action_space, cfg=self._cfg.enta, device=self.device)
-        self.entz = EntropyLearner(z_space, cfg=self._cfg.entz, device=self.device)
+        self.enta = EntropyLearner(action_space, cfg=self._cfg.enta, device=self.device, lr=self._cfg.optim.lr)
+        self.entz = EntropyLearner(z_space, cfg=self._cfg.entz, device=self.device, lr=self._cfg.optim.lr)
         self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
         return IntrinsicReward(
             self.enta, self.entz, self.info_net, self._cfg.optim
