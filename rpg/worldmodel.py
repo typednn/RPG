@@ -76,16 +76,16 @@ class GeneralizedQ(Network):
 
         return self.pi_a(s, z).a, z.detach().cpu().numpy()
 
-    def value(self, obs, prevz, timestep, z, a, detach=False):
-        obs = totensor(obs, self.device)
-        prevz = totensor(prevz, self.device, dtype=None)
-        a = totensor(a, self.device)
-        z = totensor(z, self.device)
+    # def value(self, obs, prevz, timestep, z, a, detach=False):
+    #     obs = totensor(obs, self.device)
+    #     prevz = totensor(prevz, self.device, dtype=None)
+    #     a = totensor(a, self.device)
+    #     z = totensor(z, self.device)
 
-        s = self.enc_s(obs, timestep=timestep)
-        if detach:
-            s = s.detach()
-        return self.value_fn(s, z, a)
+    #     s = self.enc_s(obs, timestep=timestep)
+    #     if detach:
+    #         s = s.detach()
+    #     return self.value_fn(s, z, a)
 
     def inference(
         self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None, pg=False):

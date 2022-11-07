@@ -44,6 +44,9 @@ class train(Configurable):
             if i % 1000 == 0:
                 print(f'iter {i}: {loss.item()}')
 
+    def draw(self):
+        x = torch.tensor()
 
 
-train.parse()
+
+trainer = train.parse()
