@@ -95,9 +95,7 @@ class ValuePolicy(AlphaPolicyBase):
 
         v1, v2 = self.q(inp), self.q2(inp)
         values = torch.cat((v1, v2), dim=-1)
-        v1 = v1 * gamma * mask + r
-        v2 = v2 * gamma * mask + r
-        return torch.cat((v1, v2), dim=-1), values
+        return values * gamma * mask + r, values
 
 
 Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])

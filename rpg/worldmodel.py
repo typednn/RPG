@@ -157,6 +157,10 @@ class GeneralizedQ(Network):
         out['q_value'] = q_values
         out['pred_values'] = values
 
+        if dones is not None:
+            from tools.utils import logger 
+            logger.logkv_mean('mean_pred_done', dones.mean().item())
+
         if sample_z:
             rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
             out.update(infos)

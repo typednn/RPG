@@ -65,7 +65,7 @@ class Trainer(Configurable, RLAlgo):
         # trainer utils ..
         hooks = None,
         path = None,
-        qmode='value',
+        qmode='Q',
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
