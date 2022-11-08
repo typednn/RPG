@@ -14,8 +14,9 @@ trainer = Trainer.parse(
     horizon=3,
     update_train_step=1,
     hooks=dict(evaluate_pi=dict()),
+
     wandb=dict(name='cheetah'),
-    _exp=dict(
+    _variants=dict(
         ln=dict(state_layer_norm=True, path='tmp/cheetah_ln', weights=dict(reward=10000.), wandb=dict(name='cheetah_ln')),
     ),
 ) # do not know if we need max_grad_norm
