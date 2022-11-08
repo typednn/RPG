@@ -18,7 +18,7 @@ spec:
             - "bash"
             - "-c"
           args:
-            - "export DATA_PATH=/cephfs/hza/data; export MODEL_PATH=/cephfs/hza/models; cd /root/RPG; GIT_SSH_COMMAND='ssh -i /root/.ssh/id_rsa_git -o IdentitiesOnly=yes' git pull; cd WORKSPACE; CMD" # replace with actual command
+            - "export DATA_PATH=/cephfs/hza/data; export MODEL_PATH=/cephfs/hza/models; cd /root/RPG; GIT_SSH_COMMAND='ssh -i /root/.ssh/id_rsa_git -o IdentitiesOnly=yes' git pull; wandb login c0b75ccb77ed6a80368686d8bc1e623923782744 ; cd WORKSPACE; CMD" # replace with actual command
             # For multiple commands, concatenate them with &&
           resources:
             requests:
