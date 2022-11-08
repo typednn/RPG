@@ -17,7 +17,7 @@ trainer = Trainer.parse(
 
     wandb=dict(name='cheetah'),
     _variants=dict(
-        ln=dict(state_layer_norm=True, path='tmp/cheetah_ln', weights=dict(reward=10000.), wandb=dict(name='cheetah_ln')),
+        ln=dict(state_layer_norm=True, path='tmp/cheetah_ln', weights=dict(reward=1000.), wandb=dict(name='cheetah_ln')),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
