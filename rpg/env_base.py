@@ -32,6 +32,7 @@ class GymVecEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated_done=True) -> None:
         # by default, the mujoco's gym env do not have a truncated reward. 
         super().__init__()
+        self.env_name = env_name
 
         import gym
         from rl.vec_envs import SubprocVectorEnv
@@ -114,6 +115,7 @@ class TorchEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated_done=False, **kwargs):
         # by default we do not have a truncated reward. 
         super().__init__()
+        self.env_name = env_name
         from solver.envs import GoalEnv
         self.nenv = n
 

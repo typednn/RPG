@@ -13,6 +13,7 @@ trainer = Trainer.parse(
     optim=dict(max_grad_norm=1.),
     horizon=3,
     update_train_step=1,
-    hooks=dict(evaluate_pi=dict())
+    hooks=dict(evaluate_pi=dict()),
+    wandb=dict(name='cheetah'),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

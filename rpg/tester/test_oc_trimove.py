@@ -21,10 +21,10 @@ trainer = Trainer.parse(
         squash=False
     ),
     enta=dict(coef=0.01, target=-2.),
-    entz=dict(coef=4., target_mode='none'),
+    entz=dict(coef=1., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
-    actor_delay=4, #10,
+    actor_delay=5, #10,
 
     update_train_step=1,
     hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),

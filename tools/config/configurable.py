@@ -294,11 +294,11 @@ class Configurable(object):
 
 
     @classmethod
-    def parse(cls, *args,cfg=None, parser=None, parse_prefix=None, strict=False, _update=None, **kwargs):
+    def parse(cls, *args,cfg=None, parser=None, parse_prefix=None, strict=False, _update=None, _exp=None, **kwargs):
         from .parse_args import parse_args
         if cfg is not None:
             assert isinstance(cfg, str), "for argument parser please input cfg as a file path"
-        wrapper = parse_args(cfg, parser=parser, parse_prefix=parse_prefix, strict=strict, update=_update)
+        wrapper = parse_args(cfg, parser=parser, parse_prefix=parse_prefix, strict=strict, update=_update, _exp=_exp)
         old_init = cls.__init__
         cls.__init__ = cls.__configurable_wrapper__(wrapper(cls.__old_init__))
         obj = cls(*args, **kwargs)

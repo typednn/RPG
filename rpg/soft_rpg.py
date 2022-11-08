@@ -66,7 +66,10 @@ class Trainer(Configurable, RLAlgo):
         hooks = None,
         path = None,
         qmode='Q',
-        zero_done_value=False 
+        zero_done_value=False,
+        state_layer_norm=False,
+
+        wandb=None,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -212,7 +215,17 @@ class Trainer(Configurable, RLAlgo):
         return Trajectory(transitions, len(obs), n_step)
 
     def run_rpgm(self, max_epoch=None):
-        logger.configure(dir=self._cfg.path, format_strs=["stdout", "log", "csv", 'tensorboard'])
+        format_strs = ["stdout", "log", "csv", 'tensorboard']
+        kwargs = {}
+        if self._cfg.wandb is not None:
+            format_strs = format_strs[:3] + ['wandb']
+            wandb_cfg = dict(self._cfg.wandb)
+            kwargs['config'] = self._cfg
+            kwargs['project'] = wandb_cfg.get('project', 'mujoco_rl')
+            kwargs['group'] = wandb_cfg.get('group', self.env.env_name)
+            kwargs['name'] = wandb_cfg.get('name', None)
+
+        logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
         env = self.env
         self.sync_alpha()
 
@@ -246,7 +259,9 @@ class Trainer(Configurable, RLAlgo):
         latent_dim = 100
         # TODO: layer norm?
         from .utils import ZTransform, config_hidden
-        enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim)) # encode state with time step ..
+
+        args = [] if not self._cfg.state_layer_norm else [torch.nn.LayerNorm(latent_dim, elementwise_affine=False)]
+        enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
         enc_z = ZTransform(z_space)
         enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
 

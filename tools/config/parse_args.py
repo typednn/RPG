@@ -18,6 +18,14 @@ def _parse_args(default_cfg='', parser=None):
             help='path to config file',
             type=str,
         )
+
+        parser.add_argument(
+            '--exp',
+            default=None,
+            help='experiment to run',
+            type=str,
+        )
+
         parser.add_argument(
             '--output_cfg',
             action="store_true"
@@ -36,7 +44,7 @@ def _parse_args(default_cfg='', parser=None):
     return args
 
 
-def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, update=None):
+def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, update=None, _exp=None):
     # remember if we use this to decorate a configurable
     # it works with the initial __init__
 
@@ -66,10 +74,18 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
             cfg: CN
             tmp = CN(cfg.copy())
 
+            
+            if args.exp is not None:
+                if _exp is None:
+                    raise KeyError(f"Experiment management configs not in cfg")
+                if args.exp not in _exp:
+                    raise KeyError(f"Exp {args.exp} not in {_exp.keys()}")
+                base = _exp[args.exp]
+                if update is not None:
+                    merge_a_into_b_builder(CN(update), base)
+                update = base
+
             if update is not None:
-                # update has lower priorities compared with the argparser. 
-                #print(cfg)
-                #exit(0)
                 merge_a_into_b_builder(CN(update), cfg)
 
             try:
