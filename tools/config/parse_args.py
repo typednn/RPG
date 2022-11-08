@@ -44,7 +44,7 @@ def _parse_args(default_cfg='', parser=None):
     return args
 
 
-def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, update=None, _exp=None):
+def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, _update=None, _exp=None):
     # remember if we use this to decorate a configurable
     # it works with the initial __init__
 
@@ -72,15 +72,18 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
 
             opt_cfg = merge_inputs(opt_cfg, **opt_kwargs)
             cfg: CN
+            cfg.set_new_allowed(True)
+            cfg.__exp_name = opts.exp
             tmp = CN(cfg.copy())
 
             
-            if args.exp is not None:
+            update = _update
+            if opts.exp is not None:
                 if _exp is None:
                     raise KeyError(f"Experiment management configs not in cfg")
-                if args.exp not in _exp:
-                    raise KeyError(f"Exp {args.exp} not in {_exp.keys()}")
-                base = _exp[args.exp]
+                if opts.exp not in _exp:
+                    raise KeyError(f"Exp {opts.exp} not in {_exp.keys()}")
+                base = CN(_exp[opts.exp])
                 if update is not None:
                     merge_a_into_b_builder(CN(update), base)
                 update = base

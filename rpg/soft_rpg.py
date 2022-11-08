@@ -223,7 +223,12 @@ class Trainer(Configurable, RLAlgo):
             kwargs['config'] = self._cfg
             kwargs['project'] = wandb_cfg.get('project', 'mujoco_rl')
             kwargs['group'] = wandb_cfg.get('group', self.env.env_name)
-            kwargs['name'] = wandb_cfg.get('name', None)
+
+            try:
+                name = self._cfg.__exp_name
+            except:
+                name = None
+            kwargs['name'] = wandb_cfg.get('name', None) + ('_' + name) if name is not None else ''
 
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
         env = self.env
