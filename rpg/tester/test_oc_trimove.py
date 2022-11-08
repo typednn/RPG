@@ -12,8 +12,8 @@ env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3)
 trainer = Trainer.parse(
     env,
     pi_z=dict(K=100000),
-    z_dim=1,
-    steps_per_epoch=200,
+    z_dim=2,
+    steps_per_epoch=150,
     buffer=dict(max_episode_num=20000),
     head=dict(
         std_mode='statewise',
@@ -33,7 +33,7 @@ trainer = Trainer.parse(
 
     info=dict(mutual_info_weight=1., action_weight=1., obs_weight=1.),
 
-    eval_episode=1,
+    eval_episode=10,
     batch_size=512,
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
