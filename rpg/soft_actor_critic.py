@@ -151,8 +151,8 @@ class SoftPolicyZ(AlphaPolicyBase):
         z = pi_z.sample()
         logp_z = pi_z.log_prob(z)
 
-        z = torch.where(new_action, prevz, z)
-        logp_z = torch.where(new_action, new_action_prob, logp_z)
+        z = torch.where(new_action, z, prevz)
+        logp_z = torch.where(new_action, logp_z, new_action_prob)
         entropy = pi_z.entropy() * new_action.float()
 
         return Zout(z, logp_z, new_action, new_action_prob, entropy)
