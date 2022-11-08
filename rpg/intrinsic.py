@@ -144,7 +144,7 @@ class IntrinsicReward:
         z_detach = traj['z'].detach()
         mutual_info = self.info_net(traj, detach=True).mean()
         posterior = self.info_net.get_posterior(traj['state'][1:].detach()).log_prob(z_detach).mean()
-        self.info_optim.optimize(- mutual_info - posterior)
+        self.info_optim.optimize(-mutual_info - posterior)
 
         logger.logkv_mean('a_ent', enta.mean())
         logger.logkv_mean('a_alpha', float(self.enta.alpha))

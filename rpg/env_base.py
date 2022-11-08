@@ -166,10 +166,10 @@ class TorchEnv(VecEnv):
         if 'z' in traj.traj[0]:
             if traj.traj[0]['z'] is not None:
                 assert 'z' not in kwargs
-                kwargs['z'] = traj.get_tensor('z')[1:]
+                kwargs['z'] = traj.get_tensor('z')
         if 'a' in traj.traj[0]:
             assert 'a' not in kwargs
-            kwargs['a'] = traj.get_tensor('a')[1:]
+            kwargs['a'] = traj.get_tensor('a')
         return self.goal_env._render_traj_rgb(obs, **kwargs)
 
 

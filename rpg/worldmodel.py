@@ -154,8 +154,13 @@ class GeneralizedQ(Network):
             out['logp_z'] = stack(logp_z)
             out['ent_z'] = stack(entz)
             
-        assert self._cfg.detach_hidden
-        out['done'] = dones = torch.sigmoid(self.done_fn(hidden if not self._cfg.detach_hidden else hidden.detach())) if self.done_fn is not None else None
+        dones = None
+        if self.done_fn is not None:
+            done_inp = torch.concat((states[1:], stack(a_embeds)), -1)
+            assert self._cfg.detach_hidden
+            out['done'] = dones = torch.sigmoid(
+                self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
+
         q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
         out['pred_values'] = values

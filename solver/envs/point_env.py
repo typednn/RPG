@@ -148,7 +148,7 @@ class PointEnv(StateEnv):
         plt.clf()
         if 'z' in traj and (traj['z'].max() < 100 or traj['z'].dtype != torch.int64):
             plt.imshow(np.uint8(img[...,::-1]*255))
-            plot_colored_embedding(traj['z'], states[1:, :, :2], s=2)
+            plot_colored_embedding(traj['z'], states[:, :, :2], s=2)
         else:
             plt.imshow(img[...,::-1])
             states = states.reshape(-1, 3)

@@ -2,7 +2,7 @@ import tqdm
 import numpy as np
 from rpg.env_base import GymVecEnv, TorchEnv
 from rpg.ppo import train_ppo
-from rpg.rpgm import Trainer
+from rpg.soft_rpg import Trainer
 #from rpg.oc import OptionCritic
 from rpg.mutlimodal import MultiModal
 

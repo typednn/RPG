@@ -66,7 +66,7 @@ class Trainer(Configurable, RLAlgo):
         hooks = None,
         path = None,
         qmode='Q',
-        zero_done_value=True,
+        zero_done_value=False 
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -146,7 +146,9 @@ class Trainer(Configurable, RLAlgo):
         for k in ['state', 'q_value', 'reward']:
             dyna_loss[k] = masked_temporal_mse(output[k], gt[k], truncated_mask) / self.horizon
 
+        # assert truncated_mask.all()
         if self._cfg.have_done:
+            assert done_gt.shape == pred_traj['done'].shape
             loss = bce(pred_traj['done'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
             dyna_loss['done'] = (loss * truncated_mask).sum(axis=0)
             logger.logkv_mean('done_acc', ((pred_traj['done'] > 0.5) == done_gt).float().mean())
@@ -197,7 +199,7 @@ class Trainer(Configurable, RLAlgo):
                 a, self.z = self.nets.policy(obs, self.z, timestep)
                 data, obs = self.step(self.env, a)
 
-                transition.update(**data, a=a, z=totensor(self.z, device=self.device))
+                transition.update(**data, a=a, z=totensor(self.z, device=self.device, dtype=None))
                 transitions.append(transition)
                 timestep = transition['next_timestep']
                 for idx in range(len(obs)):
@@ -253,7 +255,7 @@ class Trainer(Configurable, RLAlgo):
         dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
 
         reward_predictor = Seq(mlp(hidden_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
-        done_fn = mlp(hidden_dim, hidden_dim, 1) if self._cfg.have_done else None
+        done_fn = mlp(hidden_dim + latent_dim, hidden_dim, 1) if self._cfg.have_done else None
         state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
         return enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec
 
