@@ -20,9 +20,9 @@ def _parse_args(default_cfg='', parser=None):
         )
 
         parser.add_argument(
-            '--exp',
+            '--var',
             default=None,
-            help='experiment to run',
+            help='experiment variant to run',
             type=str,
         )
 
@@ -44,7 +44,7 @@ def _parse_args(default_cfg='', parser=None):
     return args
 
 
-def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, _update=None, _exp=None):
+def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, _update=None, _variants=None):
     # remember if we use this to decorate a configurable
     # it works with the initial __init__
 
@@ -73,17 +73,17 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
             opt_cfg = merge_inputs(opt_cfg, **opt_kwargs)
             cfg: CN
             cfg.set_new_allowed(True)
-            cfg.__exp_name = opts.exp
+            cfg._exp_name = opts.var
             tmp = CN(cfg.copy())
 
             
             update = _update
-            if opts.exp is not None:
-                if _exp is None:
+            if opts.var is not None:
+                if _variants is None:
                     raise KeyError(f"Experiment management configs not in cfg")
-                if opts.exp not in _exp:
-                    raise KeyError(f"Exp {opts.exp} not in {_exp.keys()}")
-                base = CN(_exp[opts.exp])
+                if opts.var not in _variants:
+                    raise KeyError(f"Exp {opts.var} not in {_variants.keys()}")
+                base = CN(_variants[opts.var])
                 if update is not None:
                     merge_a_into_b_builder(CN(update), base)
                 update = base

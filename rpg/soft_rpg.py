@@ -225,10 +225,11 @@ class Trainer(Configurable, RLAlgo):
             kwargs['group'] = wandb_cfg.get('group', self.env.env_name)
 
             try:
-                name = self._cfg.__exp_name
+                name = self._cfg._exp_name
             except:
                 name = None
-            kwargs['name'] = wandb_cfg.get('name', None) + ('_' + name) if name is not None else ''
+            kwargs['name'] = wandb_cfg.get('name', None) + (('_' + name) if name is not None else '')
+
 
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
         env = self.env
