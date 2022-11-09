@@ -91,6 +91,7 @@ class Trainer(Configurable, RLAlgo):
         self.nets, self.intrinsic_reward = self.make_network(obs_space, env.action_space, z_space)
         with torch.no_grad():
             self.target_nets = copy.deepcopy(self.nets).cuda()
+            self.target_nets.eval()
 
 
         self.nets.intrinsic_reward = self.intrinsic_reward
@@ -112,6 +113,7 @@ class Trainer(Configurable, RLAlgo):
         self.target_nets.set_alpha(alpha_a, alpha_z)
 
     def update(self):
+        self.nets.train()
         self.sync_alpha()
         obs_seq, timesteps, action, reward, done_gt, truncated_mask = self.buffer.sample(self._cfg.batch_size)
 
@@ -201,6 +203,7 @@ class Trainer(Configurable, RLAlgo):
         transitions = []
         for idx in r(n_step):
             with torch.no_grad():
+                self.nets.eval()
                 transition = dict(obs = obs, timestep=timestep)
                 a, self.z = self.nets.policy(obs, self.z, timestep)
                 data, obs = self.step(self.env, a)
@@ -271,11 +274,20 @@ class Trainer(Configurable, RLAlgo):
         from .utils import ZTransform, config_hidden
 
         args = []
-        if self._cfg.state_layer_norm:
-            args.append([torch.nn.LayerNorm(latent_dim, elementwise_affine=False)])
+        class BN(torch.nn.Module):
+            def __init__(self, dim):
+                super().__init__()
+                self.bn = torch.nn.BatchNorm1d(dim)
 
+            def forward(self, x):
+                if len(x.shape) == 3:
+                    return self.bn(x.transpose(1, 2)).transpose(1, 2)
+                return self.bn(x)
+
+        if self._cfg.state_layer_norm:
+            args.append(torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
         if self._cfg.state_batch_norm:
-            args.append([torch.nn.BatchNorm1d(latent_dim)])
+            args.append(BN(latent_dim))
 
         enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
         enc_z = ZTransform(z_space)
