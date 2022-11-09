@@ -188,6 +188,8 @@ class Trainer(Configurable, RLAlgo):
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
+            #ema(self.nets, self.target_nets, self._cfg.tau)
+            self.intrinsic_reward.ema(self._cfg.tau)
         logger.logkvs_mean(info)
 
 

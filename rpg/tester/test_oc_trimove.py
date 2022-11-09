@@ -12,7 +12,7 @@ env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3)
 trainer = Trainer.parse(
     env,
     pi_z=dict(K=100000),
-    z_dim=3,
+    z_dim=6,
     steps_per_epoch=150,
     buffer=dict(max_episode_num=20000),
     head=dict(
@@ -21,10 +21,10 @@ trainer = Trainer.parse(
         squash=False
     ),
     enta=dict(coef=0.0, target=-2.),
-    entz=dict(coef=10., target_mode='none'),
+    entz=dict(coef=1., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
-    actor_delay=2, #10,
+    actor_delay=4, #10,
 
     update_train_step=1,
     hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),

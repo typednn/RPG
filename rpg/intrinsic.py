@@ -48,6 +48,7 @@ class InfoNet(Network):
 
         zhead = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
         backbone = Seq(mlp(state_dim + action_dim, hidden_dim, zhead.get_input_dim()))
+        self.zhead = zhead
         self.info_net = Seq(backbone, zhead)
 
         zhead2 = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
@@ -110,6 +111,9 @@ class IntrinsicReward:
         self.entz = entz
         self.info_net = info_net
         if info_net is not None:
+            import copy
+            self.info_target = copy.deepcopy(info_net)
+
             self.info_optim = LossOptimizer(
                 info_net,
                 cfg = optim_cfg
@@ -118,6 +122,11 @@ class IntrinsicReward:
 
     def get_ent_from_traj(self, traj):
         return -traj['logp_a'], traj['ent_z']
+
+    def ema(self, tau):
+        from tools.utils import ema
+        if self.info_net is not None:
+            ema(self.info_net, self.info_target, tau)
 
     def estimate_unscaled_rewards(self, traj):
         reward = traj['reward']
@@ -128,7 +137,7 @@ class IntrinsicReward:
 
         entropies = torch.cat((enta, entz), dim=-1)
         if self.info_net is not None:
-            info_reward = self.info_net(traj, detach=False)
+            info_reward = self.info_target(traj, detach=False) # only use the target to compute
         else:
             info_reward = enta * 0.
 
@@ -136,6 +145,7 @@ class IntrinsicReward:
         logger.logkv_mean('reward_enta', enta.mean().item())
         logger.logkv_mean('reward_entz', entz.mean().item())
 
+        assert reward.shape == info_reward.shape
         reward = reward + info_reward
         return reward, entropies, {}
 
@@ -170,8 +180,12 @@ class IntrinsicReward:
             z0 = torch.zeros(s.shape[1:-1], dtype=torch.long, device=s.device)
             return torch.cat((z0[None, :], action))
 
-        # return self.info_net.get_posterior(s).sample()[0]
-        prev0 = self.info_net.get_posterior(s[:1]).sample()[0]
-        states = self.info_net.get_state_seq({'state': s})
-        prev1 = self.info_net.compute_info_dist(states, action).sample()[0]
-        return torch.cat((prev0, prev1))
+        # using self.info_net to sample the posterior is very dangerous .. 
+        return self.info_net.get_posterior(s).sample()[0]
+        # prev0 = self.info_net.get_posterior(s[:1]).sample()[0]
+        # states = self.info_net.get_state_seq({'state': s})
+        # prev1 = self.info_net.compute_info_dist(states, action).sample()[0]
+        # return torch.cat((prev0, prev1))
+        # sample latent z uniformly ..
+        # x = torch.zeros(s.shape[:-1] +(self.info_net.zhead.get_input_dim(),), dtype=torch.float, device=s.device)
+        # return self.info_net.zhead(x).sample()[0]

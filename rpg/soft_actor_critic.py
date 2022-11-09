@@ -85,8 +85,8 @@ class ValuePolicy(AlphaPolicyBase):
         self.z_space = z_space
         self.enc_z = enc_z
         assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim, hidden_dim, 1)
-        self.q2 = self.build_backbone(state_dim, hidden_dim, 1)
+        self.q = self.build_backbone(state_dim, hidden_dim, z_space.n)
+        self.q2 = self.build_backbone(state_dim, hidden_dim, z_space.n)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         """
@@ -100,7 +100,11 @@ class ValuePolicy(AlphaPolicyBase):
         mask = 1. if done is None else (1-done.float())
         inp = self.add_alpha(new_s)
 
+
         v1, v2 = self.q(inp), self.q2(inp)
+        v1 = batch_select(v1, z)
+        v2 = batch_select(v2, z) # condition on z ..
+
         values = torch.cat((v1, v2), dim=-1)
         return values * gamma * mask + r, values
 
@@ -115,7 +119,7 @@ class PolicyA(AlphaPolicyBase):
         self.enc_hidden = enc_hidden
         self.mode = mode
         self.backbone = self.build_backbone(
-            state_dim, hidden_dim, head.get_input_dim())
+            state_dim + enc_hidden.output_dim, hidden_dim, head.get_input_dim())
 
     def forward(self, state_emebd, hidden):
         inp = self.add_alpha(state_emebd, self.enc_hidden(hidden))
