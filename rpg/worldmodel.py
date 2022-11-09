@@ -79,7 +79,8 @@ class GeneralizedQ(Network):
         return a, z.detach().cpu().numpy()
 
     def inference(
-        self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None, pg=False):
+        self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None):
+        # z_seq is obs -> z -> a
         assert timestep.shape == (len(obs),)
 
         sample_z = (z_seq is None)

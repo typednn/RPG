@@ -159,8 +159,19 @@ class IntrinsicReward:
             logger.logkv_mean('info_ce_loss', float(-mutual_info))
             logger.logkv_mean('info_posterior_loss', float(-posterior))
 
-    def sample_posterior_z(self, enc_s, obs, timestep):
-        s = enc_s(obs, timestep=timestep)
+    def sample_posterior_z(self, enc_s, obs_seq, action, timestep):
+        # sample by posterior for the first obs  
+        # using s, a and info net to sample for the remaining ..
+        s = enc_s(obs_seq, timestep=timestep)
+        assert action.shape[0] == obs_seq.shape[0] - 1
+        assert len(s.shape) == 3
         if self.info_net is None:
-            return torch.zeros(s.shape[:-1], dtype=torch.long, device=s.device)
-        return self.info_net.get_posterior(s).sample()[0]
+            assert action.dtype == torch.long
+            z0 = torch.zeros(s.shape[1:-1], dtype=torch.long, device=s.device)
+            return torch.cat((z0[None, :], action))
+
+        prev0 = self.info_net.get_posterior(s[:1]).sample()[0]
+
+        states = self.get_state_seq({'state': s})
+        prev1 = self.into_net.compute_info_dist(states, action).sample()[0]
+        return torch.cat((prev0, prev1))

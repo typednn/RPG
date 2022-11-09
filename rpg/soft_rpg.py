@@ -119,7 +119,7 @@ class Trainer(Configurable, RLAlgo):
         batch_size = len(obs_seq[0])
 
         with torch.no_grad():
-            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, timesteps)
+            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, action, timesteps)
             gt = dict(reward=reward)
             dyna_loss = dict()
 
