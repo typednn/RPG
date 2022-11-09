@@ -66,6 +66,7 @@ class SoftQPolicy(AlphaPolicyBase):
         if self.action_dim > 0:
             inp = self.add_alpha(s, a)
         else:
+            assert torch.allclose(a, z)
             inp = self.add_alpha(s)
 
         q1 = self.q(inp)
@@ -152,7 +153,6 @@ class SoftPolicyZ(AlphaPolicyBase):
         # soft Q policy for learning z ..
         new_action = timestep % self.K == 0
         new_action_prob = torch.zeros_like(new_action).float()
-        assert new_action.all()
 
         pi_z = torch.distributions.Categorical(logits=self.q_value(state) / self.alpha[1]) # the second is the z..
         z = pi_z.sample()

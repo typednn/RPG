@@ -170,8 +170,8 @@ class IntrinsicReward:
             z0 = torch.zeros(s.shape[1:-1], dtype=torch.long, device=s.device)
             return torch.cat((z0[None, :], action))
 
+        # return self.info_net.get_posterior(s).sample()[0]
         prev0 = self.info_net.get_posterior(s[:1]).sample()[0]
-
-        states = self.get_state_seq({'state': s})
-        prev1 = self.into_net.compute_info_dist(states, action).sample()[0]
+        states = self.info_net.get_state_seq({'state': s})
+        prev1 = self.info_net.compute_info_dist(states, action).sample()[0]
         return torch.cat((prev0, prev1))
