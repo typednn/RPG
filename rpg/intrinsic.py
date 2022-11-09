@@ -42,7 +42,7 @@ class InfoNet(Network):
                 state_dim, action_dim, hidden_dim, hidden_space,
                 cfg=None,
                 mutual_info_weight=0., backbone=None, 
-                action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False,
+                action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False, epsilon=0.,
                 ):
         super().__init__(cfg)
 
@@ -82,7 +82,7 @@ class InfoNet(Network):
 
     def config_head(self, hidden_space):
         from tools.config import merge_inputs
-        discrete = dict(TYPE='Discrete', epsilon=0.0)  # 0.2 epsilon
+        discrete = dict(TYPE='Discrete', epsilon=self._cfg.epsilon)  # 0.2 epsilon
         continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=0.3989)
 
         if isinstance(hidden_space, Discrete):
@@ -111,8 +111,9 @@ class IntrinsicReward:
         self.entz = entz
         self.info_net = info_net
         if info_net is not None:
-            import copy
-            self.info_target = copy.deepcopy(info_net)
+            # import copy
+            # self.info_target = copy.deepcopy(info_net)
+            self.info_target = info_net
 
             self.info_optim = LossOptimizer(
                 info_net,
@@ -125,8 +126,8 @@ class IntrinsicReward:
 
     def ema(self, tau):
         from tools.utils import ema
-        if self.info_net is not None:
-            ema(self.info_net, self.info_target, tau)
+        # if self.info_net is not None:
+        #     ema(self.info_net, self.info_target, tau)
 
     def estimate_unscaled_rewards(self, traj):
         reward = traj['reward']

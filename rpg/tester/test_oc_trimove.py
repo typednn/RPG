@@ -6,7 +6,7 @@ from rpg.soft_rpg import Trainer
 #from rpg.oc import OptionCritic
 
 # max_grad_norm=1.
-N = 10
+N = 1
 env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3)
 
 trainer = Trainer.parse(
@@ -21,7 +21,7 @@ trainer = Trainer.parse(
         squash=False
     ),
     enta=dict(coef=0.0, target=-2.),
-    entz=dict(coef=1., target_mode='none'),
+    entz=dict(coef=4., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
     actor_delay=4, #10,
@@ -31,9 +31,10 @@ trainer = Trainer.parse(
     path='tmp/oc',
     weights=dict(reward=1000., q_value=100.),
 
-    info=dict(mutual_info_weight=1., action_weight=1., obs_weight=1.),
+    info=dict(mutual_info_weight=0.1, action_weight=1., obs_weight=1., epsilon=0.1),
 
     eval_episode=10,
     batch_size=512,
+    qmode='value',
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
