@@ -70,6 +70,7 @@ class Trainer(Configurable, RLAlgo):
         zero_done_value=False,
         state_layer_norm=False,
 
+        worldmodel=GeneralizedQ.dc,
         wandb=None,
     ):
         Configurable.__init__(self)
@@ -271,7 +272,11 @@ class Trainer(Configurable, RLAlgo):
         args = [] if not self._cfg.state_layer_norm else [torch.nn.LayerNorm(latent_dim, elementwise_affine=False)]
         enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
         enc_z = ZTransform(z_space)
-        enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
+
+        if isinstance(action_space, gym.spaces.Box):
+            enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
+        else:
+            enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
 
         layer = 1
         init_h = mlp(latent_dim, hidden_dim, hidden_dim)
@@ -285,7 +290,10 @@ class Trainer(Configurable, RLAlgo):
     def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
         self.enta = EntropyLearner(action_space, cfg=self._cfg.enta, device=self.device, lr=self._cfg.optim.lr)
         self.entz = EntropyLearner(z_space, cfg=self._cfg.entz, device=self.device, lr=self._cfg.optim.lr)
-        self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
+        if isinstance(action_space, gym.spaces.Box):
+            self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
+        else:
+            self.info_net = None
         return IntrinsicReward(
             self.enta, self.entz, self.info_net, self._cfg.optim
         )
@@ -299,9 +307,9 @@ class Trainer(Configurable, RLAlgo):
             obs_space, action_space, z_space, hidden_dim, state_dim)
 
         if self._cfg.qmode == 'Q':
-            q_fn = SoftQPolicy(state_dim, hidden_dim, z_space, hidden_dim)
+            q_fn = SoftQPolicy(state_dim, action_dim, z_space, hidden_dim)
         else:
-            q_fn = ValuePolicy(state_dim, hidden_dim, z_space, enc_z, hidden_dim)
+            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
@@ -311,6 +319,7 @@ class Trainer(Configurable, RLAlgo):
             enc_s, enc_a, pi_a, pi_z,
             init_h, dynamics, state_dec, reward_predictor, q_fn,
             done_fn, None,
+            cfg=self._cfg.worldmodel,
             gamma=self._cfg.gamma,
             lmbda=self._cfg.lmbda,
             horizon=self._cfg.horizon

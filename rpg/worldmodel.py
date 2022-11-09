@@ -75,8 +75,8 @@ class GeneralizedQ(Network):
         timestep = totensor(timestep, self.device, dtype=None)
         s = self.enc_s(obs, timestep=timestep)
         z = self.pi_z(s, prevz, timestep).z
-
-        return self.pi_a(s, z).a, z.detach().cpu().numpy()
+        a = self.pi_a(s, z).a
+        return a, z.detach().cpu().numpy()
 
     def inference(
         self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None, pg=False):
@@ -109,7 +109,7 @@ class GeneralizedQ(Network):
                     logp_z.append(_logp_z[..., None])
                     entz.append(_entz[..., None])
                 else:
-                    logp_z.append(torch.zeros((len(s), 1), device='cuda:0', dtype=torch.float32))
+                    raise NotImplementedError
                 z_seq.append(z)
             z = z_seq[idx]
 
@@ -151,7 +151,7 @@ class GeneralizedQ(Network):
             out['done'] = dones = torch.sigmoid(
                 self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
 
-        q_values, values = self.q_fn(states[:-1], z_seq, a_embeds, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
+        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
         out['pred_values'] = values
 

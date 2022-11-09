@@ -109,10 +109,11 @@ class IntrinsicReward:
         self.enta = enta
         self.entz = entz
         self.info_net = info_net
-        self.info_optim = LossOptimizer(
-            info_net,
-            cfg = optim_cfg
-        )
+        if info_net is not None:
+            self.info_optim = LossOptimizer(
+                info_net,
+                cfg = optim_cfg
+            )
 
 
     def get_ent_from_traj(self, traj):
@@ -126,7 +127,10 @@ class IntrinsicReward:
         entz = entz * self.entz.alpha
 
         entropies = torch.cat((enta, entz), dim=-1)
-        info_reward = self.info_net(traj, detach=False)
+        if self.info_net is not None:
+            info_reward = self.info_net(traj, detach=False)
+        else:
+            info_reward = enta * 0.
 
         logger.logkv_mean('reward_info', info_reward.mean().item())
         logger.logkv_mean('reward_enta', enta.mean().item())
@@ -140,21 +144,23 @@ class IntrinsicReward:
         self.enta.update(enta)
         self.entz.update(entz)
 
-        #s_seq = self.info_net.get_state_seq(samples).detach()
-        z_detach = traj['z'].detach()
-        mutual_info = self.info_net(traj, detach=True).mean()
-        posterior = self.info_net.get_posterior(traj['state'][1:].detach()).log_prob(z_detach).mean()
-        self.info_optim.optimize(-mutual_info - posterior)
-
         logger.logkv_mean('a_ent', enta.mean())
         logger.logkv_mean('a_alpha', float(self.enta.alpha))
         logger.logkv_mean('z_ent', entz.mean())
         logger.logkv_mean('z_alpha', float(self.entz.alpha))
 
-        logger.logkv_mean('info_ce_loss', float(-mutual_info))
-        logger.logkv_mean('info_posterior_loss', float(-posterior))
+        #s_seq = self.info_net.get_state_seq(samples).detach()
+        if self.info_net is not None:
+            z_detach = traj['z'].detach()
+            mutual_info = self.info_net(traj, detach=True).mean()
+            posterior = self.info_net.get_posterior(traj['state'][1:].detach()).log_prob(z_detach).mean()
+            self.info_optim.optimize(-mutual_info - posterior)
 
+            logger.logkv_mean('info_ce_loss', float(-mutual_info))
+            logger.logkv_mean('info_posterior_loss', float(-posterior))
 
     def sample_posterior_z(self, enc_s, obs, timestep):
         s = enc_s(obs, timestep=timestep)
+        if self.info_net is None:
+            return torch.zeros(s.shape[:-1], dtype=torch.long, device=s.device)
         return self.info_net.get_posterior(s).sample()[0]
