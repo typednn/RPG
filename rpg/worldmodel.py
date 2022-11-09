@@ -132,7 +132,8 @@ class GeneralizedQ(Network):
         stack = torch.stack
         hidden = stack(hidden)
         states = stack(states)
-        out = dict(hidden=hidden, state=states, reward=self.reward_predictor(states[1:], stack(a_embeds)))
+        a_embeds = stack(a_embeds)
+        out = dict(hidden=hidden, state=states, reward=self.reward_predictor(states[1:], a_embeds))
 
         if sample_a:
             a_seq = out['a'] = stack(a_seq)
@@ -145,12 +146,12 @@ class GeneralizedQ(Network):
             
         dones = None
         if self.done_fn is not None:
-            done_inp = torch.concat((states[1:], stack(a_embeds)), -1)
+            done_inp = torch.concat((states[1:], a_embeds), -1)
             assert self._cfg.detach_hidden
             out['done'] = dones = torch.sigmoid(
                 self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
 
-        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
+        q_values, values = self.q_fn(states[:-1], z_seq, a_embeds, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
         out['q_value'] = q_values
         out['pred_values'] = values
 

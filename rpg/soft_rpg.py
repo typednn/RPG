@@ -1,5 +1,6 @@
 import tqdm
 import copy
+import gym
 import torch
 from tools.config import Configurable
 from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, TimedSeq, logger, Identity, ema, CatNet, totensor
@@ -75,7 +76,7 @@ class Trainer(Configurable, RLAlgo):
         RLAlgo.__init__(self, None, build_hooks(hooks))
 
         obs_space = env.observation_space
-        action_dim = env.action_space.shape[0]
+        #action_dim = env.action_space.shape[0] if isinstance(env.action_space, gym.spaces.Box) else 1
         self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)
 
         self.horizon = horizon
@@ -83,7 +84,7 @@ class Trainer(Configurable, RLAlgo):
         self.device = 'cuda:0'
 
         # buffer samples horizon + 1
-        self.buffer = ReplayBuffer(obs_space.shape, action_dim, env.max_time_steps, horizon, cfg=buffer)
+        self.buffer = ReplayBuffer(obs_space.shape, env.action_space, env.max_time_steps, horizon, cfg=buffer)
 
         self.nets, self.intrinsic_reward = self.make_network(obs_space, env.action_space, z_space)
         with torch.no_grad():
@@ -218,17 +219,18 @@ class Trainer(Configurable, RLAlgo):
         format_strs = ["stdout", "log", "csv", 'tensorboard']
         kwargs = {}
         if self._cfg.wandb is not None:
-            format_strs = format_strs[:3] + ['wandb']
             wandb_cfg = dict(self._cfg.wandb)
-            kwargs['config'] = self._cfg
-            kwargs['project'] = wandb_cfg.get('project', 'mujoco_rl')
-            kwargs['group'] = wandb_cfg.get('group', self.env.env_name)
+            if 'stop' not in wandb_cfg:
+                format_strs = format_strs[:3] + ['wandb']
+                kwargs['config'] = self._cfg
+                kwargs['project'] = wandb_cfg.get('project', 'mujoco_rl')
+                kwargs['group'] = wandb_cfg.get('group', self.env.env_name)
 
-            try:
-                name = self._cfg._exp_name
-            except:
-                name = None
-            kwargs['name'] = wandb_cfg.get('name', None) + (('_' + name) if name is not None else '')
+                try:
+                    name = self._cfg._exp_name
+                except:
+                    name = None
+                kwargs['name'] = wandb_cfg.get('name', None) + (('_' + name) if name is not None else '')
 
 
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
@@ -297,9 +299,9 @@ class Trainer(Configurable, RLAlgo):
             obs_space, action_space, z_space, hidden_dim, state_dim)
 
         if self._cfg.qmode == 'Q':
-            q_fn = SoftQPolicy(state_dim, action_dim, z_space, hidden_dim)
+            q_fn = SoftQPolicy(state_dim, hidden_dim, z_space, hidden_dim)
         else:
-            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
+            q_fn = ValuePolicy(state_dim, hidden_dim, z_space, enc_z, hidden_dim)
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)

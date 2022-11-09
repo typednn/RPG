@@ -52,7 +52,7 @@ class SoftQPolicy(AlphaPolicyBase):
         self.q = self.build_backbone(state_dim + action_dim, hidden_dim, z_space.n)
         self.q2 = self.build_backbone(state_dim + action_dim, hidden_dim, z_space.n)
 
-    def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
+    def forward(self, s, z, a_embed, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         """
         Potential (Anyway, this is just different way of value estimate.)
             V(s, prevz)
@@ -61,7 +61,7 @@ class SoftQPolicy(AlphaPolicyBase):
             Note that the entropy of the current step is not included ..
         """
         # return the Q value .. if it's value, return self._cfg.gamma
-        inp = self.add_alpha(s, a)
+        inp = self.add_alpha(s, a_embed)
         q1 = self.q(inp)
         q2 = self.q2(inp)
         q_values = batch_select(q1, z)

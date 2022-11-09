@@ -1,4 +1,5 @@
 import torch
+import gym
 import numpy as np
 from tools.config import Configurable
 from .traj import Trajectory
@@ -6,7 +7,7 @@ from .traj import Trajectory
 
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
-    def __init__(self, obs_shape, action_dim, episode_length, horizon,
+    def __init__(self, obs_shape, action_space, episode_length, horizon,
                        cfg=None, device='cuda:0', max_episode_num=2000, modality='state'):
         super().__init__()
 
@@ -15,7 +16,6 @@ class ReplayBuffer(Configurable):
         self.episode_length = episode_length
         self.capacity = max_episode_num * episode_length
         self.obs_shape = obs_shape
-        self.action_dim = action_dim
         self.horizon = horizon
 
         assert modality == 'state'
@@ -24,7 +24,12 @@ class ReplayBuffer(Configurable):
         self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device) # avoid last buggy..
         self._next_obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
 
-        self._action = torch.empty((self.capacity, action_dim), dtype=torch.float32, device=self.device)
+        if isinstance(action_space, gym.spaces.Box):
+            self._action = torch.empty((self.capacity, *action_space.shape), dtype=torch.float32, device=self.device)
+        else:
+            self._action = torch.empty((self.capacity,), dtype=torch.long, device=self.device)
+
+
         self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
@@ -77,7 +82,7 @@ class ReplayBuffer(Configurable):
         obs_seq = torch.empty((self.horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
         timesteps = torch.empty((self.horizon + 1, batch_size), dtype=torch.float32, device=self.device)
 
-        action = torch.empty((self.horizon, batch_size, self.action_dim), dtype=torch.float32, device=self.device)
+        action = torch.empty((self.horizon, batch_size, *self._action.shape[1:]), dtype=torch.float32, device=self.device)
         reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         done = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
