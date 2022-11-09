@@ -128,6 +128,7 @@ class Trainer(Configurable, RLAlgo):
 
             next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
             z_seq = prev_z[1:].reshape(-1, *prev_z.shape[2:])
+            # zz = z_seq.reshape(-1).detach().cpu().numpy().tolist(); print([zz.count(i) for i in range(6)])
             next_timesteps = timesteps[1:].reshape(-1)
 
             samples = self.target_nets.inference(next_obs, z_seq, next_timesteps, self.horizon)
@@ -174,15 +175,15 @@ class Trainer(Configurable, RLAlgo):
 
 
         # ---------------------- update actor ----------------------
+        rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
         if self.update_step % self._cfg.actor_delay == 0:
-            rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
             loss_a = self.nets.pi_a.loss(rollout)
             loss_z = self.nets.pi_z.loss(rollout)
 
             logger.logkvs_mean({'a_loss': float(loss_a.mean()), 'z_loss': float(loss_z.mean())})
             self.actor_optim.optimize(loss_a + loss_z)
 
-            self.intrinsic_reward.update(rollout)
+        self.intrinsic_reward.update(rollout)
 
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:

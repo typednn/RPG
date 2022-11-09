@@ -115,7 +115,7 @@ class PolicyA(AlphaPolicyBase):
         self.enc_hidden = enc_hidden
         self.mode = mode
         self.backbone = self.build_backbone(
-            state_dim + enc_hidden.output_dim, hidden_dim, head.get_input_dim())
+            state_dim, hidden_dim, head.get_input_dim())
 
     def forward(self, state_emebd, hidden):
         inp = self.add_alpha(state_emebd, self.enc_hidden(hidden))
@@ -150,7 +150,6 @@ class SoftPolicyZ(AlphaPolicyBase):
         return self.qnet(self.add_alpha(state))[..., 0, :]
 
     def forward(self, state, prevz, timestep, z=None):
-        # soft Q policy for learning z ..
         new_action = timestep % self.K == 0
         new_action_prob = torch.zeros_like(new_action).float()
 
