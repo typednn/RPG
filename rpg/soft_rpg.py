@@ -69,6 +69,7 @@ class Trainer(Configurable, RLAlgo):
         qmode='Q',
         zero_done_value=False,
         state_layer_norm=False,
+        state_batch_norm=False,
 
         worldmodel=GeneralizedQ.dc,
         wandb=None,
@@ -269,7 +270,13 @@ class Trainer(Configurable, RLAlgo):
         # TODO: layer norm?
         from .utils import ZTransform, config_hidden
 
-        args = [] if not self._cfg.state_layer_norm else [torch.nn.LayerNorm(latent_dim, elementwise_affine=False)]
+        args = []
+        if self._cfg.state_layer_norm:
+            args.append([torch.nn.LayerNorm(latent_dim, elementwise_affine=False)])
+
+        if self._cfg.state_batch_norm:
+            args.append([torch.nn.BatchNorm1d(latent_dim)])
+
         enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
         enc_z = ZTransform(z_space)
 

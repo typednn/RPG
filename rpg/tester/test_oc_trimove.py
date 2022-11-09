@@ -20,7 +20,7 @@ trainer = Trainer.parse(
         std_scale=0.2,
         squash=False
     ),
-    enta=dict(coef=0.01, target=-2.),
+    enta=dict(coef=0.0, target=-2.),
     entz=dict(coef=1., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,

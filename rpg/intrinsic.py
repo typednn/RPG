@@ -145,8 +145,8 @@ class IntrinsicReward:
         self.entz.update(entz)
 
         logger.logkv_mean('a_ent', enta.mean())
-        logger.logkv_mean('a_alpha', float(self.enta.alpha))
         logger.logkv_mean('z_ent', entz.mean())
+        logger.logkv_mean('a_alpha', float(self.enta.alpha))
         logger.logkv_mean('z_alpha', float(self.entz.alpha))
 
         #s_seq = self.info_net.get_state_seq(samples).detach()
