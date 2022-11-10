@@ -71,6 +71,7 @@ class Trainer(Configurable, RLAlgo):
         zero_done_value=False,
         state_layer_norm=False,
         state_batch_norm=False,
+        no_state_encoder=False,
 
         worldmodel=GeneralizedQ.dc,
         wandb=None,
@@ -226,8 +227,8 @@ class Trainer(Configurable, RLAlgo):
                 self.nets.eval()
                 transition = dict(obs = obs, timestep=timestep)
                 a, self.z = self.nets.policy(obs, self.z, timestep)
-                if mode != 'training' and idx == 0:
-                    print(self.z, self.nets.pi_z.q_value(self.nets.enc_s(obs, timestep=timestep)))
+                # if mode != 'training' and idx == 0:
+                #     print(self.z, self.nets.pi_z.q_value(self.nets.enc_s(obs, timestep=timestep)))
                 data, obs = self.step(self.env, a)
 
                 transition.update(**data, a=a, z=totensor(self.z, device=self.device, dtype=None))
@@ -290,8 +291,6 @@ class Trainer(Configurable, RLAlgo):
             return out
 
     def make_dynamic_network(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
-        hidden_dim = 256
-        latent_dim = 100
         # TODO: layer norm?
         from .utils import ZTransform, config_hidden
 
@@ -312,7 +311,12 @@ class Trainer(Configurable, RLAlgo):
             args.append(BN(latent_dim))
         assert len(args) == 0
 
-        enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+        if self._cfg.no_state_encoder:
+            enc_s = TimedSeq(Identity(), *args) # encode state with time step ..
+            latent_dim = obs_space.shape[0]
+        else:
+            enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+        self.state_dim = latent_dim
         enc_z = ZTransform(z_space)
 
         if isinstance(action_space, gym.spaces.Box):
@@ -347,6 +351,7 @@ class Trainer(Configurable, RLAlgo):
 
         enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec = self.make_dynamic_network(
             obs_space, action_space, z_space, hidden_dim, state_dim)
+        state_dim = self.state_dim
 
         if self._cfg.qmode == 'Q':
             q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
