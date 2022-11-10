@@ -79,6 +79,7 @@ class SoftQPolicy(AlphaPolicyBase):
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
         self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
+        zero_done_value=False,
     ) -> None:
         #nn.Module.__init__(self)
         AlphaPolicyBase.__init__(self)
@@ -104,6 +105,8 @@ class ValuePolicy(AlphaPolicyBase):
 
         v1, v2 = self.q(inp), self.q2(inp)
         values = torch.cat((v1, v2), dim=-1)
+        if self._cfg.zero_done_value:
+            mask = 1. # ignore the done in the end ..
         return values * gamma * mask + r, values
 
 

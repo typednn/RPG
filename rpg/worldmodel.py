@@ -91,8 +91,6 @@ class GeneralizedQ(Network):
         if sample_a:
             a_seq, logp_a = [], []
 
-        hidden = []
-
         s = self.enc_s(obs, timestep=timestep)
         states = [s]
 
@@ -125,16 +123,16 @@ class GeneralizedQ(Network):
             assert torch.allclose(o[-1], h)
             s = self.state_dec(h[-1]) # predict the next hidden state ..
 
-            hidden.append(h[-1])
+            # hidden.append(h[-1])
             states.append(s)
 
             timestep = timestep + 1
 
         stack = torch.stack
-        hidden = stack(hidden)
+        # hidden = stack(hidden)
         states = stack(states)
         a_embeds = stack(a_embeds)
-        out = dict(hidden=hidden, state=states, reward=self.reward_predictor(states[1:], a_embeds))
+        out = dict(state=states, reward=self.reward_predictor(states[1:], a_embeds))
 
         if sample_a:
             a_seq = out['a'] = stack(a_seq)
@@ -169,7 +167,7 @@ class GeneralizedQ(Network):
 
             discount = 1
             prefix = 0.
-            for i in range(len(hidden)):
+            for i in range(len(rewards)):
                 prefix = prefix + entropies[i].sum(axis=-1, keepdims=True) * discount
                 vpreds.append(prefix + q_values[i] * discount)
                 prefix = prefix + rewards[i] * discount

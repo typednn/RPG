@@ -75,6 +75,8 @@ class Trainer(Configurable, RLAlgo):
 
         worldmodel=GeneralizedQ.dc,
         wandb=None,
+
+        dynamic_type='normal',
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -319,18 +321,37 @@ class Trainer(Configurable, RLAlgo):
         self.state_dim = latent_dim
         enc_z = ZTransform(z_space)
 
-        if isinstance(action_space, gym.spaces.Box):
-            enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
+        layer = 1 # gru layers ..
+        if self._cfg.dynamic_type == 'normal':
+            if isinstance(action_space, gym.spaces.Box):
+                enc_a = mlp(action_space.shape[0], hidden_dim, hidden_dim)
+            else:
+                enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
+            a_dim = hidden_dim
+
+            init_h = mlp(latent_dim, hidden_dim, hidden_dim)
+            dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
+            state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
+        elif self._cfg.dynamic_type == 'tiny':
+            if isinstance(action_space, gym.spaces.Box):
+                enc_a = Identity()
+                a_dim = action_space.shape[0]
+            else:
+                enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
+                a_dim = action_space.n
+
+            init_h = Identity()
+            #dynamics = torch.nn.GRU(a_dim, latent_dim, layer)
+            class Duplicate(torch.nn.Module):
+                def forward(self, x):
+                    return x, x
+            dynamics = Seq(mlp(a_dim + latent_dim, hidden_dim, latent_dim), Duplicate())
+            state_dec = Identity()
         else:
-            enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
+            raise NotImplementedError
 
-        layer = 1
-        init_h = mlp(latent_dim, hidden_dim, hidden_dim)
-        dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
-
-        reward_predictor = Seq(mlp(hidden_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
-        done_fn = mlp(hidden_dim + latent_dim, hidden_dim, 1) if self._cfg.have_done else None
-        state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
+        reward_predictor = Seq(mlp(a_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
+        done_fn = mlp(a_dim + latent_dim, hidden_dim, 1) if self._cfg.have_done else None
         return enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec
 
     def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
@@ -356,7 +377,7 @@ class Trainer(Configurable, RLAlgo):
         if self._cfg.qmode == 'Q':
             q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
         else:
-            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
+            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_valeu)
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
