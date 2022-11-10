@@ -77,7 +77,7 @@ class InfoNet(Network):
             a_seq = a_seq.detach()
             z_seq = z_seq.detach()
         info =  self.compute_info_dist(
-            states, a_seq).log_prob(z_seq) * self._cfg.mutual_info_weight # in case of discrete ..
+            states, a_seq).log_prob(z_seq)
         return info[..., None]
 
     def config_head(self, hidden_space):
@@ -136,30 +136,22 @@ class IntrinsicReward:
         enta = enta * self.enta.alpha
         entz = entz * self.entz.alpha
 
-        entropies = torch.cat((enta, entz), dim=-1)
         if self.info_net is not None:
-            info_reward = self.info_target(traj, detach=False) # only use the target to compute
+            info_reward = self.info_target(traj, detach=False
+                                           ) * self.info_target._cfg.mutual_info_weight # in case of discrete .. # only use the target to compute
         else:
             info_reward = enta * 0.
+        entropies = torch.cat((enta, entz, info_reward), dim=-1)
 
-        logger.logkv_mean('reward_info', info_reward.mean().item())
         logger.logkv_mean('reward_enta', enta.mean().item())
         logger.logkv_mean('reward_entz', entz.mean().item())
+        logger.logkv_mean('reward_info', info_reward.mean().item())
 
         assert reward.shape == info_reward.shape
-        reward = reward + info_reward
+        reward = reward # + info_reward
         return reward, entropies, {}
 
     def update(self, traj):
-        enta, entz = self.get_ent_from_traj(traj)
-        self.enta.update(enta)
-        self.entz.update(entz)
-
-        logger.logkv_mean('a_ent', enta.mean())
-        logger.logkv_mean('z_ent', entz.mean())
-        logger.logkv_mean('a_alpha', float(self.enta.alpha))
-        logger.logkv_mean('z_alpha', float(self.entz.alpha))
-
         #s_seq = self.info_net.get_state_seq(samples).detach()
         if self.info_net is not None:
             z_detach = traj['z'].detach()
@@ -180,8 +172,6 @@ class IntrinsicReward:
             assert action.dtype == torch.long
             z0 = torch.zeros(s.shape[1:-1], dtype=torch.long, device=s.device)
             return torch.cat((z0[None, :], action))
-
-        # using self.info_net to sample the posterior is very dangerous .. 
         return self.info_net.get_posterior(s).sample()[0]
         # prev0 = self.info_net.get_posterior(s[:1]).sample()[0]
         # states = self.info_net.get_state_seq({'state': s})

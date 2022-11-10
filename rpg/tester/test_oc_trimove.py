@@ -16,11 +16,14 @@ trainer = Trainer.parse(
     steps_per_epoch=150,
     buffer=dict(max_episode_num=20000),
     head=dict(
-        std_mode='fix_no_grad',
-        std_scale=0.2,
-        squash=False
+        #std_mode='fix_no_grad',
+        #std_scale=0.2,
+        # squash=False
+        std_mode='statewise',
+        std_scale = 0.3,
+        squash=True
     ),
-    enta=dict(coef=0.0, target=-2.),
+    enta=dict(coef=0.1, target=-2.),
     entz=dict(coef=4., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
@@ -31,7 +34,7 @@ trainer = Trainer.parse(
     path='tmp/oc',
     weights=dict(reward=1000., q_value=100.),
 
-    info=dict(mutual_info_weight=0.1, action_weight=1., obs_weight=1., epsilon=0.1),
+    info=dict(mutual_info_weight=0.1, action_weight=1., obs_weight=1., epsilon=0.01),
 
     eval_episode=10,
     batch_size=512,

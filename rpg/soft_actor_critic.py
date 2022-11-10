@@ -43,14 +43,15 @@ def batch_select(values, z=None):
 
 class SoftQPolicy(AlphaPolicyBase):
     def __init__(
-        self,state_dim, action_dim, z_space, hidden_dim, cfg = None,
+        self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
     ) -> None:
         #nn.Module.__init__(self)
         AlphaPolicyBase.__init__(self)
         self.z_space = z_space
+        self.enc_z = enc_z
         assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim + action_dim, hidden_dim, z_space.n)
-        self.q2 = self.build_backbone(state_dim + action_dim, hidden_dim, z_space.n)
+        self.q = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
         self.action_dim = action_dim
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
@@ -63,17 +64,16 @@ class SoftQPolicy(AlphaPolicyBase):
         """
         # return the Q value .. if it's value, return self._cfg.gamma
         # assert torch.allclose(a, z)
+        z = self.enc_z(z)
         if self.action_dim > 0:
-            inp = self.add_alpha(s, a)
+            inp = self.add_alpha(s, a, z)
         else:
             assert torch.allclose(a, z)
-            inp = self.add_alpha(s)
+            inp = self.add_alpha(s, z)
 
         q1 = self.q(inp)
         q2 = self.q2(inp)
-        q_values = batch_select(q1, z)
-        q_values2 = batch_select(q2, z)
-        value = torch.cat((q_values, q_values2), dim=-1)
+        value = torch.cat((q1, q2), dim=-1)
         return value, None
 
 class ValuePolicy(AlphaPolicyBase):
@@ -85,8 +85,8 @@ class ValuePolicy(AlphaPolicyBase):
         self.z_space = z_space
         self.enc_z = enc_z
         assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim, hidden_dim, z_space.n)
-        self.q2 = self.build_backbone(state_dim, hidden_dim, z_space.n)
+        self.q = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         """
@@ -97,14 +97,12 @@ class ValuePolicy(AlphaPolicyBase):
             Note that the entropy of the current step is not included ..
         """
         # return the Q value .. if it's value, return self._cfg.gamma
+        z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())
-        inp = self.add_alpha(new_s)
+        inp = self.add_alpha(new_s, z)
 
 
         v1, v2 = self.q(inp), self.q2(inp)
-        v1 = batch_select(v1, z)
-        v2 = batch_select(v2, z) # condition on z ..
-
         values = torch.cat((v1, v2), dim=-1)
         return values * gamma * mask + r, values
 
@@ -141,7 +139,7 @@ class PolicyA(AlphaPolicyBase):
 
 
 class SoftPolicyZ(AlphaPolicyBase):
-    def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, K=1, output_ent=False) -> None:
+    def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, K=1, output_ent=False, epsilon=0.) -> None:
         super().__init__()
         self.K = K
         self.enc_z = enc_z
@@ -151,13 +149,19 @@ class SoftPolicyZ(AlphaPolicyBase):
         )
 
     def q_value(self, state):
-        return self.qnet(self.add_alpha(state))[..., 0, :]
+        v = self.qnet(self.add_alpha(state))
+        return v[..., 0, :]
 
     def forward(self, state, prevz, timestep, z=None):
         new_action = timestep % self.K == 0
         new_action_prob = torch.zeros_like(new_action).float()
 
-        pi_z = torch.distributions.Categorical(logits=self.q_value(state) / self.alpha[1]) # the second is the z..
+        logits = self.q_value(state) / self.alpha[1]
+        if self._cfg.epsilon  == 0.:
+            pi_z = torch.distributions.Categorical(logits=logits) # the second is the z..
+        else:
+            prob = torch.softmax(logits, dim=-1) * (1 - self._cfg.epsilon) + self._cfg.epsilon / logits.shape[-1]
+            pi_z = torch.distributions.Categorical(probs=prob)
         z = pi_z.sample()
         logp_z = pi_z.log_prob(z)
 
@@ -172,11 +176,15 @@ class SoftPolicyZ(AlphaPolicyBase):
         state = rollout['state'].detach()
         q_value = rollout['q_value'].detach()
         z = rollout['z'].detach()
-        entropies = rollout['entropies'].detach()
+        entropies = rollout['extra_rewards'].detach()
 
         # replicate the q value to the pi_z ..
+        q_value = q_value.min(axis=-1, keepdims=True).values
         with torch.no_grad():
-            q_target = q_value + entropies[..., 0:1]
-        q_predict = batch_select(self.q_value(state), z)
-        q_target = q_target.min(axis=-1, keepdims=True).values
+            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
+
+        q_val = self.q_value(state[:-1])
+        q_predict = batch_select(q_val, z)
+        assert q_predict.shape == q_target.shape
+        # assert torch.allclose(q_predict, batch_select(self.q_value(state), z))
         return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  

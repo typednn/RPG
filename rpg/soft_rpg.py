@@ -60,6 +60,7 @@ class Trainer(Configurable, RLAlgo):
         warmup_steps=1000,
         steps_per_epoch=None,
         tau=0.005,
+        z_delay=None,
         actor_delay=2,
         eval_episode=10,
 
@@ -84,6 +85,8 @@ class Trainer(Configurable, RLAlgo):
         self.horizon = horizon
         self.env = env
         self.device = 'cuda:0'
+        self.z_delay = z_delay or actor_delay
+        assert actor_delay % self.z_delay == 0
 
         # buffer samples horizon + 1
         self.buffer = ReplayBuffer(obs_space.shape, env.action_space, env.max_time_steps, horizon, cfg=buffer)
@@ -176,14 +179,28 @@ class Trainer(Configurable, RLAlgo):
 
         # ---------------------- update actor ----------------------
         rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
-        if self.update_step % self._cfg.actor_delay == 0:
-            loss_a = self.nets.pi_a.loss(rollout)
-            loss_z = self.nets.pi_z.loss(rollout)
 
-            logger.logkvs_mean({'a_loss': float(loss_a.mean()), 'z_loss': float(loss_z.mean())})
+        if self.update_step % self.z_delay == 0:
+            loss_z = self.nets.pi_z.loss(rollout)
+            if self.update_step % self._cfg.actor_delay == 0:
+                loss_a = self.nets.pi_a.loss(rollout)
+                logger.logkv_mean('a_loss', float(loss_a))
+            else:
+                loss_a = 0.
+            logger.logkv_mean('z_loss', float(loss_z))
             self.actor_optim.optimize(loss_a + loss_z)
 
+        enta, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
+        logger.logkv_mean('a_ent', enta.mean())
+        logger.logkv_mean('z_ent', entz.mean())
+        if self.update_step % self.z_delay == 0:
+            self.entz.update(entz)
+            logger.logkv_mean('z_alpha', float(self.entz.alpha))
+        if self.update_step % self._cfg.actor_delay == 0:
+            self.enta.update(enta)
+            logger.logkv_mean('a_alpha', float(self.enta.alpha))
         self.intrinsic_reward.update(rollout)
+
 
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
@@ -291,6 +308,7 @@ class Trainer(Configurable, RLAlgo):
             args.append(torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
         if self._cfg.state_batch_norm:
             args.append(BN(latent_dim))
+        assert len(args) == 0
 
         enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
         enc_z = ZTransform(z_space)
@@ -329,7 +347,7 @@ class Trainer(Configurable, RLAlgo):
             obs_space, action_space, z_space, hidden_dim, state_dim)
 
         if self._cfg.qmode == 'Q':
-            q_fn = SoftQPolicy(state_dim, action_dim, z_space, hidden_dim)
+            q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
         else:
             q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
 

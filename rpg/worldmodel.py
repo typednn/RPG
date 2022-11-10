@@ -152,7 +152,7 @@ class GeneralizedQ(Network):
             out['done'] = dones = torch.sigmoid(
                 self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
 
-        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma) 
+        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma)
         out['q_value'] = q_values
         out['pred_values'] = values
 
@@ -162,17 +162,18 @@ class GeneralizedQ(Network):
 
         if sample_z:
             rewards, entropies, infos = self.intrinsic_reward.estimate_unscaled_rewards(out) # return rewards, (ent_a,ent_z)
+            assert entropies.shape[-1] == 3, "enta, entz, info"
             out.update(infos)
 
-            discount = 1
-
-            prefix = 0.
             vpreds = []
 
+            discount = 1
+            prefix = 0.
             for i in range(len(hidden)):
-                vpred = (prefix + (entropies[i].sum(axis=-1, keepdims=True) + q_values[i]) * discount)
-                vpreds.append(vpred)
+                prefix = prefix + entropies[i].sum(axis=-1, keepdims=True) * discount
+                vpreds.append(prefix + q_values[i] * discount)
                 prefix = prefix + rewards[i] * discount
+
                 discount = discount * self.gamma
                 if dones is not None:
                     assert dones.shape[-1] == 1
@@ -180,7 +181,7 @@ class GeneralizedQ(Network):
 
             vpreds = stack(vpreds)
             out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
-            out['entropies'] = entropies
+            out['extra_rewards'] = entropies
             assert out['value'].shape[-1] == 2, "must be double q learning .."
 
         return out
