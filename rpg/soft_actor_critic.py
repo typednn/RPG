@@ -156,7 +156,15 @@ class SoftPolicyZ(AlphaPolicyBase):
         new_action = timestep % self.K == 0
         new_action_prob = torch.zeros_like(new_action).float()
 
-        logits = self.q_value(state) / self.alpha[1]
+        q = self.q_value(state)
+        logits = q / self.alpha[1]
+
+        # v = self.alpha[1] * torch.log(torch.sum(torch.exp(q/self.alpha[1]), dim=1, keepdim=True))
+        # dist = torch.exp((q-v)/self.alpha[1])
+        # #dist = dist / torch.sum(dist)
+        # print(torch.sum(dist))
+
+
         if self._cfg.epsilon  == 0.:
             pi_z = torch.distributions.Categorical(logits=logits) # the second is the z..
         else:

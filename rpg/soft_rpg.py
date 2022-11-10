@@ -226,6 +226,8 @@ class Trainer(Configurable, RLAlgo):
                 self.nets.eval()
                 transition = dict(obs = obs, timestep=timestep)
                 a, self.z = self.nets.policy(obs, self.z, timestep)
+                if mode != 'training' and idx == 0:
+                    print(self.z, self.nets.pi_z.q_value(self.nets.enc_s(obs, timestep=timestep)))
                 data, obs = self.step(self.env, a)
 
                 transition.update(**data, a=a, z=totensor(self.z, device=self.device, dtype=None))
