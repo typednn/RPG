@@ -377,7 +377,7 @@ class Trainer(Configurable, RLAlgo):
         if self._cfg.qmode == 'Q':
             q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
         else:
-            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_valeu)
+            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
 
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
