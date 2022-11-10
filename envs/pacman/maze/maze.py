@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import random
-from hrl.envs.pacman.maze import console
+from . import console
 
 # Easy to read representation for each cardinal direction.
 N, S, W, E = ('n', 's', 'w', 'e')

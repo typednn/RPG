@@ -1,16 +1,7 @@
 # build a maze with less thiner walls... the current one is not very efficient..
 
 import os
-import cv2
 import numpy as np
-import torch
-import copy
-import pickle
-from typing import Optional, TypeVar, Type, Union
-
-import pandas as pd
-import seaborn as sns
-from matplotlib import pyplot as plt
 
 """Adapted from hiro-robot-envs maze_env.py."""
 

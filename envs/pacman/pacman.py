@@ -5,7 +5,7 @@ from gym.spaces import Box, Discrete
 from .maze import MazeGame
 import numpy as np
 from .utils import get_maze_env_obs, render_maze, render_background
-from hrl.config import Configurable
+from tools.config import Configurable
 
 class PacManEnv(Configurable, gym.Env):
     def __init__(self,
