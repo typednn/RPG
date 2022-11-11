@@ -111,46 +111,12 @@ class AntManEnv(PacManEnv):
             'success': int(loc == goal)
         }
 
-    # def step_meta(self, action):
-    #     if isinstance(action, np.ndarray) or isinstance(action, list):
-    #         action = np.array(action)
-    #         assert action.size == 1
-    #         action = action[0]
-    #     assert action in self.action_space[1]
-    #     x, y = self.loc.copy()
-    #     # action, nswe
-    #     cell = self.maze.maze[int(x), int(y)]
-    #     self.penalty = 0
-    #     if action == 0:
-    #         self.penalty = 'n' in cell
-    #         self.subgoal = (x, y-1)
-    #     elif action == 1:
-    #         self.penalty = 's' in cell
-    #         self.subgoal = (x, y+1)
-    #     elif action == 2:
-    #         self.penalty = 'w' in cell
-    #         self.subgoal = (x - 1, y)
-    #     elif action == 3:
-    #         self.penalty = 'e' in cell
-    #         self.subgoal = (x + 1, y)
-    #     else:
-    #         self.penalty = 0
-    #         self.subgoal = (x, y)
-    #     return self.get_obs()
-
     def step(self, action):
         self.low_obs, _, _, _ = self.ant_env.step(action)
         self.loc = self.low_obs[:2].copy()/self.ant_env.MAZE_SIZE_SCALING
         rewards = self.get_reward()
         low_success = rewards['low_success']
         del rewards['low_success']
-
-        # return self.get_obs(), [rewards['low'], rewards['high']], False, {
-        #     'done_bool': False,
-        #     'low_done_bool': False,
-        #     'success': rewards['success'],
-        #     'low_success': low_success,
-        # }
         return self.get_obs(), rewards['meta'], False, {'success': rewards['success']}  
 
     def render(self, mode):
