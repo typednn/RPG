@@ -1,12 +1,5 @@
-import os
-import cv2
 import numpy as np
-import torch
-import copy
-import pickle
-from typing import Optional, TypeVar, Type, Union
-
-from matplotlib import pyplot as plt
+from tools.config import Configurable
 from .pacman import PacManEnv, Box, Discrete, MazeGame, get_maze_env_obs, render_maze, render_background
 
 from ..hiro_robot_envs.maze_env_v2 import MazeEnvV2
@@ -35,6 +28,7 @@ class AntManEnv(PacManEnv):
                  block_size=20,
                  reward_type='sparse',
                  include_low_obs=1., penalty=0.2):
+        Configurable.__init__(self)
 
         self.ant_env = AntMazeEnv(height, width, maze_size_scaling=4.8, wall_size=0.1)
 
@@ -48,9 +42,9 @@ class AntManEnv(PacManEnv):
         self.observation_space = [
             Box(-np.inf, np.inf, (self.ant_env.observation_space.shape[0] + 4 + 2,)),
             Box(-np.inf, np.inf, (6 + (2 if include_low_obs else 0), height, width)),
-        ]
+        ][0]
 
-        self.action_space = [Discrete(5), self.ant_env.action_space]
+        self.action_space = [Discrete(5), self.ant_env.action_space][1]
 
         self.reset_maze = reset_maze
         self.reset_goal = reset_goal
@@ -77,7 +71,9 @@ class AntManEnv(PacManEnv):
 
         obs = self.low_obs.copy()
         obs[:2] *= 0.0003
-        return [np.concatenate((obs, high[y, x][:4], diff)), high]
+        #return [np.concatenate((obs, high[y, x][:4], diff)), high]
+
+        return self.low_obs
 
 
     def reset(self):
@@ -86,7 +82,7 @@ class AntManEnv(PacManEnv):
         self.maze.reset(reset_target=self.reset_goal)
 
         self._background = None
-        self._high_background = get_maze_env_obs(self.maze, self.observation_space[1].shape[0])
+        self._high_background = get_maze_env_obs(self.maze, self.observation_space.shape[0])
         self.loc = np.array(self.maze.player) + 0.5
         self.goal = np.array(self.maze.target) + 0.5
         self.subgoal = tuple(map(int, self.loc))
@@ -101,7 +97,7 @@ class AntManEnv(PacManEnv):
         loc = tuple(map(int, self.loc))
         goal = tuple(map(int, self.goal))
         subgoal = tuple(map(int, self.subgoal))
-        high_reward = int(loc == goal) - self.penalty * self.penalty_weight
+        high_reward = int(loc == goal) # - self.penalty * self.penalty_weight
         low_success = int(loc == subgoal)
         if self.reward_type == 'sparse':
             low_reward = int(loc == subgoal)
@@ -115,32 +111,32 @@ class AntManEnv(PacManEnv):
             'success': int(loc == goal)
         }
 
-    def step_meta(self, action):
-        if isinstance(action, np.ndarray) or isinstance(action, list):
-            action = np.array(action)
-            assert action.size == 1
-            action = action[0]
-        assert action in self.action_space[1]
-        x, y = self.loc.copy()
-        # action, nswe
-        cell = self.maze.maze[int(x), int(y)]
-        self.penalty = 0
-        if action == 0:
-            self.penalty = 'n' in cell
-            self.subgoal = (x, y-1)
-        elif action == 1:
-            self.penalty = 's' in cell
-            self.subgoal = (x, y+1)
-        elif action == 2:
-            self.penalty = 'w' in cell
-            self.subgoal = (x - 1, y)
-        elif action == 3:
-            self.penalty = 'e' in cell
-            self.subgoal = (x + 1, y)
-        else:
-            self.penalty = 0
-            self.subgoal = (x, y)
-        return self.get_obs()
+    # def step_meta(self, action):
+    #     if isinstance(action, np.ndarray) or isinstance(action, list):
+    #         action = np.array(action)
+    #         assert action.size == 1
+    #         action = action[0]
+    #     assert action in self.action_space[1]
+    #     x, y = self.loc.copy()
+    #     # action, nswe
+    #     cell = self.maze.maze[int(x), int(y)]
+    #     self.penalty = 0
+    #     if action == 0:
+    #         self.penalty = 'n' in cell
+    #         self.subgoal = (x, y-1)
+    #     elif action == 1:
+    #         self.penalty = 's' in cell
+    #         self.subgoal = (x, y+1)
+    #     elif action == 2:
+    #         self.penalty = 'w' in cell
+    #         self.subgoal = (x - 1, y)
+    #     elif action == 3:
+    #         self.penalty = 'e' in cell
+    #         self.subgoal = (x + 1, y)
+    #     else:
+    #         self.penalty = 0
+    #         self.subgoal = (x, y)
+    #     return self.get_obs()
 
     def step(self, action):
         self.low_obs, _, _, _ = self.ant_env.step(action)
@@ -149,12 +145,13 @@ class AntManEnv(PacManEnv):
         low_success = rewards['low_success']
         del rewards['low_success']
 
-        return self.get_obs(), [rewards['low'], rewards['high']], False, {
-            'done_bool': False,
-            'low_done_bool': False,
-            'success': rewards['success'],
-            'low_success': low_success,
-        }
+        # return self.get_obs(), [rewards['low'], rewards['high']], False, {
+        #     'done_bool': False,
+        #     'low_done_bool': False,
+        #     'success': rewards['success'],
+        #     'low_success': low_success,
+        # }
+        return self.get_obs(), rewards['meta'], False, {'success': rewards['success']}  
 
     def render(self, mode):
         if self._background is None and mode == 'rgb_array':
