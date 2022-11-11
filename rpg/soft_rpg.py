@@ -143,7 +143,6 @@ class Trainer(Configurable, RLAlgo):
             if self._cfg.qmode == 'Q':
                 gt['q_value'] = reward + (1-done_gt.float()) * self._cfg.gamma * qtarg
             else:
-                assert not done_gt.any()
                 if self._cfg.zero_done_value:
                     qtarg = qtarg * (1 - done_gt.float())
                 gt['q_value'] = qtarg
