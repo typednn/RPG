@@ -67,8 +67,8 @@ class Trainer(Configurable, RLAlgo):
         # trainer utils ..
         hooks = None,
         path = None,
-        qmode='Q',
-        zero_done_value=False,
+        qmode='value',
+        zero_done_value=True, # by default, let the value network to predict the done.
         state_layer_norm=False,
         state_batch_norm=False,
         no_state_encoder=False,
@@ -98,7 +98,6 @@ class Trainer(Configurable, RLAlgo):
         with torch.no_grad():
             self.target_nets = copy.deepcopy(self.nets).cuda()
             self.target_nets.eval()
-
 
         self.nets.intrinsic_reward = self.intrinsic_reward
         self.target_nets.intrinsic_reward = self.intrinsic_reward
@@ -392,9 +391,7 @@ class Trainer(Configurable, RLAlgo):
             lmbda=self._cfg.lmbda,
             horizon=self._cfg.horizon
         )
-
         network.apply(orthogonal_init)
-
         info_net = self.make_intrinsic_reward(
             obs_space, action_space, z_space, hidden_dim, state_dim
         )

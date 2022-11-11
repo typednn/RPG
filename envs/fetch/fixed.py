@@ -1,5 +1,4 @@
 import numpy as np
-from ..env_builder import register
 
 def compute_action(env, goal, grasp, k=10.):
     return np.append(k * (goal - env.get_gripper_pose()), grasp).clip(-1, 1)
@@ -60,5 +59,3 @@ class Fixed(SequentialStack):
         self.steps = self.substeps
         self.obj_id = 1
         return self._get_obs()
-
-register(Fixed)

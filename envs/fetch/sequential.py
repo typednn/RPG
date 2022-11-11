@@ -4,7 +4,6 @@ import torch
 
 from .construction import FetchBlockConstructionEnv
 from tools.config import Configurable
-from ..env_builder import register
 import gym
 
 class SequentialStack(Configurable, gym.Env):
@@ -235,5 +234,3 @@ class SequentialStack(Configurable, gym.Env):
         self.obj_id = int(state[-2])
         self.steps = int(state[-1])
         self.env.set_state(state[:-2])
-
-register(SequentialStack)

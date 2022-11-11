@@ -37,6 +37,10 @@ class GymVecEnv(VecEnv):
         import gym
         from rl.vec_envs import SubprocVectorEnv
         def make_env():
+            if env_name == 'AntPush':
+                from envs.ant_envs import AntHEnv
+                from gym.wrappers import TimeLimit
+                return TimeLimit(AntHEnv(env_name), 500)
             return gym.make(env_name)
 
         self.nenv = n

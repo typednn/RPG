@@ -125,9 +125,10 @@ class IntrinsicReward:
         return -traj['logp_a'], traj['ent_z']
 
     def ema(self, tau):
-        from tools.utils import ema
+        #from tools.utils import ema
         # if self.info_net is not None:
         #     ema(self.info_net, self.info_target, tau)
+        pass
 
     def estimate_unscaled_rewards(self, traj):
         reward = traj['reward']

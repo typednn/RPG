@@ -71,30 +71,29 @@ def config_hidden(hidden, hidden_space):
     return hidden_head
 
 
-def done_rewards_values(values, prefix, dones):
-    if dones is not None:
-        assert dones.shape == prefix.shape
-        not_done = 1 - dones
+# def done_rewards_values(values, prefix, dones):
+#     if dones is not None:
+#         assert dones.shape == prefix.shape
+#         not_done = 1 - dones
 
-        alive = torch.cumprod(not_done, 0)
-        assert (alive <= 1.).all()
+#         alive = torch.cumprod(not_done, 0)
+#         assert (alive <= 1.).all()
 
-        r = prefix.clone()
-        r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
+#         r = prefix.clone()
+#         r[1:] = r[1:] - r[:-1] # get the gamma decayed rewards ..
 
-        alive_r = torch.ones_like(alive)
-        alive_r[1:] = alive[:-1]
-        prefix = (r * alive_r).cumsum(0)
+#         alive_r = torch.ones_like(alive)
+#         alive_r[1:] = alive[:-1]
+#         prefix = (r * alive_r).cumsum(0)
 
-        values = values * alive
-        from tools.utils import logger
-        logger.logkv_mean('not_done',  not_done.mean().item())
-    return values, prefix
+#         values = values * alive
+#         from tools.utils import logger
+#         logger.logkv_mean('not_done',  not_done.mean().item())
+#     return values, prefix
 
 
 def lmbda_decay_weight(lmbda, horizon, lmbda_last):
     weights = []
-    lmbda = 1
     sum_lmbda = 0.
     for _ in range(horizon):
         weights.append(lmbda)
