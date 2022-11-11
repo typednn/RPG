@@ -30,9 +30,9 @@ class PacManEnv(Configurable, gym.Env):
         self.wall_eps = 0.05
 
         self.observation_space = [Box(-np.inf, np.inf, (2+4+2,)),
-                                  Box(-np.inf, np.inf, (6 + (2 if include_low_obs > 0 else 0), height, width)),]
+                                  Box(-np.inf, np.inf, (6 + (2 if include_low_obs > 0 else 0), height, width)),][1]
 
-        self.action_space = [Box(-1, 1, (2,)),Discrete(5)]
+        self.action_space = [Box(-1, 1, (2,)),Discrete(5)][0]
 
         self.reset_maze = reset_maze
         self.reset_goal = reset_goal
@@ -75,19 +75,13 @@ class PacManEnv(Configurable, gym.Env):
         loc = tuple(map(int, self.loc))
         goal = tuple(map(int, self.goal))
         subgoal = tuple(map(int, self.subgoal))
-        high_reward = int(loc == goal)  - self._penalty * self.penalty
-        low_success = int(loc == subgoal)
-        if self.reward_type == 'sparse':
-            low_reward = int(loc == subgoal)
-        else:
-            low_reward = -np.linalg.norm(self.loc - (np.float32(subgoal) + 0.5))
-
-        return {
-            'meta': high_reward,
-            'low': low_reward,
-            'low_success': low_success,
-            'success': int(loc==goal)
-        }
+        high_reward = int(loc == goal)  #- self._penalty * self.penalty
+        # low_success = int(loc == subgoal)
+        # if self.reward_type == 'sparse':
+        #     low_reward = int(loc == subgoal)
+        # else:
+        #     low_reward = -np.linalg.norm(self.loc - (np.float32(subgoal) + 0.5))
+        return high_reward, int(loc == goal)
 
     def reset(self):
         if self.reset_maze or self.maze is None:
@@ -95,7 +89,7 @@ class PacManEnv(Configurable, gym.Env):
         self.maze.reset(reset_target=self.reset_goal)
 
         self._background = None
-        self._high_background = get_maze_env_obs(self.maze, self.observation_space[1].shape[0])
+        self._high_background = get_maze_env_obs(self.maze, self.observation_space.shape[0])
 
 
         self.rects = []
@@ -125,33 +119,33 @@ class PacManEnv(Configurable, gym.Env):
             cv2.rectangle(imgs, f(i[0]), f(i[1]), (255, 0, 255), -1)
         return imgs
 
-    def step_meta(self, action):
-        if isinstance(action, np.ndarray) or isinstance(action, list):
-            action = np.array(action)
-            assert action.size == 1
-            action = action[0]
-        assert action in self.action_space[1]
-        x, y = self.loc.copy()
-        x = int(x)
-        y = int(y)
-        # action, nswe
-        cell = self.maze.maze[x, y]
-        if action == 0:
-            self._penalty = 'n' in cell
-            self.subgoal = (x, y-1)
-        elif action == 1:
-            self._penalty = 's' in cell
-            self.subgoal = (x, y+1)
-        elif action == 2:
-            self._penalty = 'w' in cell
-            self.subgoal = (x - 1, y)
-        elif action == 3:
-            self._penalty = 'e' in cell
-            self.subgoal = (x + 1, y)
-        else:
-            self._penalty = 0
-            self.subgoal = (x, y)
-        return self.get_obs()
+    # def step_meta(self, action):
+    #     if isinstance(action, np.ndarray) or isinstance(action, list):
+    #         action = np.array(action)
+    #         assert action.size == 1
+    #         action = action[0]
+    #     assert action in self.action_space[1]
+    #     x, y = self.loc.copy()
+    #     x = int(x)
+    #     y = int(y)
+    #     # action, nswe
+    #     cell = self.maze.maze[x, y]
+    #     if action == 0:
+    #         self._penalty = 'n' in cell
+    #         self.subgoal = (x, y-1)
+    #     elif action == 1:
+    #         self._penalty = 's' in cell
+    #         self.subgoal = (x, y+1)
+    #     elif action == 2:
+    #         self._penalty = 'w' in cell
+    #         self.subgoal = (x - 1, y)
+    #     elif action == 3:
+    #         self._penalty = 'e' in cell
+    #         self.subgoal = (x + 1, y)
+    #     else:
+    #         self._penalty = 0
+    #         self.subgoal = (x, y)
+    #     return self.get_obs()
 
     def step_clip(self, loc, dir):
         # eight directions, from north, clock wise..
@@ -159,21 +153,10 @@ class PacManEnv(Configurable, gym.Env):
         return step(self.rects, loc[0], loc[1], dir[0], dir[1])
 
     def step(self, action):
-        #if action.dot(self.get_obs()['low'][-2:]) < -0.1:
-        #    print(self.get_obs()['low'][-2:], action, np.array(self.subgoal)+0.5, self.loc)
-        #    exit(0)
         action = np.array(action).clip(-1, 1) * self.action_scale
         self.loc = np.array(self.step_clip(self.loc, action))
-        rewards = self.get_reward()
-        low_success = rewards['low_success']
-        del rewards['low_success']
-
-        return self.get_obs(), (rewards['low'], rewards['meta']), False, {
-            'done_bool': False,
-            'low_done_bool': False,
-            'low_success': low_success,
-            "success": rewards['success']
-        }
+        rewards, success = self.get_reward()
+        return self.get_obs(), rewards, False, {"success": success}
 
     def render(self, mode):
         if self._background is None and mode == 'rgb_array':
