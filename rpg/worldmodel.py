@@ -45,7 +45,7 @@ class GeneralizedQ(Network):
             
         dyna_net = [enc_s, enc_a, init_h, dynamic_fn, state_dec, reward_predictor, q_fn]
         if self.done_fn is not None:
-            dyna_net.append(self.done_fn)
+            dyna_net.append(done_fn)
         self.dynamics = torch.nn.ModuleList(dyna_net)
         self.policies = torch.nn.ModuleList([pi_a, pi_z])
 
