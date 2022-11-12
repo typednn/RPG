@@ -162,6 +162,8 @@ class GeneralizedQ(Network):
             prefix = 0.
             for i in range(len(rewards)):
                 prefix = prefix + entropies[i].sum(axis=-1, keepdims=True) * discount
+                if i > 0:
+                    print(prefix.shape, q_values.shape)
                 vpreds.append(prefix + q_values[i] * discount)
                 prefix = prefix + rewards[i] * discount
 
