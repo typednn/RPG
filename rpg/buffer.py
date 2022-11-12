@@ -95,11 +95,7 @@ class ReplayBuffer(Configurable):
             _idxs = (idxs + t).clamp(0, self.capacity-1)
             action[t] = self._action[_idxs]
             reward[t] = self._reward[_idxs]
-            if _done is None:
-                _done = self._dones[_idxs]
-            else:
-                _done = torch.maximum(_done, self._dones[_idxs]) # once done, forever done
-            done[t] = _done
+            done[t] = self._dones[_idxs]
             truncated[t] = self._truncated[_idxs]
 
             obs_seq[t+1] = self._next_obs[_idxs]

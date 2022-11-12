@@ -109,7 +109,7 @@ class GymVecEnv(VecEnv):
             'next_obs': next_obs, # ending state of the previous transition.
             'next_timestep': self.steps.copy(),
             'r': np.array(reward)[:, None],
-            'done': done,
+            'done': done.copy(),
             'info': info,
             'total_reward': self.returns.copy(),
             'truncated': [('TimeLimit.truncated' in i) for i in info],
