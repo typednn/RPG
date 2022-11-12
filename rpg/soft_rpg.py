@@ -98,7 +98,7 @@ class Trainer(Configurable, RLAlgo):
 
         self.nets, self.intrinsic_reward = self.make_network(obs_space, env.action_space, z_space)
         with torch.no_grad():
-            self.target_nets = copy.deepcopy(self.nets).cuda()
+            self.target_nets = copy.deepcopy(self.nets)
             self.target_nets.eval()
 
         self.nets.intrinsic_reward = self.intrinsic_reward
@@ -109,7 +109,6 @@ class Trainer(Configurable, RLAlgo):
 
         self.update_step = 0
         self.z = None
-
         self.sync_alpha()
 
     def sync_alpha(self):

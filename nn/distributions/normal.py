@@ -94,7 +94,10 @@ class Normal(DistHead):
         #from tools.utils import clamp
         #log_stds = torch.clamp(
             # log_stds, minval=max(self.LOG_STD_MIN, self.minimal_std_val), maxval=self.LOG_STD_MAX)
-        log_stds = log_stds.clamp(min=self.LOG_STD_MIN, max=self.LOG_STD_MAX)
+        from tools.utils import clamp
+        # log_stds = clamp(min=self.LOG_STD_MIN, max=self.LOG_STD_MAX)
+        log_stds = clamp(
+            log_stds, minval=max(self.LOG_STD_MIN, self.minimal_std_val), maxval=self.LOG_STD_MAX)
         action_std = torch.exp(log_stds) * self.std_scale
         # else:
         #     log_stds = torch.tanh(log_stds)
