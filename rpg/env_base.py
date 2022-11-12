@@ -71,7 +71,7 @@ class GymVecEnv(VecEnv):
         return self.obs, self.steps.copy()
 
     def render(self):
-        pass
+        return self.vec_env.render(id=0, mode='rgb_array')
 
     def step(self, actions):
         assert self.obs is not None, "must start before running"
@@ -98,6 +98,8 @@ class GymVecEnv(VecEnv):
                 self.steps[j] = 0
                 self.returns[j] = 0
                 episode.append({'step': step, 'reward': total_reward})
+                if 'success' in info[j]:
+                    episode[-1]['success'] = info[j]['success']
 
             for idx, k in zip(end_envs, self.vec_env.reset(end_envs, **self.kwargs)):
                 obs[idx] = k
@@ -202,6 +204,9 @@ class TorchEnv(VecEnv):
                 self.steps[j] = 0
                 self.returns[j] = 0
                 episode.append({'step': step, 'reward': total_reward})
+
+                if 'success' in info[j]:
+                    episode[-1]['success'] = info[j]['success']
             obs = self.goal_env.reset(**self.kwargs)
 
         if self.ignore_truncated_done:

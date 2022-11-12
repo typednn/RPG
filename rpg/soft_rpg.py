@@ -77,6 +77,8 @@ class Trainer(Configurable, RLAlgo):
         wandb=None,
 
         dynamic_type='normal',
+
+        save_video=0,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -223,6 +225,7 @@ class Trainer(Configurable, RLAlgo):
         r = tqdm.trange if self._cfg.update_train_step > 0 else range 
 
         transitions = []
+        images = []
         for idx in r(n_step):
             with torch.no_grad():
                 self.nets.eval()
@@ -231,6 +234,9 @@ class Trainer(Configurable, RLAlgo):
                 # if mode != 'training' and idx == 0:
                 #     print(self.z, self.nets.pi_z.q_value(self.nets.enc_s(obs, timestep=timestep)))
                 data, obs = self.step(self.env, a)
+
+                if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
+                    images.append(self.env.render('rgb_array'))
 
                 transition.update(**data, a=a, z=totensor(self.z, device=self.device, dtype=None))
                 transitions.append(transition)
@@ -242,6 +248,10 @@ class Trainer(Configurable, RLAlgo):
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
                     self.update()
+
+        if len(images) > 0:
+            logger.animate(images, 'eval.mp4')
+
         return Trajectory(transitions, len(obs), n_step)
 
     def run_rpgm(self, max_epoch=None):
@@ -350,7 +360,7 @@ class Trainer(Configurable, RLAlgo):
             raise NotImplementedError
 
         reward_predictor = Seq(mlp(a_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
-        done_fn = mlp(a_dim + latent_dim, hidden_dim, 1) if self._cfg.have_done else None
+        done_fn = mlp(latent_dim, hidden_dim, 1) if self._cfg.have_done else None
         return enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec
 
     def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):

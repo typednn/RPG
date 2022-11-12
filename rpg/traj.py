@@ -91,21 +91,27 @@ class Trajectory:
         # average additional infos, for example success, if necessary.
         n = 0
         rewards = []
+        successes = []
         avg_len = 0
         for i in range(self.timesteps):
             if 'episode' in self.traj[i]:
                 for j in self.traj[i]['episode']:
                     n += 1
                     rewards.append(j['reward'])
+                    if 'success' in j:
+                        successes.append(j['success'])
                     avg_len += j['step']
         if n > 0:
             rewards = np.array(rewards)
-            return {
+            out =  {
                 "num_episode": n,
                 "rewards": rewards.mean(),
                 "rewards_std": rewards.std(),
                 "avg_len": avg_len / n,
             }
+            if len(successes) > 0:
+                out['success'] = np.array(successes).mean()
+            return out
         else:
             return {"num_episode": n}
         

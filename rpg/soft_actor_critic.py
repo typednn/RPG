@@ -102,7 +102,6 @@ class ValuePolicy(AlphaPolicyBase):
         mask = 1. if done is None else (1-done.float())
         inp = self.add_alpha(new_s, z)
 
-
         v1, v2 = self.q(inp), self.q2(inp)
         values = torch.cat((v1, v2), dim=-1)
         if self._cfg.zero_done_value:

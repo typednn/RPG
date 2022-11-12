@@ -79,7 +79,7 @@ class GeneralizedQ(Network):
         return a, z.detach().cpu().numpy()
 
     def inference(
-        self, obs, z, timestep, step, z_seq=None, a_seq=None, pi_a=None, pi_z=None):
+        self, obs, z, timestep, step, z_seq=None, a_seq=None):
         # z_seq is obs -> z -> a
         assert timestep.shape == (len(obs),)
 
@@ -98,22 +98,17 @@ class GeneralizedQ(Network):
         h = self.init_h(s)[None,:]
         a_embeds = []
 
-        if pi_a is None: pi_a = self.pi_a
-        if pi_z is None: pi_z = self.pi_z
 
         for idx in range(step):
             if len(z_seq) <= idx:
-                if pi_z is not None:
-                    z, _logp_z, z_new, logp_z_new, _entz = pi_z(s, z, timestep=timestep)
-                    logp_z.append(_logp_z[..., None])
-                    entz.append(_entz[..., None])
-                else:
-                    raise NotImplementedError
+                z, _logp_z, z_new, logp_z_new, _entz = self.pi_z(s, z, timestep=timestep)
+                logp_z.append(_logp_z[..., None])
+                entz.append(_entz[..., None])
                 z_seq.append(z)
             z = z_seq[idx]
 
             if len(a_seq) <= idx:
-                a, _logp_a = pi_a(s, z)
+                a, _logp_a = self.pi_a(s, z)
                 logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
 
@@ -128,25 +123,23 @@ class GeneralizedQ(Network):
 
             timestep = timestep + 1
 
-        stack = torch.stack
-        # hidden = stack(hidden)
-        states = stack(states)
-        a_embeds = stack(a_embeds)
+        states = torch.stack(states)
+        a_embeds = torch.stack(a_embeds)
         out = dict(state=states, reward=self.reward_predictor(states[1:], a_embeds))
 
         if sample_a:
-            a_seq = out['a'] = stack(a_seq)
-            out['logp_a'] = stack(logp_a)
+            a_seq = out['a'] = torch.stack(a_seq)
+            out['logp_a'] = torch.stack(logp_a)
 
         if sample_z:
-            z_seq = out['z'] = stack(z_seq)
-            out['logp_z'] = stack(logp_z)
-            out['ent_z'] = stack(entz)
+            z_seq = out['z'] = torch.stack(z_seq)
+            out['logp_z'] = torch.stack(logp_z)
+            out['ent_z'] = torch.stack(entz)
             
         dones = None
         if self.done_fn is not None:
-            done_inp = torch.concat((states[1:], a_embeds), -1)
-            assert self._cfg.detach_hidden
+            #done_inp = torch.concat((states[1:], a_embeds), -1)
+            done_inp = states[1:]
             out['done'] = dones = torch.sigmoid(
                 self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
 
@@ -177,7 +170,7 @@ class GeneralizedQ(Network):
                     assert dones.shape[-1] == 1
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
 
-            vpreds = stack(vpreds)
+            vpreds = torch.stack(vpreds)
             out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
             out['extra_rewards'] = entropies
             assert out['value'].shape[-1] == 2, "must be double q learning .."
