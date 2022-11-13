@@ -329,7 +329,7 @@ class Trainer(Configurable, RLAlgo):
             args.append(torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
         if self._cfg.state_batch_norm:
             args.append(BN(latent_dim))
-        assert len(args) == 0
+        # assert len(args) == 0
 
         if self._cfg.no_state_encoder:
             enc_s = TimedSeq(Identity(), *args) # encode state with time step ..
