@@ -5,11 +5,12 @@ import numpy as np
 
 
 class TripleAntEnv(gym.Env):
-    def __init__(self) -> None:
+    def __init__(self, n_goals=3) -> None:
         super().__init__()
 
         width = 4
         height = 4
+        self.n_goals =n_goals
         self.ant_env = AntMazeEnv(4, 4, maze_size_scaling=4.8, wall_size=0.1, lookat=(0, 0, 0))
 
 
@@ -40,9 +41,9 @@ class TripleAntEnv(gym.Env):
                 [1./2 * 3 ** 0.5 , 1./2],
                 [-1./2 * 3 ** 0.5, 1./2]
             ], 
-        ) * self.ant_env.MAZE_SIZE_SCALING
+        )[:self.n_goals] * self.ant_env.MAZE_SIZE_SCALING
         reward = -np.linalg.norm( (self.loc[None, :2] - goals[:, :2]), axis=-1)
-        reward = reward.min(axis=-1)
+        reward = reward.max(axis=-1)
         return self.get_obs(), reward, False, {}
 
     def render(self, mode='rgb_array'):

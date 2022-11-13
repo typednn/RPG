@@ -71,10 +71,6 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         super(BlockEnv, self).__init__(dt, frameskip, gravity)
 
-        
-        self.agent = self.add_articulation(
-            0., -1.4, self.block_size, (0.75, 0.25, 0.25),
-            self.ranges, "pusher", friction=0, damping=0, material=self.material)
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=-4, high=4, shape=(len(obs),))
@@ -191,3 +187,9 @@ class BlockEnv(gym.Env, SimulatorBase):
                              (self.block_size, self.block_size, 0.1),
                              np.array(COLORS[i]) * 1.2, f'goal{i}', True, False))
         self.objects = self.blocks + self.goal_vis
+
+        
+        self.agent = self.add_articulation(
+            0., -1.4, self.block_size, (0.75, 0.25, 0.25),
+            self.ranges, "pusher", friction=0, damping=0, material=self.material)
+        self.objects.append(self.agent)

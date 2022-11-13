@@ -30,7 +30,7 @@ class VecEnv(ABC):
 
 
 class GymVecEnv(VecEnv):
-    def __init__(self, env_name, n, ignore_truncated_done=True) -> None:
+    def __init__(self, env_name, n, ignore_truncated_done=True, **kwargs) -> None:
         # by default, the mujoco's gym env do not have a truncated reward. 
         super().__init__()
         self.env_name = env_name
@@ -41,16 +41,16 @@ class GymVecEnv(VecEnv):
             from gym.wrappers import TimeLimit
             if env_name == 'AntPush':
                 from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name), 500)
+                return TimeLimit(AntHEnv(env_name, **kwargs), 500)
 
             elif env_name == 'TripleAnt':
                 from envs.triple_ant import TripleAntEnv
-                return TimeLimit(TripleAntEnv(), 100)
+                return TimeLimit(TripleAntEnv( **kwargs), 100)
             elif env_name == 'BlockPush':
                 import os
                 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
                 from envs.block import BlockEnv
-                return TimeLimit(BlockEnv(), 100)
+                return TimeLimit(BlockEnv(**kwargs), 100)
 
             return gym.make(env_name)
 
