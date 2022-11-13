@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from gym.wrappers import TimeLimit
 from tools.utils import tonumpy
 
 
@@ -37,10 +38,20 @@ class GymVecEnv(VecEnv):
         import gym
         from rl.vec_envs import SubprocVectorEnv
         def make_env():
+            from gym.wrappers import TimeLimit
             if env_name == 'AntPush':
                 from envs.ant_envs import AntHEnv
-                from gym.wrappers import TimeLimit
                 return TimeLimit(AntHEnv(env_name), 500)
+
+            elif env_name == 'TripleAnt':
+                from envs.triple_ant import TripleAntEnv
+                return TimeLimit(TripleAntEnv(), 100)
+            elif env_name == 'BlockPush':
+                import os
+                os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+                from envs.block import BlockEnv
+                return TimeLimit(BlockEnv(), 100)
+
             return gym.make(env_name)
 
         self.nenv = n
@@ -70,8 +81,8 @@ class GymVecEnv(VecEnv):
 
         return self.obs, self.steps.copy()
 
-    def render(self):
-        return self.vec_env.render(id=0, mode='rgb_array')
+    def render(self, mode='rgb_array'):
+        return self.vec_env.render(id=0, mode=mode)
 
     def step(self, actions):
         assert self.obs is not None, "must start before running"

@@ -6,7 +6,7 @@ images = []
 
 images.append(env.render('rgb_array'))
 
-for i in range(500):
+for i in range(100):
     env.step(env.action_space.sample())
     images.append(env.render('rgb_array'))
 

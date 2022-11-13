@@ -21,13 +21,11 @@ class TripleAntEnv(gym.Env):
         self.ant_env.set_map(self._high_background)
         self.loc = np.zeros(2)
 
-        
     def get_obs(self):
         return self.low_obs.copy()
-        
 
     def reset(self):
-        self.ant_env.wrapped_env.init_qpos[:2] = self.loc * self.ant_env.MAZE_SIZE_SCALING
+        self.ant_env.wrapped_env.init_qpos[:2] = 0. #self.loc * self.ant_env.MAZE_SIZE_SCALING
         self.low_obs = self.ant_env.reset()
         return self.get_obs()
 

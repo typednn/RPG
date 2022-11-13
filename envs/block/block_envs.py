@@ -73,7 +73,7 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         
         self.agent = self.add_articulation(
-            -1, 0, self.block_size, (0.75, 0.25, 0.25),
+            0., -1.4, self.block_size, (0.75, 0.25, 0.25),
             self.ranges, "pusher", friction=0, damping=0, material=self.material)
 
         obs = self.reset()
@@ -138,11 +138,18 @@ class BlockEnv(gym.Env, SimulatorBase):
     def compute_reward(self):
         r = 0
         self.success = 0
+        contacts = []
         for b, g in zip(self.blocks, self.goal_vis):
-            dist = np.linalg.norm(b.get_qpos() - g.get_pose().p[:2])
+            box_pos = b.get_qpos()
+            dist = np.linalg.norm(box_pos - g.get_pose().p[:2])
             self.success += dist < self.success_threshold
             r += dist ** 2
-        return - r ** 0.5
+
+            contacts.append( np.linalg.norm(self.get_agent_pos() - box_pos) )
+
+        contact_reward = np.min(contacts)
+        
+        return - r ** 0.5 -  contact_reward * 0.1 # contact bonus .. 
 
 
     def build_scene(self):
@@ -175,7 +182,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         for i in range(self.n_block):
             self.blocks.append(
                 self.add_articulation(
-                    i*self.block_size*3, 0.0, self.block_size, COLORS[i],
+                    (i - 1) * 1.4, 0.0, self.block_size, COLORS[i],
                     ranges, f"block{i}", friction=0,
                     damping=5000, material=material)
             )

@@ -245,7 +245,7 @@ class Trainer(Configurable, RLAlgo):
                 data, obs = self.step(self.env, a)
 
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
-                    images.append(self.env.render('rgb_array'))
+                    images.append(self.env.render('rgb_array')[0])
 
                 transition.update(**data, a=a, z=prevz)
                 transitions.append(transition)
