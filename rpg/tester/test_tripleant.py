@@ -33,7 +33,7 @@ trainer = Trainer.parse(
 
     info=dict(mutual_info_weight=100., action_weight=1., obs_weight=1., epsilon=0.01),
 
-    eval_episode=1,
+    eval_episode=10,
     save_video=300, # save video ..
     batch_size=512,
     qmode='value',
