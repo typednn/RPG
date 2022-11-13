@@ -100,6 +100,7 @@ class ValuePolicy(AlphaPolicyBase):
         # return the Q value .. if it's value, return self._cfg.gamma
         z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())
+        # print(new_s.shape, new_s.device, z.shape, z.device)
         inp = self.add_alpha(new_s, z)
 
         v1, v2 = self.q(inp), self.q2(inp)
@@ -140,46 +141,47 @@ class PolicyA(AlphaPolicyBase):
         return -rollout['value'][..., 0].mean()
 
 
-class SoftPolicyZ(AlphaPolicyBase):
-    def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, K=1, output_ent=False, epsilon=0.) -> None:
+class PolicyZ(AlphaPolicyBase):
+    def __init__(self, cfg=None, K=1000000000) -> None:
         super().__init__()
-        self.K = K
+
+
+    def forward(self, state, prevz, timestep):
+        new_action = (timestep % self._cfg.K == 0)
+        new_action_prob = torch.zeros_like(new_action).float()
+        z = prevz.clone()
+
+        logp_z = torch.zeros_like(new_action_prob)
+        entropy = torch.zeros_like(new_action_prob) 
+
+        if new_action.any():
+            pi_z = self.policy(state[new_action])
+            newz, newz_logp = pi_z.sample()
+            z[new_action] = newz
+            logp_z[new_action] = newz_logp
+            entropy[new_action] = -newz_logp
+        return Zout(z, logp_z, new_action, new_action_prob, entropy)
+
+    def policy(self, state):
+        raise NotImplementedError
+
+
+
+class SoftPolicyZ(PolicyZ):
+    def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, epsilon=0.) -> None:
+        super().__init__()
         self.enc_z = enc_z
         self.zdim = self.enc_z.output_dim
-        self.qnet = self.build_backbone(
-            state_dim, hidden_dim, (3 if output_ent else  1, self.zdim)
-        )
+        self.qnet = self.build_backbone(state_dim, hidden_dim, self.zdim)
 
     def q_value(self, state):
-        v = self.qnet(self.add_alpha(state))
-        return v[..., 0, :]
+        return self.qnet(self.add_alpha(state))
 
-    def forward(self, state, prevz, timestep, z=None):
-        new_action = timestep % self.K == 0
-        new_action_prob = torch.zeros_like(new_action).float()
-
+    def policy(self, state):
         q = self.q_value(state)
         logits = q / self.alpha[1]
-
-        # v = self.alpha[1] * torch.log(torch.sum(torch.exp(q/self.alpha[1]), dim=1, keepdim=True))
-        # dist = torch.exp((q-v)/self.alpha[1])
-        # #dist = dist / torch.sum(dist)
-        # print(torch.sum(dist))
-
-
-        if self._cfg.epsilon  == 0.:
-            pi_z = torch.distributions.Categorical(logits=logits) # the second is the z..
-        else:
-            prob = torch.softmax(logits, dim=-1) * (1 - self._cfg.epsilon) + self._cfg.epsilon / logits.shape[-1]
-            pi_z = torch.distributions.Categorical(probs=prob)
-        z = pi_z.sample()
-        logp_z = pi_z.log_prob(z)
-
-        z = torch.where(new_action, z, prevz)
-        logp_z = torch.where(new_action, logp_z, new_action_prob)
-        entropy = pi_z.entropy() * new_action.float()
-
-        return Zout(z, logp_z, new_action, new_action_prob, entropy)
+        from nn.distributions import CategoricalAction
+        return CategoricalAction(logits, epsilon=self._cfg.epsilon)
 
     def loss(self, rollout):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 

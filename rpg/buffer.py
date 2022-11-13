@@ -33,7 +33,7 @@ class ReplayBuffer(Configurable):
         self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
-        self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
+        self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device) - 1
         self._z = None
 
         self._eps = 1e-6
@@ -126,6 +126,7 @@ class ReplayBuffer(Configurable):
     
     @torch.no_grad()
     def sample_start(self, batch_size):
-        idx = torch.where(self._timesteps == 0)
-        idx = idx[torch.from_numpy(np.random.choice(len(idx), batch_size, replace=not self._full)).to(self.device)]
+        idx = torch.where(self._timesteps == 0)[0]
+        select = torch.from_numpy(np.random.choice(len(idx), batch_size, replace=not self._full)).to(self.device)
+        idx = idx[select]
         return self._obs[idx], self._z[idx], self._timesteps[idx]

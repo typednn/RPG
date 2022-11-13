@@ -6,9 +6,6 @@
 
 import torch
 from .soft_rpg import *
-from .soft_actor_critic import AlphaPolicyBase, Zout
-from .hidden_policy import HiddenPolicy
-from .soft_actor_critic import PolicyZ
 
 
 class SkillLearning(Trainer):
@@ -37,11 +34,10 @@ class SkillLearning(Trainer):
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
 
-        from .hidden_policy import GaussianPolicy, SoftPolicy
         if self._cfg.z_dim == 0:
-            pi_z = PolicyZ(GaussianPolicy(state_dim, self.z_space, cfg=self._cfg.pi_z))
+            raise NotImplementedError
         else:
-            pi_z = PolicyZ(SoftPolicyZ(state_dim, self.z_space, cfg=self._cfg.pi_z))
+            pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
 
         network = GeneralizedQ(
             enc_s, enc_a, pi_a, pi_z,
@@ -63,7 +59,7 @@ class SkillLearning(Trainer):
         )
 
     def update_pi_a(self):
-        if self.update_step % self.actor_delay == 0:
+        if self.update_step % self._cfg.actor_delay == 0:
             obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
             rollout = self.nets.inference(obs_seq[0], z, timesteps[0], self.horizon)
 
@@ -79,7 +75,8 @@ class SkillLearning(Trainer):
 
     def update_pi_z(self):
         if self.update_step % self.z_delay == 0:
-            o, t, z = self.buffer.sample_start(self._cfg.batch_size)
+            o, z, t = self.buffer.sample_start(self._cfg.batch_size)
+            assert (t < 1).all()
             rollout = self.nets.inference(o, z, t, self.horizon)
 
             loss_z = self.nets.pi_z.loss(rollout)
@@ -100,7 +97,7 @@ class SkillLearning(Trainer):
         # ---------------------- update dynamics ----------------------
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
         batch_size = len(obs_seq[0])
-        prev_z = z[None, :].expand(len(obs_seq), -1, -1)
+        prev_z = z[None, :].expand(len(obs_seq), *z.shape)
         self.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
 
         self.update_pi_a()

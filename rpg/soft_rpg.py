@@ -92,6 +92,7 @@ class Trainer(Configurable, RLAlgo):
         self.horizon = horizon
         self.env = env
         self.device = 'cuda:0'
+        self.actor_delay = actor_delay
         self.z_delay = z_delay or actor_delay
         assert actor_delay % self.z_delay == 0
 
