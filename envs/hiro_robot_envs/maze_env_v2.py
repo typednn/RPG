@@ -95,11 +95,11 @@ class MazeEnvV2(gym.Env):
                 if not map[0, j, i]:
                     name = f"wall_{i}_{j}_h"
                     id = self.wrapped_env.model.geom_name2id(name)
-                    poses[id][:2] -= 100
+                    poses[id][:2] -= 200
                 if not map[2, j, i]:
                     name = f"wall_{i}_{j}_v"
                     id = self.wrapped_env.model.geom_name2id(name)
-                    poses[id][:2] -= 100
+                    poses[id][:2] -= 200
         self.wrapped_env.model.geom_pos[:] = poses
         self.wrapped_env.sim.forward()
 

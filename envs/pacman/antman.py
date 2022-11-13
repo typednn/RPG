@@ -10,9 +10,9 @@ class NewAntEnv(AntEnv):
         self.viewer.cam.trackbodyid = -1
         #from mujoco_py.generated import const
         #self.viewer.cam.type = const.CAMERA_FIXED
-        self.viewer.cam.lookat[0] = 9
-        self.viewer.cam.lookat[1] = 9
-        self.viewer.cam.lookat[2] = 5
+        self.viewer.cam.lookat[0] = self.lookat[0]
+        self.viewer.cam.lookat[1] = self.lookat[1]
+        self.viewer.cam.lookat[2] = self.lookat[2]
 
         self.viewer.cam.elevation = -70  # camera rotation around the axis in the plane going through the frame origin (if 0 you just see a line)
 

@@ -24,12 +24,13 @@ class AntEnv(mujoco_env.MujocoEnv, utils.EzPickle):
   FILE = "ant.xml"
 
   def __init__(self, file_path=None, expose_all_qpos=True,
-               expose_body_coms=None, expose_body_comvels=None):
+               expose_body_coms=None, expose_body_comvels=None, lookat=(9, 9, 5)):
     self._expose_all_qpos = expose_all_qpos
     self._expose_body_coms = expose_body_coms
     self._expose_body_comvels = expose_body_comvels
     self._body_com_indices = {}
     self._body_comvel_indices = {}
+    self.lookat = lookat
 
     mujoco_env.MujocoEnv.__init__(self, file_path, 5)
     utils.EzPickle.__init__(self)
