@@ -70,6 +70,7 @@ class SkillLearning(Trainer):
             enta, _ = self.intrinsic_reward.get_ent_from_traj(rollout)
             self.enta.update(enta)
             logger.logkv_mean('a_alpha', float(self.enta.alpha))
+            logger.logkv_mean('a_ent', float(enta.mean()))
 
             self.intrinsic_reward.update(rollout)
 
@@ -86,6 +87,7 @@ class SkillLearning(Trainer):
             _, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
             self.entz.update(entz)
             logger.logkv_mean('z_alpha', float(self.entz.alpha))
+            logger.logkv_mean('z_ent', float(entz.mean()))
 
 
     def update(self):
