@@ -198,3 +198,5 @@ class SoftPolicyZ(AlphaPolicyBase):
         assert q_predict.shape == q_target.shape
         # assert torch.allclose(q_predict, batch_select(self.q_value(state), z))
         return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
+
+

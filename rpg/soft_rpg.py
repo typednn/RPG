@@ -175,7 +175,7 @@ class Trainer(Configurable, RLAlgo):
         s = output['state']
         logger.logkv_mean('state_mean', float(s.mean()))
         logger.logkv_mean('state_min', float(s.min()))
-        logger.logkv_mean('state_gax', float(s.max()))
+        logger.logkv_mean('state_max', float(s.max()))
 
 
     def update(self):
