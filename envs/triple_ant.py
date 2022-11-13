@@ -47,7 +47,7 @@ class TripleAntEnv(gym.Env):
         )[:self.n_goals] * self.ant_env.MAZE_SIZE_SCALING
         reward = -np.linalg.norm((self.loc[None, :2] - goals[:, :2]), axis=-1)
         reward = reward.max(axis=-1)
-        return self.get_obs(), reward, False, {}
+        return self.get_obs(), reward * 0.2, False, {}
 
     def render(self, mode='rgb_array'):
         return self.ant_env.render(mode=mode)

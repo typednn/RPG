@@ -5,7 +5,7 @@
 import torch
 from torch import nn
 from tools.utils import Seq, mlp, logger
-from nn.distributions import CategoricalAction
+from nn.distributions import CategoricalAction, Normal
 from tools.nn_base import Network
 from gym import spaces
 from tools.config import Configurable, as_builder
@@ -85,7 +85,7 @@ class ValuePolicy(AlphaPolicyBase):
         AlphaPolicyBase.__init__(self)
         self.z_space = z_space
         self.enc_z = enc_z
-        assert isinstance(z_space, spaces.Discrete)
+        # assert isinstance(z_space, spaces.Discrete)
         self.q = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
         self.q2 = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
 
@@ -180,8 +180,10 @@ class SoftPolicyZ(PolicyZ):
     def policy(self, state):
         q = self.q_value(state)
         logits = q / self.alpha[1]
+
         from nn.distributions import CategoricalAction
-        return CategoricalAction(logits, epsilon=self._cfg.epsilon)
+        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
+        return out
 
     def loss(self, rollout):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
@@ -202,3 +204,21 @@ class SoftPolicyZ(PolicyZ):
         return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
 
 
+
+
+class GaussianPolicy(PolicyZ):
+    def __init__(
+        self, state_dim, hidden_dim, z_space, cfg=None, K=1000000000, head=Normal.gdc(std_scale=1., std_mode='fix_no_grad', nocenter=True)
+    ) -> None:
+        super().__init__()
+        self.head = Normal(z_space, cfg=head)
+        self.qnet = self.build_backbone(state_dim, hidden_dim, self.head.get_input_dim())
+
+    def policy(self, state):
+        return self.head(self.qnet(state))
+
+    def loss(self, rollout):
+        with torch.no_grad():
+            value = rollout['value'][0].min(axis=-1).values
+        pg = -rollout['logp_z'][0] * (value - value.mean()).detach()
+        return pg.mean()

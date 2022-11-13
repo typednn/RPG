@@ -6,6 +6,7 @@
 
 import torch
 from .soft_rpg import *
+from .soft_actor_critic import GaussianPolicy
 
 
 class SkillLearning(Trainer):
@@ -35,7 +36,7 @@ class SkillLearning(Trainer):
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
 
         if self._cfg.z_dim == 0:
-            raise NotImplementedError
+            pi_z = GaussianPolicy(state_dim, hidden_dim, self.z_space, cfg=self._cfg.pi_z)
         else:
             pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
 

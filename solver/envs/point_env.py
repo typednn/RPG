@@ -146,9 +146,10 @@ class PointEnv(StateEnv):
 
         from ..draw_utils import plot_colored_embedding
         plt.clf()
-        if 'z' in traj and (traj['z'].max() < 100 or traj['z'].dtype != torch.int64):
+        if 'z' in traj:
             #x = traj['z'].detach().cpu().numpy()
-            print(torch.bincount(traj['z'].long().flatten()))
+            if traj['z'].dtype == torch.int64:
+                print(torch.bincount(traj['z'].long().flatten()))
             plt.imshow(np.uint8(img[...,::-1]*255))
             plot_colored_embedding(traj['z'], states[:, :, :2], s=2)
         else:
