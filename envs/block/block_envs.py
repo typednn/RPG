@@ -89,7 +89,7 @@ class BlockEnv(gym.Env, SimulatorBase):
             pos.append(b.get_qpos())
             vel.append(b.get_qvel())
             diff.append(g.get_pose().p[:2] - b.get_qpos())
-        return np.concatenate(pos + vel + diff)
+        return np.concatenate(pos + vel + diff + [self.get_agent_pos(), self.get_agent_vel()])
 
 
     def step(self, action: np.ndarray):

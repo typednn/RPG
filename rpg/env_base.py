@@ -139,7 +139,7 @@ class GymVecEnv(VecEnv):
         # if 'a' in traj.traj[0]:
         #     assert 'a' not in kwargs
         #     kwargs['a'] = traj.get_tensor('a')
-        return self.vec_env._render_traj_rgb(0, traj=traj, **kwargs)
+        return self.vec_env._render_traj_rgb(0, traj=traj, **kwargs)[0]
 
 class TorchEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated_done=False, **kwargs):

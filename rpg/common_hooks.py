@@ -146,6 +146,12 @@ class save_traj(HookBase):
         if trainer.epoch_id % self.n_epoch == 0:
             assert trainer.mode == 'sample'
             traj = trainer.evaluate(env, steps)
+
+            logger.logkvs_mean(
+                {'eval_' + k: v 
+                 for k, v in traj.summarize_epsidoe_info().items()}
+            )
+
             old_obs = traj.get_tensor('obs')
             if trainer.obs_rms:
                 old_obs = trainer.obs_rms.unormalize(old_obs)

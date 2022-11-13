@@ -297,7 +297,7 @@ class BaseVectorEnv(gym.Env):
             raise RuntimeError(
                 f"Environments {self.waiting_id} are still stepping, cannot "
                 "render them now.")
-        return [self.workers[i]._render_traj_rgb(**kwargs) for i in id]
+        return [self.workers[i].render_traj_rgb(**kwargs) for i in id]
 
     def close(self) -> None:
         """Close all of the environments.

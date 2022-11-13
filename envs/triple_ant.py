@@ -58,19 +58,18 @@ class TripleAntEnv(gym.Env):
         from tools.utils import plt_save_fig_array
         import matplotlib.pyplot as plt
         from solver.draw_utils import plot_colored_embedding
+        import torch
         #states = states.detach().cpu().numpy()
         states = traj.get_tensor('obs', device='cpu')
         z = traj.get_tensor('z', device='cpu')
-        states = states[:, :2]
+        print(torch.bincount(z.long().flatten()))
 
+        states = states[..., :2]
         plt.clf()
-        #states = states * 128 + 64 
-
-        import torch
-        print(torch.bincount(traj['z'].long().flatten()))
         # plt.imshow(np.uint8(img[...,::-1]*255))
         plot_colored_embedding(z, states[:, :, :2], s=2)
 
         # plt.xlim([0, 256])
         # plt.ylim([0, 256])
-        return plt_save_fig_array()[:, :, :3]
+        out = plt_save_fig_array()[:, :, :3]
+        return out
