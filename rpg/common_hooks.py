@@ -149,6 +149,7 @@ class save_traj(HookBase):
             old_obs = traj.get_tensor('obs')
             if trainer.obs_rms:
                 old_obs = trainer.obs_rms.unormalize(old_obs)
+                raise NotImplementedError
             traj.old_obs = old_obs
             img = env.render_traj(traj) 
             logger.savefig(self.traj_name + '.png', img)

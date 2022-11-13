@@ -15,7 +15,7 @@ trainer = Trainer.parse(
 
     wandb=dict(name='hopper2-q'),
     _variants=dict(
-        ln=dict(state_layer_norm=True, path='tmp/hopper_ln', weights=dict(state=10000.)),
+        ln=dict(state_layer_norm=True, path='tmp/hopper_ln', weights=dict(state=10000.), have_done=True),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

@@ -111,6 +111,8 @@ def _worker(
                 break
             elif cmd == "render":
                 p.send(env.render(**data) if hasattr(env, "render") else None)
+            elif cmd == "_render_traj_rgb":
+                p.send(env._render_traj_rgb(**data) if hasattr(env, "render") else None)
             elif cmd == "seed":
                 p.send(env.seed(data) if hasattr(env, "seed") else None)
             elif cmd == "getattr":
@@ -220,6 +222,10 @@ class SubprocEnvWorker(EnvWorker):
 
     def render(self, **kwargs: Any) -> Any:
         self.parent_remote.send(["render", kwargs])
+        return self.parent_remote.recv()
+
+    def _render_traj_rgb(self, **kwargs: Any) -> Any:
+        self.parent_remote.send(["_render_traj_rgb", kwargs])
         return self.parent_remote.recv()
 
     def close_env(self) -> None:

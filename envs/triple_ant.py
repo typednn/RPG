@@ -37,14 +37,40 @@ class TripleAntEnv(gym.Env):
 
         goals = np.array(
             [
+                # [1./2 * 3 ** 0.5 , 1./2],
+                # [-1./2 * 3 ** 0.5, 1./2],
                 [0                      , -1.], 
-                [1./2 * 3 ** 0.5 , 1./2],
-                [-1./2 * 3 ** 0.5, 1./2]
+                [0                      , 1.], 
+                [-1.                      , -0.], 
+                [1.                      , 0.], 
             ], 
         )[:self.n_goals] * self.ant_env.MAZE_SIZE_SCALING
-        reward = -np.linalg.norm( (self.loc[None, :2] - goals[:, :2]), axis=-1)
+        reward = -np.linalg.norm((self.loc[None, :2] - goals[:, :2]), axis=-1)
         reward = reward.max(axis=-1)
         return self.get_obs(), reward, False, {}
 
     def render(self, mode='rgb_array'):
         return self.ant_env.render(mode=mode)
+
+        
+    def _render_traj_rgb(self, traj, **kwargs):
+        import matplotlib.pyplot
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+        from solver.draw_utils import plot_colored_embedding
+        #states = states.detach().cpu().numpy()
+        states = traj.get_tensor('obs', device='cpu')
+        z = traj.get_tensor('z', device='cpu')
+        states = states[:, :2]
+
+        plt.clf()
+        #states = states * 128 + 64 
+
+        import torch
+        print(torch.bincount(traj['z'].long().flatten()))
+        # plt.imshow(np.uint8(img[...,::-1]*255))
+        plot_colored_embedding(z, states[:, :, :2], s=2)
+
+        # plt.xlim([0, 256])
+        # plt.ylim([0, 256])
+        return plt_save_fig_array()[:, :, :3]

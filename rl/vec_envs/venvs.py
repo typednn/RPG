@@ -285,6 +285,20 @@ class BaseVectorEnv(gym.Env):
                 "render them now.")
         return [self.workers[i].render(**kwargs) for i in id]
 
+    def _render_traj_rgb(self, id=None, **kwargs: Any) -> List[Any]:
+        """Render all of the environments."""
+
+        id = self._wrap_id(id)
+        if self.is_async:
+            self._assert_id(id)
+
+        self._assert_is_not_closed()
+        if self.is_async and len(self.waiting_id) > 0:
+            raise RuntimeError(
+                f"Environments {self.waiting_id} are still stepping, cannot "
+                "render them now.")
+        return [self.workers[i]._render_traj_rgb(**kwargs) for i in id]
+
     def close(self) -> None:
         """Close all of the environments.
         This function will be called only once (if not, it will be called during

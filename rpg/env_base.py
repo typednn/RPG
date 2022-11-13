@@ -128,6 +128,19 @@ class GymVecEnv(VecEnv):
         }
         
 
+    def render_traj(self, traj, **kwargs):
+        # from .traj import Trajectory
+        # traj: Trajectory
+        # obs = traj.old_obs
+        # if 'z' in traj.traj[0]:
+        #     if traj.traj[0]['z'] is not None:
+        #         assert 'z' not in kwargs
+        #         kwargs['z'] = traj.get_tensor('z')
+        # if 'a' in traj.traj[0]:
+        #     assert 'a' not in kwargs
+        #     kwargs['a'] = traj.get_tensor('a')
+        return self.vec_env._render_traj_rgb(0, traj=traj, **kwargs)
+
 class TorchEnv(VecEnv):
     def __init__(self, env_name, n, ignore_truncated_done=False, **kwargs):
         # by default we do not have a truncated reward. 

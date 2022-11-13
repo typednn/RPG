@@ -101,7 +101,7 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         r = self.compute_reward()
         # d = np.linalg.norm(self.block.get_qpos() - self.goal)
-        return self._get_obs(), self.compute_reward(), False, {}
+        return self._get_obs(), r, False, {}
 
     def reset(self):
         SimulatorBase.reset(self)
@@ -141,13 +141,13 @@ class BlockEnv(gym.Env, SimulatorBase):
             box_pos = b.get_qpos()
             dist = np.linalg.norm(box_pos - g.get_pose().p[:2])
             self.success += dist < self.success_threshold
-            r += dist ** 2
+            r += dist
 
             contacts.append( np.linalg.norm(agent_pos - box_pos) )
 
         contact_reward = np.min(contacts)
         
-        return - r ** 0.5 -  contact_reward * 0.3 # contact bonus .. 
+        return - r  -  contact_reward * 0.3 # contact bonus .. 
 
 
     def build_scene(self):
