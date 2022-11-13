@@ -38,7 +38,7 @@ class Trainer(Configurable, RLAlgo):
             std_scale=0.2
         ),
         z_head=None,
-        pi_z=SoftPolicyZ.dc,
+        pi_z=None, #SoftPolicyZ.dc,
 
         buffer = ReplayBuffer.dc,
         optim = LossOptimizer.gdc(lr=3e-4),
@@ -77,8 +77,10 @@ class Trainer(Configurable, RLAlgo):
         wandb=None,
 
         dynamic_type='normal',
-
         save_video=0,
+
+        
+        state_dim=100,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -118,17 +120,13 @@ class Trainer(Configurable, RLAlgo):
         self.nets.set_alpha(alpha_a, alpha_z)
         self.target_nets.set_alpha(alpha_a, alpha_z)
 
-    def update(self):
-        self.nets.train()
-        self.sync_alpha()
-        obs_seq, timesteps, action, reward, done_gt, truncated_mask = self.buffer.sample(self._cfg.batch_size)
-
-        # ---------------------- update dynamics ----------------------
-        assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
+        
+    def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
         batch_size = len(obs_seq[0])
+        pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
 
         with torch.no_grad():
-            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, action, timesteps)
+
             gt = dict(reward=reward)
             dyna_loss = dict()
 
@@ -153,7 +151,6 @@ class Trainer(Configurable, RLAlgo):
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
 
-        pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
         output = dict(state=pred_traj['state'][1:], q_value=pred_traj['q_value'],  reward=pred_traj['reward'])
         if self._cfg.qmode == 'value':
             output['q_value'] = pred_traj['pred_values']
@@ -173,12 +170,24 @@ class Trainer(Configurable, RLAlgo):
         self.dyna_optim.optimize(dyna_loss_total)
         info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         logger.logkv_mean('dyna_total_loss', float(dyna_loss_total.mean()))
+        logger.logkvs_mean(info)
 
         s = output['state']
         logger.logkv_mean('state_mean', float(s.mean()))
         logger.logkv_mean('state_min', float(s.min()))
         logger.logkv_mean('state_gax', float(s.max()))
 
+
+    def update(self):
+        self.nets.train()
+        self.sync_alpha()
+        obs_seq, timesteps, action, reward, done_gt, truncated_mask = self.buffer.sample(self._cfg.batch_size)
+
+        # ---------------------- update dynamics ----------------------
+        assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
+        with torch.no_grad():
+            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, action, timesteps)
+        self.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
 
         # ---------------------- update actor ----------------------
         rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
@@ -208,9 +217,8 @@ class Trainer(Configurable, RLAlgo):
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
-            #ema(self.nets, self.target_nets, self._cfg.tau)
             self.intrinsic_reward.ema(self._cfg.tau)
-        logger.logkvs_mean(info)
+
 
 
     def inference(self, n_step, mode='training'):
@@ -229,6 +237,7 @@ class Trainer(Configurable, RLAlgo):
             with torch.no_grad():
                 self.nets.eval()
                 transition = dict(obs = obs, timestep=timestep)
+                prevz = totensor(self.z, device=self.device, dtype=None)
                 a, self.z = self.nets.policy(obs, self.z, timestep)
                 # if mode != 'training' and idx == 0:
                 #     print(self.z, self.nets.pi_z.q_value(self.nets.enc_s(obs, timestep=timestep)))
@@ -237,7 +246,7 @@ class Trainer(Configurable, RLAlgo):
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
                     images.append(self.env.render('rgb_array'))
 
-                transition.update(**data, a=a, z=totensor(self.z, device=self.device, dtype=None))
+                transition.update(**data, a=a, z=prevz)
                 transitions.append(transition)
                 timestep = transition['next_timestep']
                 for idx in range(len(obs)):
@@ -302,7 +311,7 @@ class Trainer(Configurable, RLAlgo):
 
     def make_dynamic_network(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
         # TODO: layer norm?
-        from .utils import ZTransform, config_hidden
+        from .utils import ZTransform
 
         args = []
         class BN(torch.nn.Module):
@@ -375,7 +384,7 @@ class Trainer(Configurable, RLAlgo):
 
     def make_network(self, obs_space, action_space, z_space):
         hidden_dim = 256
-        state_dim = 100
+        state_dim = self._cfg.state_dim
         action_dim = action_space.shape[0]
 
         enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec = self.make_dynamic_network(

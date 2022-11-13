@@ -8,7 +8,7 @@ from .traj import Trajectory
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
     def __init__(self, obs_shape, action_space, episode_length, horizon,
-                       cfg=None, device='cuda:0', max_episode_num=2000, modality='state'):
+                       cfg=None, device='cuda:0', max_episode_num=2000, modality='state', store_z=False):
         super().__init__()
 
         self.cfg = cfg
@@ -34,6 +34,7 @@ class ReplayBuffer(Configurable):
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
+        self._z = None
 
         self._eps = 1e-6
         self._full = False
@@ -56,6 +57,11 @@ class ReplayBuffer(Configurable):
         dones, truncated = traj.get_truncated_done(self.device)
         assert truncated[-1].all()
 
+        if self._cfg.store_z:
+            z = traj.get_tensor('z', self.device, dtype=None)
+            if self._z is None:
+                self._z = torch.empty((self.capacity, *z.shape[2:]), dtype=z.dtype, device=self.device)
+
         for i in range(traj.nenv):
             l = min(length, self.capacity - self.idx)
 
@@ -70,28 +76,35 @@ class ReplayBuffer(Configurable):
             self._truncated[self.idx:self.idx+l] = truncated[:l, i, None]
             self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
 
+            if self._z is not None:
+                self._z[self.idx:self.idx+l] = z[:l, i]
+
             self.idx = (self.idx + l) % self.capacity
             self._full = self._full or self.idx == 0
 
     @torch.no_grad()
-    def sample(self, batch_size):
+    def sample(self, batch_size, horizon=None):
         # NOTE that the data after truncated will be something random ..
+        horizon = horizon or self.horizon
         total = self.total_size()
         idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
 
-        obs_seq = torch.empty((self.horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
-        timesteps = torch.empty((self.horizon + 1, batch_size), dtype=torch.float32, device=self.device)
+        obs_seq = torch.empty((horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
+        timesteps = torch.empty((horizon + 1, batch_size), dtype=torch.float32, device=self.device)
 
-        action = torch.empty((self.horizon, batch_size, *self._action.shape[1:]), dtype=self._action.dtype, device=self.device)
-        reward = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
-        done = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
-        truncated = torch.empty((self.horizon, batch_size, 1), dtype=torch.float32, device=self.device)
+        action = torch.empty((horizon, batch_size, *self._action.shape[1:]), dtype=self._action.dtype, device=self.device)
+        reward = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
+        done = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
+        truncated = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
 
-        _done = None
         obs_seq[0] = self._obs[idxs]
         timesteps[0] = self._timesteps[idxs]
 
-        for t in range(self.horizon):
+        if self._z is not None:
+            z = self._z[idxs] # NOTE: we require the whole z to be the same ..
+
+
+        for t in range(horizon):
             _idxs = (idxs + t).clamp(0, self.capacity-1)
             action[t] = self._action[_idxs]
             reward[t] = self._reward[_idxs]
@@ -105,4 +118,14 @@ class ReplayBuffer(Configurable):
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
         # raise NotImplementedError("The truncation seems incorrect in the end, need to be fixed")
-        return obs_seq, timesteps, action, reward, done, truncated_mask[..., 0]
+        output = (obs_seq, timesteps, action, reward, done, truncated_mask[..., 0])
+        if self._z is not None:
+            output += (z,) #NOTE: this is the z before the state ..
+        return output
+
+    
+    @torch.no_grad()
+    def sample_start(self, batch_size):
+        idx = torch.where(self._timesteps == 0)
+        idx = idx[torch.from_numpy(np.random.choice(len(idx), batch_size, replace=not self._full)).to(self.device)]
+        return self._obs[idx], self._z[idx], self._timesteps[idx]
