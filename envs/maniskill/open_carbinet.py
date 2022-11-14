@@ -320,6 +320,9 @@ class OpenCabinetEnv(MS1BaseEnv):
         # The maximum DoF is 6 in our data.
         return [(self.cabinet, 8)]
 
+    def get_done(self, info: dict, **kwargs):
+        return False # never stop early ..
+
 
 # @register_gym_env(name="OpenCabinetDoor-v1", max_episode_steps=200)
 # class OpenCabinetDoorEnv(OpenCabinetEnv):
