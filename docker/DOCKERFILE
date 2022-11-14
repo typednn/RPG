@@ -88,3 +88,4 @@ RUN curl -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sc
     && chmod +x /usr/local/bin/patchelf
 RUN python3 -c "import gym; gym.make('HalfCheetah-v3')"
 RUN pip install --no-cache scipy
+RUN pip install --no-cache IPython
