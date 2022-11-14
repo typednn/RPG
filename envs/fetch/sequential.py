@@ -13,12 +13,12 @@ class SequentialStack(Configurable, gym.Env):
                  action_range=0.3,
                  frameskip=1,
                  sparse_scale=1.,
-                 contact_scale=100.,
-                 dist_scale=100.,
+                 contact_scale=1.,
+                 dist_scale=10.,
                  n_contact_scale=0.0,
                  random_init=False,
                  random_goal=False,
-                 double_stage=True,
+                 double_stage=False,
                  double_stage_steps=15,
                  incremental_reward=True,
                  substeps=50,
@@ -181,25 +181,25 @@ class SequentialStack(Configurable, gym.Env):
 
         contact_reward = -contact_dist
         dist_reward = -goal_dist
-        if self.incremental_reward:
-            dist_reward = (dist_reward + self.prev_dist) * 10
-            contact_reward = (contact_reward + self.prev_contact) * 10
 
-        if self.double_stage:
-            if self.stage_id == 0:
-                dist_reward = 0.0
-            else:
-                contact_reward *= 0.3
-        else:
-            contact_reward *= 0.3
+        # if self.incremental_reward:
+        #     dist_reward = (dist_reward + self.prev_dist) * 10
+        #     contact_reward = (contact_reward + self.prev_contact) * 10
 
-        if self.stop_dist_reward and subgoal_dists[self.obj_id]<=self.distance_threshold:
-            dist_reward = 0
+        # if self.double_stage:
+        #     if self.stage_id == 0:
+        #         dist_reward = 0.0
+        #     else:
+        #         contact_reward *= 0.3
+        # else:
+        #     contact_reward *= 0.3
+
+        # if self.stop_dist_reward and subgoal_dists[self.obj_id]<=self.distance_threshold:
+        #     dist_reward = 0
 
         reward = ((r + self.num_blocks) * self.sparse_scale # bias ..
                   + contact_reward * self.contact_scale
-                  + dist_reward * self.dist_scale
-                  )
+                  + dist_reward * self.dist_scale)
         return reward
 
     def step(self, action):

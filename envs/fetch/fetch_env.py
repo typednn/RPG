@@ -65,19 +65,19 @@ class FetchEnv(robot_env.RobotEnv):
         else:
             raise NotImplementedError
 
-    def compute_reward_image(self):
-        grip_pos = self.sim.data.get_site_xpos('robot0:grip')
+    # def compute_reward_image(self):
+    #     grip_pos = self.sim.data.get_site_xpos('robot0:grip')
 
-        if not self.has_object:
-            achieved_goal = grip_pos.copy()
-        else:
-            object_pos = self.sim.data.get_site_xpos('object0')
-            achieved_goal = np.squeeze(object_pos.copy())
-        d = np.linalg.norm(achieved_goal - self.goal.copy())
-        if self.reward_type == 'sparse':
-            return -(d > self.distance_threshold).astype(np.float32)
-        else:
-            return -d
+    #     if not self.has_object:
+    #         achieved_goal = grip_pos.copy()
+    #     else:
+    #         object_pos = self.sim.data.get_site_xpos('object0')
+    #         achieved_goal = np.squeeze(object_pos.copy())
+    #     d = np.linalg.norm(achieved_goal - self.goal.copy())
+    #     if self.reward_type == 'sparse':
+    #         return -(d > self.distance_threshold).astype(np.float32)
+    #     else:
+    #         return -d
     # RobotEnv methods
     # ----------------------------
 
