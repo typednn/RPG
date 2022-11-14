@@ -89,6 +89,7 @@ class BlockEnv(gym.Env, SimulatorBase):
             pos.append(b.get_qpos())
             vel.append(b.get_qvel())
             diff.append(g.get_pose().p[:2] - b.get_qpos())
+        assert len(self.get_agent_pos()) == 2
         return np.concatenate(pos + vel + diff + [self.get_agent_pos(), self.get_agent_vel()])
 
 
@@ -195,3 +196,27 @@ class BlockEnv(gym.Env, SimulatorBase):
             0., -1.4, self.block_size, (0.75, 0.25, 0.25),
             self.ranges, "pusher", friction=0, damping=0, material=self.material)
         self.objects.append(self.agent)
+
+        
+    def _render_traj_rgb(self, traj, **kwargs):
+        import matplotlib.pyplot
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+        from solver.draw_utils import plot_colored_embedding
+        import torch
+        #states = states.detach().cpu().numpy()
+        states = traj.get_tensor('obs', device='cpu')
+        z = traj.get_tensor('z', device='cpu')
+
+        if z.dtype == torch.float64:
+            print(torch.bincount(z.long().flatten()))
+
+        states = states[..., -4:-2] # this is the observation of the block push
+        plt.clf()
+        # plt.imshow(np.uint8(img[...,::-1]*255))
+        plot_colored_embedding(z, states[:, :, :2], s=2)
+
+        # plt.xlim([0, 256])
+        # plt.ylim([0, 256])
+        out = plt_save_fig_array()[:, :, :3]
+        return out
