@@ -32,7 +32,7 @@ trainer = SkillLearning.parse(
 
     update_train_step=1,
     hooks=dict(save_traj=dict()),
-    path='tmp/tripleant_n',
+    path='tmp/ant',
     weights=dict(reward=100., q_value=1.),
 
     info=dict(mutual_info_weight=3., action_weight=1., obs_weight=1., epsilon=0.01),
@@ -41,5 +41,9 @@ trainer = SkillLearning.parse(
     save_video=300, # save video ..
     batch_size=512,
     qmode='value',
+    _variants=dict(
+        normal=dict(info=dict(mutual_info_weight=3.), enta=dict(target=-4.), wandb=dict(name='normal_ant')),
+        smallent=dict(info=dict(mutual_info_weight=10.), enta=dict(target=-8.), wandb=dict(name='normal_ant')),
+    )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
