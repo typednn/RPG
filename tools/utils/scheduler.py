@@ -20,7 +20,11 @@ class Scheduler(Configurable, abc.ABC):
             delta = epoch - self.epoch
             self.epoch = epoch
 
-        return self._step(self.epoch, delta)
+        self.value = self._step(self.epoch, delta)
+        return self.value
+    
+    def get(self):
+        return self.value
 
 
     @abc.abstractmethod
@@ -28,28 +32,27 @@ class Scheduler(Configurable, abc.ABC):
         pass
 
 
-class ConstantScheduler(Scheduler):
+class constant(Scheduler):
     def __init__(self, cfg=None) -> None:
-        super().__init__(cfg)
+        super().__init__()
 
     def _step(self, cur_epoch, delta):
-        return self.value
+        return self.init_value
 
 
-class ExponentialScheduler(Scheduler):
-    def __init__(self, cfg=None, decay=0.99, min_value=0.) -> None:
-        super().__init__(cfg)
-        self.decay = cfg.decay
-        self.min_value = cfg.min_value
+class exp(Scheduler):
+    def __init__(self, cfg=None, gamma=0.99, min_value=0.) -> None:
+        super().__init__()
+        self.gamma = gamma
+        self.min_value = min_value
 
     def _step(self, cur_epoch, delta):
-        self.value = max(self.min_value, self.value * (self.decay ** delta))
-        return self.value
+        return max(self.min_value, self.value * (self.gamma ** delta))
 
 
-class MultiStepScheduler(Scheduler):
+class stage(Scheduler):
     def __init__(self, cfg=None, milestones=None, gamma=0.1) -> None:
-        super().__init__(cfg)
+        super().__init__()
         self.milestones = milestones
         self.gamma = gamma
 

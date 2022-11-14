@@ -103,13 +103,22 @@ class InfoNet(Network):
         return self.posterior_z(states)
 
 
-class IntrinsicReward:
+from tools.utils.scheduler import Scheduler
+
+class IntrinsicReward(Configurable):
     def __init__(
         self, enta, entz, info_net: InfoNet, optim_cfg,
+        cfg=None,
+        entz_decay=Scheduler.to_build(TYPE='constant'),
+        info_decay=Scheduler.to_build(TYPE='constant'),
     ):
+        super().__init__()
         self.enta = enta
         self.entz = entz
         self.info_net = info_net
+
+        self.entz_decay = Scheduler.build(entz_decay)
+        self.info_decay = Scheduler.build(info_decay)
         if info_net is not None:
             # import copy
             # self.info_target = copy.deepcopy(info_net)
@@ -135,11 +144,11 @@ class IntrinsicReward:
 
         enta, entz = self.get_ent_from_traj(traj)
         enta = enta * self.enta.alpha
-        entz = entz * self.entz.alpha
+        entz = entz * self.entz.alpha * self.entz_decay.get()
 
         if self.info_net is not None:
-            info_reward = self.info_target(traj, detach=False
-                                           ) * self.info_target._cfg.mutual_info_weight # in case of discrete .. # only use the target to compute
+            info_reward = self.info_target(
+                traj, detach=False) * self.info_target._cfg.mutual_info_weight * self.info_decay.get() # in case of discrete .. # only use the target to compute
         else:
             info_reward = enta * 0.
         entropies = torch.cat((enta, entz, info_reward), dim=-1)
@@ -147,6 +156,8 @@ class IntrinsicReward:
         logger.logkv_mean('reward_enta', enta.mean().item())
         logger.logkv_mean('reward_entz', entz.mean().item())
         logger.logkv_mean('reward_info', info_reward.mean().item())
+        logger.logkv_mean('decay_z', self.entz_decay.get())
+        logger.logkv_mean('decay_info', self.info_decay.get())
 
         assert reward.shape == info_reward.shape
         reward = reward # + info_reward
@@ -154,6 +165,8 @@ class IntrinsicReward:
 
     def update(self, traj):
         #s_seq = self.info_net.get_state_seq(samples).detach()
+        self.entz_decay.step()
+        self.info_decay.step()
         if self.info_net is not None:
             z_detach = traj['z'].detach()
             mutual_info = self.info_net(traj, detach=True).mean()

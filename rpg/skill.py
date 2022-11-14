@@ -51,14 +51,6 @@ class SkillLearning(Trainer):
         )
         return network.cuda(), info_net
 
-    def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
-        self.enta = EntropyLearner(action_space, cfg=self._cfg.enta, device=self.device, lr=self._cfg.optim.lr)
-        self.entz = EntropyLearner(z_space, cfg=self._cfg.entz, device=self.device, lr=self._cfg.optim.lr)
-        self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
-        return IntrinsicReward(
-            self.enta, self.entz, self.info_net, self._cfg.optim
-        )
-
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
             obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)

@@ -81,6 +81,7 @@ class Trainer(Configurable, RLAlgo):
 
         
         state_dim=100,
+        ir=None,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -375,12 +376,9 @@ class Trainer(Configurable, RLAlgo):
     def make_intrinsic_reward(self, obs_space, action_space, z_space, hidden_dim, latent_dim):
         self.enta = EntropyLearner(action_space, cfg=self._cfg.enta, device=self.device, lr=self._cfg.optim.lr)
         self.entz = EntropyLearner(z_space, cfg=self._cfg.entz, device=self.device, lr=self._cfg.optim.lr)
-        if isinstance(action_space, gym.spaces.Box):
-            self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
-        else:
-            self.info_net = None
+        self.info_net = InfoNet(latent_dim, action_space.shape[0], hidden_dim, z_space, cfg=self._cfg.info).cuda()
         return IntrinsicReward(
-            self.enta, self.entz, self.info_net, self._cfg.optim
+            self.enta, self.entz, self.info_net, self._cfg.optim, cfg=self._cfg.ir
         )
 
     def make_network(self, obs_space, action_space, z_space):
@@ -400,6 +398,7 @@ class Trainer(Configurable, RLAlgo):
         head = DistHead.build(action_space, cfg=self._cfg.head)
         pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
         pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
+
 
         network = GeneralizedQ(
             enc_s, enc_a, pi_a, pi_z,

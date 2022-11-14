@@ -40,5 +40,7 @@ trainer = SkillLearning.parse(
     eval_episode=10,
     batch_size=512,
     qmode='value',
+
+    ir=dict(info_decay=dict(TYPE='exp', gamma=0.1), entz_decay=dict(TYPE='exp', gamma=0.1))
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
