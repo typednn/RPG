@@ -54,6 +54,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         random_blocks=False,
         random_goals=False,
         n_block=3,
+        success_reward=0,
     ):
 
         
@@ -75,6 +76,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         obs = self.reset()
         self.observation_space = spaces.Box(low=-4, high=4, shape=(len(obs),))
         self.action_space = spaces.Box(low=-1, high=1, shape=(2,))
+        self.success_reward = success_reward
 
 
     def get_agent_pos(self):
@@ -102,7 +104,7 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         r = self.compute_reward()
         # d = np.linalg.norm(self.block.get_qpos() - self.goal)
-        return self._get_obs(), r, False, {}
+        return self._get_obs(), r, False, {'success': self.success}
 
     def reset(self):
         SimulatorBase.reset(self)
@@ -148,7 +150,7 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         contact_reward = np.min(contacts)
         
-        return - r  -  contact_reward * 0.3 # contact bonus .. 
+        return - r  -  contact_reward * 0.3 + (self.success) * self.success_reward  # contact bonus .. 
 
 
     def build_scene(self):

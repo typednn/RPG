@@ -8,12 +8,13 @@ from rpg.skill import SkillLearning
 
 # max_grad_norm=1.
 N = 1
-env = GymVecEnv('BlockPush', N, ignore_truncated_done=True)
+env = GymVecEnv('BlockPush', N, ignore_truncated_done=True, success_reward=2)
 
 trainer = SkillLearning.parse(
     env,
     pi_z=dict(K=100000),
-    z_dim=10,
+    z_dim=0,
+    z_cont_dim=4,
     steps_per_epoch=1000,
     buffer=dict(max_episode_num=20000),
     head=dict(
