@@ -306,7 +306,7 @@ class OpenCabinetEnv(MS1BaseEnv):
             total_success += info[target_link_id]["success"]
 
         info.update(success=total_success)
-        return np.sum(reward_open) + np.max(ee_to_handles)
+        return np.sum(reward_open) - np.min(ee_to_handles)
 
     # -------------------------------------------------------------------------- #
     # Observations

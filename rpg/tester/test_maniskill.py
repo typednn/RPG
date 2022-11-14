@@ -29,7 +29,7 @@ trainer = SkillLearning.parse(
 
     update_train_step=1,
     hooks=dict(evaluate_pi=dict()),
-    path='tmp/fetch',
+    path='tmp/cabinet',
     weights=dict(reward=100., q_value=1.),
 
     info=dict(mutual_info_weight=10., action_weight=1., obs_weight=1., epsilon=0.01),

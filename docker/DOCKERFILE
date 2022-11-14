@@ -90,3 +90,43 @@ RUN python3 -c "import gym; gym.make('HalfCheetah-v3')"
 RUN pip install --no-cache scipy
 RUN pip install --no-cache IPython
 RUN pip install --no-cache scikit-learn
+
+
+# Install os-level packages
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    vim \
+    tmux \
+    wget \
+    unzip \
+    htop \
+    rsync \
+    ca-certificates \
+    bash-completion \
+    libjpeg-dev \
+    libpng-dev  \
+    libvulkan1 \
+    mesa-utils \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache GitPython
+RUN pip install --no-cache pyyaml
+RUN pip install --no-cache tabulate
+RUN pip install --no-cache imageio
+RUN pip install --no-cache imageio[ffmpeg]
+RUN pip install --no-cache trimesh
+RUN pip install --no-cache open3d
+RUN pip install --no-cache rtree
+
+WORKDIR /root/
+ARG MANISKILL_KEY
+RUN echo "${MANISKILL_KEY}" > ~/.ssh/id_rsa_maniskill
+RUN chmod 600 ~/.ssh/id_rsa_maniskill
+RUN GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa_maniskill -o IdentitiesOnly=yes" git clone git@github.com:haosulab/ManiSkill2-dev.git
+WORKDIR /root/ManiSkill2-dev
+RUN git checkout cvpr2023-for-hza
+RUN python setup.py develop 
+RUN python tools/download.py --uid cabinet
+WORKDIR /root/RPG/
