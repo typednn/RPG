@@ -4,11 +4,14 @@ env = SequentialStack()
 env.reset()
 images = []
 
-images.append(env.render('rgb_array'))
 
-for i in range(10):
-    env.step(env.action_space.sample())
+for i in range(3):
+    env.reset()
     images.append(env.render('rgb_array'))
+
+    for j in range(100):
+        env.step(env.action_space.sample())
+        images.append(env.render('rgb_array'))
 
 from tools.utils import animate
 
