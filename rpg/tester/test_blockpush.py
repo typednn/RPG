@@ -2,14 +2,15 @@ import tqdm
 import numpy as np
 from rpg.env_base import GymVecEnv
 from rpg.ppo import train_ppo
-from rpg.soft_rpg import Trainer
+# $from rpg.soft_rpg import Trainer
+from rpg.skill import SkillLearning
 #from rpg.oc import OptionCritic
 
 # max_grad_norm=1.
 N = 1
 env = GymVecEnv('BlockPush', N, ignore_truncated_done=True)
 
-trainer = Trainer.parse(
+trainer = SkillLearning.parse(
     env,
     pi_z=dict(K=100000),
     z_dim=10,
@@ -37,6 +38,6 @@ trainer = Trainer.parse(
     save_video=300, # save video ..
     batch_size=512,
     qmode='value',
-    max_epoch=200,
+    
 ) # do not know if we need max_grad_norm
-trainer.run_rpgm()
+trainer.run_rpgm(max_epoch=200)
