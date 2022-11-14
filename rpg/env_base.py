@@ -60,6 +60,10 @@ class GymVecEnv(VecEnv):
                 from envs.fetch.sequential import SequentialStack
                 return TimeLimit(SequentialStack(**kwargs), 60)
 
+            elif env_name == 'Cabinet':
+                from envs.maniskill_env import make
+                return TimeLimit(make(**kwargs), 60)
+
             return gym.make(env_name)
 
         self.nenv = n

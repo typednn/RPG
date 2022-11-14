@@ -29,9 +29,10 @@ class OpenCabinetEnv(MS1BaseEnv):
     agent: MobilePandaSingleArm
     MAX_DOF = 8
 
-    def __init__(self, *args, fixed_target_link_idx: int = None, **kwargs):
+    def __init__(self, *args, fixed_target_link_idx: int = None, target_links=None, **kwargs):
         # The index in target links (not all links)
         self._fixed_target_link_idx = fixed_target_link_idx
+        self.my_target_links = target_links
         self._cache_bboxes = {}
         super().__init__(*args, **kwargs)
 
@@ -252,13 +253,16 @@ class OpenCabinetEnv(MS1BaseEnv):
 
     def evaluate(self, **kwargs) -> dict:
         infos = {}
+
+        qpos = self.cabinet.get_qpos()
+
         for target_link_idx in range(len(self.target_links)):
             vel_norm = np.linalg.norm(self.target_link[target_link_idx].velocity)
             ang_vel_norm = np.linalg.norm(self.target_link[target_link_idx].angular_velocity)
-            link_qpos = self.link_qpos[target_link_idx]
+            link_qpos = qpos[target_link_idx]
 
             flags = dict(
-                open_enough=link_qpos >= self.target_qpos,
+                open_enough=link_qpos >= self.target_qpos[target_link_idx],
             )
 
             infos[target_link_idx] = dict(
@@ -277,9 +281,12 @@ class OpenCabinetEnv(MS1BaseEnv):
         ee_to_handles = []
         reward_open = []
         total_success = 0
-        for target_link_id in [0]: # just grasp the first ..
+
+        target_links = [0] if self.my_target_links is None else self.my_target_links
+
+        for target_link_id in target_links: # just grasp the first ..
             handle_pose = self.target_link[target_link_id].pose
-            ee_pose = self.agent.hand.pose
+            # ee_pose = self.agent.hand.pose
 
             # Position
             ee_coords = self.agent.get_ee_coords_sample()  # [2, 10, 3]
@@ -296,7 +303,6 @@ class OpenCabinetEnv(MS1BaseEnv):
 
             reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 4
             reward_open.append(reward_qpos)
-
             total_success += info[target_link_id]["success"]
 
         info.update(success=total_success)
