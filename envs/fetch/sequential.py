@@ -23,7 +23,7 @@ class SequentialStack(Configurable, gym.Env):
                  incremental_reward=True,
                  substeps=50,
                  norm=2,
-                 include_step_in_obs=False,
+                 include_step_in_obs=True,
                  distance_threshold=0.05,
                  stop_dist_reward=False):
         super(SequentialStack, self).__init__()
@@ -96,11 +96,11 @@ class SequentialStack(Configurable, gym.Env):
 
         len_obs = 10
         assert len(obs) == len_obs + self.num_blocks * 15
-        if self.include_step_in_obs:
-            obs = np.append(obs, self.steps%self.substeps/self.substeps)
-            len_obs += 1
         robot_state = obs[:len_obs]
         block_states = obs[len_obs:].reshape(self.num_blocks, -1)
+        if self.include_step_in_obs:
+            robot_state = np.append(robot_state, self.steps/self.substeps)
+            len_obs += 1
         if include_stage:
             stages = np.zeros((self.num_blocks, self.stage_dim))
             stages[self.obj_id, self.stage_id] = 1

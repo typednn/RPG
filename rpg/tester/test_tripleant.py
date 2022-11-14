@@ -13,7 +13,7 @@ env = GymVecEnv('TripleAnt', N, ignore_truncated_done=True, n_goals=4)
 trainer = SkillLearning.parse(
     env,
     pi_z=dict(K=100000),
-    z_dim=15,
+    z_dim=10,
     steps_per_epoch=1000,
     buffer=dict(max_episode_num=20000),
     head=dict(
@@ -21,7 +21,7 @@ trainer = SkillLearning.parse(
         std_scale = 1.,
         squash=True
     ),
-    enta=dict(coef=1., target_mode='auto', target=1.),
+    enta=dict(coef=1., target_mode='auto', target=2.),
     entz=dict(coef=100000., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=2,

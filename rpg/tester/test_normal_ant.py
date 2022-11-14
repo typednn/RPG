@@ -16,7 +16,7 @@ trainer = SkillLearning.parse(
     pi_z=dict(K=100000),
     # z_dim=10,
     z_dim=0,
-    z_cont_dim=4,
+    z_cont_dim=5,
     steps_per_epoch=1000,
     buffer=dict(max_episode_num=20000),
     head=dict(
@@ -24,18 +24,18 @@ trainer = SkillLearning.parse(
         std_scale = 1.,
         squash=True
     ),
-    enta=dict(coef=1., target_mode='auto', target=1.),
+    enta=dict(coef=1., target_mode='auto', target=0.),
     entz=dict(coef=100000., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=2,
-    actor_delay=4, #10,
+    actor_delay=2, #10,
 
     update_train_step=1,
     hooks=dict(save_traj=dict()),
     path='tmp/tripleant_n',
     weights=dict(reward=100., q_value=1.),
 
-    info=dict(mutual_info_weight=2., action_weight=1., obs_weight=1., epsilon=0.01),
+    info=dict(mutual_info_weight=3., action_weight=1., obs_weight=1., epsilon=0.01),
 
     eval_episode=10,
     save_video=300, # save video ..
