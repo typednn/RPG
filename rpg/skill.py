@@ -13,7 +13,7 @@ class SkillLearning(Trainer):
     # gaussian latent ..
     def __init__(self,
                  env: Union[GymVecEnv, TorchEnv],
-                 cfg=None, z_dim=0, z_cont_dim=10, buffer=dict(store_z=True)
+                 cfg=None, z_dim=0, z_cont_dim=0, buffer=dict(store_z=True)
             ):
         super().__init__(env)
 

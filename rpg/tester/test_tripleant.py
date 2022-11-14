@@ -2,14 +2,15 @@ import tqdm
 import numpy as np
 from rpg.env_base import GymVecEnv
 from rpg.ppo import train_ppo
-from rpg.soft_rpg import Trainer
+#from rpg.soft_rpg import Trainer
 #from rpg.oc import OptionCritic
+from rpg.skill import SkillLearning
 
 # max_grad_norm=1.
 N = 1
 env = GymVecEnv('TripleAnt', N, ignore_truncated_done=True, n_goals=4)
 
-trainer = Trainer.parse(
+trainer = SkillLearning.parse(
     env,
     pi_z=dict(K=100000),
     z_dim=10,
@@ -20,7 +21,7 @@ trainer = Trainer.parse(
         std_scale = 1.,
         squash=True
     ),
-    enta=dict(coef=1., target_mode='auto'),
+    enta=dict(coef=1., target_mode='auto', target=1.),
     entz=dict(coef=100000., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=2,

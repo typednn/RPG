@@ -62,7 +62,9 @@ class TripleAntEnv(gym.Env):
         #states = states.detach().cpu().numpy()
         states = traj.get_tensor('obs', device='cpu')
         z = traj.get_tensor('z', device='cpu')
-        print(torch.bincount(z.long().flatten()))
+
+        if z.dtype == torch.float64:
+            print(torch.bincount(z.long().flatten()))
 
         states = states[..., :2]
         plt.clf()

@@ -151,6 +151,7 @@ class PolicyZ(AlphaPolicyBase):
         new_action_prob = torch.zeros_like(new_action).float()
         z = prevz.clone()
 
+
         logp_z = torch.zeros_like(new_action_prob)
         entropy = torch.zeros_like(new_action_prob) 
 
