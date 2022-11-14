@@ -69,7 +69,6 @@ RUN pip install mujoco_py
 RUN pip install tensorboardX
 RUN pip install opencv-python
 RUN pip install tqdm
-RUN pip install gym==0.23.1
 RUN pip install yacs>=0.1.8
 RUN pip install matplotlib
 RUN pip install transforms3d
@@ -86,6 +85,7 @@ RUN pip install mujoco
 
 RUN curl -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
     && chmod +x /usr/local/bin/patchelf
+RUN pip install gym==0.21.0
 RUN python3 -c "import gym; gym.make('HalfCheetah-v3')"
 RUN pip install --no-cache scipy
 RUN pip install --no-cache IPython
