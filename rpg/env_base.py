@@ -41,24 +41,24 @@ class GymVecEnv(VecEnv):
             from gym.wrappers import TimeLimit
             if env_name == 'AntPush':
                 from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 500)
+                return TimeLimit(AntHEnv(env_name, **kwargs), 60)
 
             elif env_name == 'TripleAnt':
                 from envs.triple_ant import TripleAntEnv
-                return TimeLimit(TripleAntEnv( **kwargs), 100)
+                return TimeLimit(TripleAntEnv( **kwargs), 60)
 
             elif env_name == 'BlockPush':
                 import os
                 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
                 from envs.block import BlockEnv
-                return TimeLimit(BlockEnv(**kwargs), 100)
+                return TimeLimit(BlockEnv(**kwargs), 60)
 
 
             elif env_name == 'Fetch':
-                import os
-                os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+                # import os
+                # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
                 from envs.fetch.sequential import SequentialStack
-                return TimeLimit(SequentialStack(**kwargs), 100)
+                return TimeLimit(SequentialStack(**kwargs), 60)
 
             return gym.make(env_name)
 

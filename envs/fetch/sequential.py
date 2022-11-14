@@ -21,7 +21,7 @@ class SequentialStack(Configurable, gym.Env):
                  double_stage=False,
                  double_stage_steps=15,
                  incremental_reward=True,
-                 substeps=50,
+                 substeps=30,
                  norm=2,
                  include_step_in_obs=True,
                  distance_threshold=0.05,
