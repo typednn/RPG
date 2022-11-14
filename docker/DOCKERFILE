@@ -89,3 +89,4 @@ RUN pip install gym==0.21.0
 RUN python3 -c "import gym; gym.make('HalfCheetah-v3')"
 RUN pip install --no-cache scipy
 RUN pip install --no-cache IPython
+RUN pip install --no-cache sklearn
