@@ -251,30 +251,32 @@ class OpenCabinetEnv(MS1BaseEnv):
         return self.cabinet.get_qvel()[self.target_joint_idx_q]
 
     def evaluate(self, **kwargs) -> dict:
-        vel_norm = np.linalg.norm(self.target_link.velocity)
-        ang_vel_norm = np.linalg.norm(self.target_link.angular_velocity)
-        link_qpos = self.link_qpos
+        infos = {}
+        for target_link_idx in range(len(self.target_links)):
+            vel_norm = np.linalg.norm(self.target_link[target_link_idx].velocity)
+            ang_vel_norm = np.linalg.norm(self.target_link[target_link_idx].angular_velocity)
+            link_qpos = self.link_qpos[target_link_idx]
 
-        flags = dict(
-            cabinet_static=vel_norm <= 0.1 and ang_vel_norm <= 1,
-            open_enough=link_qpos >= self.target_qpos,
-        )
+            flags = dict(
+                open_enough=link_qpos >= self.target_qpos,
+            )
 
-        return dict(
-            success=all(flags.values()),
-            **flags,
-            link_vel_norm=vel_norm,
-            link_ang_vel_norm=ang_vel_norm,
-            link_qpos=link_qpos
-        )
+            infos[target_link_idx] = dict(
+                success=all(flags.values()),
+                **flags,
+                link_vel_norm=vel_norm,
+                link_ang_vel_norm=ang_vel_norm,
+                link_qpos=link_qpos
+            )
+        return infos
 
     def compute_dense_reward(self, *args, info: dict, **kwargs):
-        reward = 0.0
-
         # -------------------------------------------------------------------------- #
         # The end-effector should be close to the target pose
         # -------------------------------------------------------------------------- #
         ee_to_handles = []
+        reward_open = []
+        total_success = 0
         for target_link_id in [0]: # just grasp the first ..
             handle_pose = self.target_link[target_link_id].pose
             ee_pose = self.agent.hand.pose
@@ -290,71 +292,15 @@ class OpenCabinetEnv(MS1BaseEnv):
             # reward_ee_to_handle = -
             #reward += reward_ee_to_handle
             ee_to_handles.append(dist_ee_to_handle.mean() * 2)
+            link_qpos = info[target_link_id]["link_qpos"]
 
-            # # Encourage grasping the handle
-            # ee_center_at_world = ee_coords.mean(0)  # [10, 3]
-            # ee_center_at_handle = transform_points(
-            #     handle_pose.inv().to_transformation_matrix(), ee_center_at_world
-            # )
-            # dist_ee_center_to_handle = self.target_handle_sdf.signed_distance(
-            #     ee_center_at_handle
-            # )
-            # dist_ee_center_to_handle = dist_ee_center_to_handle.max()
-            # reward_ee_center_to_handle = (
-            #     clip_and_normalize(dist_ee_center_to_handle, -0.01, 4e-3) - 1
-            # )
-            # reward += reward_ee_center_to_handle
+            reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 4
+            reward_open.append(reward_qpos)
 
-            # # Rotation
-            # target_grasp_poses = self.target_handles_grasp_poses[self.target_link_idx]
-            # angles_ee_to_grasp_poses = [
-            #     angle_distance(ee_pose, x) for x in target_grasp_poses
-            # ]
-            # ee_rot_reward = min(angles_ee_to_grasp_poses) / np.pi
-            # reward += ee_rot_reward
+            total_success += info[target_link_id]["success"]
 
-            # -------------------------------------------------------------------------- #
-            # Stage reward
-            # -------------------------------------------------------------------------- #
-            stage_reward = -5
-            coeff_qvel = 1.5  # joint velocity
-            coeff_qpos = 0.5  # joint position distance
-            link_qpos = info["link_qpos"]
-            link_qvel = self.link_qvel
-
-            ee_close_to_handle = (
-                dist_ee_to_handle.max() <= 0.01 and dist_ee_center_to_handle > 0
-            )
-            if ee_close_to_handle:
-                stage_reward += 0.5
-
-                # Distance between current and target joint positions
-                # TODO(jigu): the lower bound 0 is problematic? should we use lower bound of joint limits?
-                reward_qpos = (
-                    clip_and_normalize(link_qpos, 0, self.target_qpos) * coeff_qpos
-                )
-                reward += reward_qpos
-
-                if not info["open_enough"]:
-                    # Encourage positive joint velocity to increase joint position
-                    reward_qvel = clip_and_normalize(link_qvel, -0.1, 0.5) * coeff_qvel
-                    reward += reward_qvel
-                else:
-                    # Add coeff_qvel for smooth transition of stagess
-                    stage_reward += 2 + coeff_qvel
-                    reward_static = -(
-                        info["link_vel_norm"] + info["link_ang_vel_norm"] * 0.5
-                    )
-                    reward += reward_static
-
-                    if info["cabinet_static"]:
-                        stage_reward += 1
-
-        # Update info
-        info.update(ee_close_to_handle=ee_close_to_handle, stage_reward=stage_reward)
-
-        reward += stage_reward
-        return reward
+        info.update(success=total_success)
+        return np.sum(reward_open) + np.max(ee_to_handles)
 
     # -------------------------------------------------------------------------- #
     # Observations
