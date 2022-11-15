@@ -116,12 +116,13 @@ class SequentialStack(Configurable, gym.Env):
         if not self.random_init or self.goal is None:
             self.env.seed(1)
 
-        sim_config = dict(
-            init_pos = dict(
-                object0 = [1.42368875, 0.63464874],
-                object1 = [1.24926771, 0.65516281],
-            )
-        )
+        # sim_config = dict(
+        #     init_pos = dict(
+        #         object0 = [1.42368875, 0.67464874],
+        #         object1 = [1.24926771, 0.65516281],
+        #     )
+        # )
+        sim_config = {}
         self.env.reset(self.goal is None or self.random_goal, **sim_config)
         self.goal = True # sampled goal
 
