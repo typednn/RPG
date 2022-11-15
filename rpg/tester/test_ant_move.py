@@ -37,6 +37,8 @@ trainer = SkillLearning.parse(
 
     info=dict(mutual_info_weight=3., action_weight=1., obs_weight=1., epsilon=0.01),
 
+    gamma=0.97,
+
     eval_episode=10,
     save_video=300, # save video ..
     batch_size=512,
@@ -64,6 +66,7 @@ trainer = SkillLearning.parse(
 
         rew = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.2, action_weight=0.), ir=dict(reward_decay=dict(init_value=0.1)), wandb=dict(name='antmove'), enta=dict(coef=1., target=2.)),
 
+        rew_incr = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.2, action_weight=0.), ir=dict(reward_decay=dict(init_value=0.1, TYPE='exp', start=50000, end=200000, )), wandb=dict(name='antmove'), enta=dict(coef=1., target=1.)),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

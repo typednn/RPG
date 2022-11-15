@@ -40,6 +40,8 @@ trainer = SkillLearning.parse(
     batch_size=512,
     qmode='Q',
 
+    gamma=0.97
+
     _variants=dict(
         mbrl=dict(z_dim=1, z_cont_dim=0),
         maxent=dict(),
@@ -54,8 +56,10 @@ trainer = SkillLearning.parse(
             pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False)),
             info=dict(mutual_info_weight=2., action_weight=0.),
         ),
-        entz3 = dict(
+        # entz3 entz coef is 10000 ..  
+        entz4 = dict(
             enta=dict(target=-1.),
+            entz=dict(coef=100.),
             ir=dict(entz_decay=dict(TYPE='exp', start=10, end=1000000, min_value=0.0001), reward_decay=dict(init_value=0.4)),
             pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False)),
             info=dict(mutual_info_weight=2., action_weight=0.),

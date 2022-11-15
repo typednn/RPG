@@ -41,7 +41,7 @@ class constant(Scheduler):
 
 
 class exp(Scheduler):
-    def __init__(self, cfg=None, gamma=0.99, min_value=0., start=0, end=None) -> None:
+    def __init__(self, cfg=None, gamma=0.99, min_value=0., start=0, end=None, target_value=None) -> None:
         super().__init__()
         self.gamma = gamma
         self.min_value = min_value
@@ -53,7 +53,8 @@ class exp(Scheduler):
             # decaying b
             assert self.end > self.start
             import numpy as np
-            self.gamma = np.exp((np.log(max(self.min_value, 1e-10)) - np.log(self.init_value))  / (self.end - self.start))
+            target_value = target_value or self.min_value
+            self.gamma = np.exp((np.log(max(target_value, 1e-10)) - np.log(self.init_value))  / (self.end - self.start))
 
     def _step(self, cur_epoch, delta):
         if cur_epoch < self.start:
@@ -61,6 +62,8 @@ class exp(Scheduler):
 
         if self.end is None:
             return max(self.min_value, self.value * (self.gamma ** delta))
+        if cur_epoch > self.end:
+            return self.value
         return max(self.min_value, self.init_value * (self.gamma ** (cur_epoch - self.start)))
 
 

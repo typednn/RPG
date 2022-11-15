@@ -118,7 +118,7 @@ class SequentialStack(Configurable, gym.Env):
 
         sim_config = dict(
             init_pos = dict(
-                object0 = [1.14926771, 0.90516281],
+                object0 = [1.42368875, 0.90516281],
                 object1 = [1.42368875, 0.67464874],
             )
         )
@@ -196,6 +196,7 @@ class SequentialStack(Configurable, gym.Env):
 
         # print(contact_dists)
 
+        print(contact_dists)
 
         r = - not_reached.sum()
         if len(contact_dists) > 0:
@@ -205,6 +206,7 @@ class SequentialStack(Configurable, gym.Env):
         dist_reward = - subgoal_dists.sum()
 
         info['success'] = (1-not_reached).sum()
+
 
         # contact_reward = -contact_dist
         # dist_reward = -goal_dist
