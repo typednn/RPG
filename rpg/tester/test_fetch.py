@@ -41,7 +41,7 @@ trainer = SkillLearning.parse(
 
     _variants=dict(
         mbrl=dict(z_dim=1),
-        maxent=dict(z_dim=0, z_cont_dim=4,),
+        maxent=dict(z_dim=0, z_cont_dim=4, ir=dict(reward_decay=dict(init_value=0.2))),
     )
     
 ) # do not know if we need max_grad_norm
