@@ -11,7 +11,6 @@ if __name__ == '__main__':
     env.reset()
     images.append(env.render(mode='rgb_array'))
     for i in range(100):
-        env.reset()
         env.step(env.action_space.sample())
         images.append(env.render(mode='rgb_array'))
     from tools.utils import animate

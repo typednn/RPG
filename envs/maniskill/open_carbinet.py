@@ -172,12 +172,13 @@ class OpenCabinetEnv(MS1BaseEnv):
     def _initialize_robot(self):
         # Base position
         # The forward direction of cabinets is -x.
-        center = np.array([0, 0.8])
+        center = np.array([0, 0.8 - 0.3]) # closer to link1
         dist = self._episode_rng.uniform(1.6, 1.8)
         theta = self._episode_rng.uniform(0.9 * np.pi, 1.1 * np.pi)
+        # theta = 1.
+        theta = np.pi
         direction = np.array([np.cos(theta), np.sin(theta)])
         xy = center + direction * dist
-        print(xy)
 
         # Base orientation
         noise_ori = self._episode_rng.uniform(-0.05 * np.pi, 0.05 * np.pi)
@@ -302,10 +303,10 @@ class OpenCabinetEnv(MS1BaseEnv):
             ee_to_handles.append(dist_ee_to_handle.mean() * 2)
             link_qpos = info[target_link_id]["link_qpos"]
 
-            reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 4
-            reward_open.append(reward_qpos)
-            total_success += info[target_link_id]["success"]
-        print(ee_to_handles)
+            if target_link_id == 1:
+                reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 5
+                reward_open.append(reward_qpos)
+                total_success += info[target_link_id]["success"]
 
         info.update(success=total_success)
         return np.sum(reward_open) - np.min(ee_to_handles)
