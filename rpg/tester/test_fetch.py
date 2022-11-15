@@ -24,8 +24,8 @@ trainer = SkillLearning.parse(
     enta=dict(coef=1., target_mode='auto'),
     entz=dict(coef=10000., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
-    horizon=2,
-    actor_delay=4, #10,
+    horizon=3,
+    actor_delay=2, #10,
 
     update_train_step=1,
     hooks=dict(evaluate_pi=dict()),
@@ -34,7 +34,7 @@ trainer = SkillLearning.parse(
 
     info=dict(mutual_info_weight=1., action_weight=1., obs_weight=1., epsilon=0.01),
 
-    eval_episode=10,
+    eval_episode=1,
     save_video=300, # save video ..
     batch_size=512,
     qmode='value',
