@@ -304,7 +304,7 @@ class OpenCabinetEnv(MS1BaseEnv):
             link_qpos = info[target_link_id]["link_qpos"]
 
             if target_link_id == 0:
-                reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 5
+                reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 4
                 reward_open.append(reward_qpos)
                 total_success += info[target_link_id]["success"]
 
