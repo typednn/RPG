@@ -33,8 +33,7 @@ trainer = SkillLearning.parse(
     path='tmp/blockpush',
     weights=dict(reward=100., q_value=1.),
 
-    #info=dict(mutual_info_weight=10., action_weight=1., obs_weight=1., epsilon=0.01),
-    info=dict(mutual_info_weight=1., action_weight=1., obs_weight=1., epsilon=0.01),
+    info=dict(mutual_info_weight=2., action_weight=1., obs_weight=1., epsilon=0.01),
 
     eval_episode=10,
     save_video=300, # save video ..
@@ -44,6 +43,11 @@ trainer = SkillLearning.parse(
     _variants=dict(
         mbrl=dict(z_dim=1, z_cont_dim=0),
         maxent=dict(),
+        entz=dict(
+            entz=dict(coef=100.),
+            ir=dict(entz_decay=dict(TYPE='exp', start=10, end=1000000, min_value=0.0001)),
+            pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))
+        )
     )
     
 ) # do not know if we need max_grad_norm
