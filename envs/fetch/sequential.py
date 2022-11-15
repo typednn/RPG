@@ -36,7 +36,6 @@ class SequentialStack(Configurable, gym.Env):
         self.action_range = action_range
         self.distance_threshold = distance_threshold
 
-        self.obj_id = 0
         self.stage_id = 0
         self.steps = 0
         self.num_blocks = num_blocks
@@ -82,7 +81,7 @@ class SequentialStack(Configurable, gym.Env):
         self.double_stage = double_stage
         self.double_stage_steps = double_stage_steps
 
-        self.observation_space = gym.spaces.Box(-np.inf, np.inf, (len_obs + self.stage_dim * self.num_blocks + (self.num_blocks + 1) * 3
+        self.observation_space = gym.spaces.Box(-np.inf, np.inf, (len_obs + (self.num_blocks + 1) * 3
                                                                   + int(self.include_step_in_obs),))
         self.observation_space.shared_dim = 10 + int(self.include_step_in_obs)
         self.observation_space.num_blocks = self.num_blocks
@@ -101,14 +100,14 @@ class SequentialStack(Configurable, gym.Env):
         if self.include_step_in_obs:
             robot_state = np.append(robot_state, self.steps/self.substeps)
             len_obs += 1
-        if include_stage:
-            stages = np.zeros((self.num_blocks, self.stage_dim))
-            stages[self.obj_id, self.stage_id] = 1
-            block_states = np.concatenate((block_states, stages), 1)
-        if include_stage_id:
-            subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
-            dist = np.array(subgoal_dists) <= self.distance_threshold
-            block_states = np.concatenate((block_states, dist[:, None]), 1)
+        # if include_stage:
+        #     stages = np.zeros((self.num_blocks, self.stage_dim))
+        #     stages[self.obj_id, self.stage_id] = 1
+        #     block_states = np.concatenate((block_states, stages), 1)
+        # if include_stage_id:
+        #     subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
+        #     dist = np.array(subgoal_dists) <= self.distance_threshold
+        #     block_states = np.concatenate((block_states, dist[:, None]), 1)
         obs = np.concatenate((robot_state, block_states.reshape(-1), self.obs['desired_goal']))
         return obs
 
@@ -117,70 +116,90 @@ class SequentialStack(Configurable, gym.Env):
         if not self.random_init or self.goal is None:
             self.env.seed(1)
 
-        self.env.reset(self.goal is None or self.random_goal)
+        sim_config = dict(
+            init_pos = dict(
+                object1 = [1.24926771, 0.65516281],
+                object0 = [1.42368875, 0.61464874],
+            )
+        )
+        self.env.reset(self.goal is None or self.random_goal, **sim_config)
         self.goal = True # sampled goal
 
         self.obs = self.env.unwrapped._get_obs()
-        self.obj_id = 0
         self.stage_id = 0
         self.steps = 0
         return self._get_obs()
 
-    def contact_dist(self):
-        target_pose = np.copy(self.obs['achieved_goal'][self.obj_id*3:(self.obj_id+1)*3][:])
-        target_pose[2] += 0.02
+    # def contact_dist(self):
+    #     target_pose = np.copy(self.obs['achieved_goal'][self.obj_id*3:(self.obj_id+1)*3][:])
+    #     target_pose[2] += 0.02
 
-        return np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
+    #     return np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
 
     def subgoal_distances(self, achieved, goal):
         out = achieved[:-3] - self.env.goal[:-3]
         out = out.reshape(-1, 3)
         return np.linalg.norm(out, self.norm, axis=1)
 
-    def get_n_contact(self):
-        sim = self.env.sim
-        left=0
-        right=0
-        obj_name = f'object{self.obj_id}'
-        for i in range(sim.data.ncon):
-            contact = sim.data.contact[i]
-            a, b = sim.model.geom_id2name(contact.geom1), sim.model.geom_id2name(contact.geom2)
-            #print('contact', i)
-            #print('dist', contact.dist)
-            if a is None or b is None:
-                continue
-            if 'finger' in a:
-                a, b = b, a
-            if a == obj_name:
-                if 'l_gripper' in b :
-                    left = 1
-                else:
-                    right = 1
-        return left + right
+    # def get_n_contact(self):
+    #     sim = self.env.sim
+    #     left=0
+    #     right=0
+    #     obj_name = f'object{self.obj_id}'
+    #     for i in range(sim.data.ncon):
+    #         contact = sim.data.contact[i]
+    #         a, b = sim.model.geom_id2name(contact.geom1), sim.model.geom_id2name(contact.geom2)
+    #         #print('contact', i)
+    #         #print('dist', contact.dist)
+    #         if a is None or b is None:
+    #             continue
+    #         if 'finger' in a:
+    #             a, b = b, a
+    #         if a == obj_name:
+    #             if 'l_gripper' in b :
+    #                 left = 1
+    #             else:
+    #                 right = 1
+    #     return left + right
 
     def f(self, x):
         return -(x + np.log(x+0.005))
 
-    def compute_prev_reward(self):
-        obj_goal = np.copy(self.env.goal[self.obj_id*3:self.obj_id*3+3])
-        if self.incremental_reward:
-            self.prev_dist = np.linalg.norm(self.obs['achieved_goal'][self.obj_id * 3:self.obj_id * 3 + 3] - obj_goal, self.norm)
-            self.prev_contact = self.contact_dist()
+    # def compute_prev_reward(self):
+    #     obj_goal = np.copy(self.env.goal[self.obj_id*3:self.obj_id*3+3])
+    #     if self.incremental_reward:
+    #         self.prev_dist = np.linalg.norm(self.obs['achieved_goal'][self.obj_id * 3:self.obj_id * 3 + 3] - obj_goal, self.norm)
+    #         self.prev_contact = self.contact_dist()
 
     def compute_reward_info(self, info):
-        obj_goal = np.copy(self.env.goal[self.obj_id*3:self.obj_id*3+3])
+        # obj_goal = np.copy(self.env.goal[self.obj_id*3:self.obj_id*3+3])
         subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
-        contact_dist = self.contact_dist()
-        goal_dist = np.linalg.norm(self.obs['achieved_goal'][self.obj_id * 3:self.obj_id * 3 + 3] - obj_goal, self.norm)
+        # contact_dist = self.contact_dist()
+        contact_dists = []
+        reached = np.array(subgoal_dists) > self.distance_threshold
 
-        r = -(np.array(subgoal_dists) > self.distance_threshold).sum()
+        for obj_id in range(self.num_blocks):
+            target_pose = np.copy(self.obs['achieved_goal'][obj_id*3:(obj_id+1)*3][:])
+            target_pose[2] += 0.02
 
-        info['done_bool'] = False
-        info['contact_dist'] = contact_dist
-        info['success'] = (np.array(subgoal_dists) < self.env.distance_threshold).sum()
+            to_contact = np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
+            if reached[obj_id]:
+                to_contact = 0.
 
-        contact_reward = -contact_dist
-        dist_reward = -goal_dist
+            contact_dists.append(to_contact) # hand ..
+
+            # obj_goal = np.copy(self.env.goal[obj_id*3:obj_id*3+3])
+            # goal_dists.append(np.linalg.norm(self.obs['achieved_goal'][obj_id * 3:obj_id * 3 + 3] - obj_goal, self.norm))
+
+
+        r = - reached.sum()
+        contact_reward = - np.min(contact_dists)
+        dist_reward = - subgoal_dists.sum()
+
+        info['success'] = reached.sum()
+
+        # contact_reward = -contact_dist
+        # dist_reward = -goal_dist
 
         # if self.incremental_reward:
         #     dist_reward = (dist_reward + self.prev_dist) * 10
@@ -205,32 +224,32 @@ class SequentialStack(Configurable, gym.Env):
     def step(self, action):
         action = np.array(action).clip(-1, 1)
         # print('prev achieved', self.obs['achieved_goal'][self.obj_id * 3:(self.obj_id+1)*3])
-        self.compute_prev_reward()
+        # self.compute_prev_reward()
         self.obs, r, _, info = self.env.step(action)
         reward = self.compute_reward_info(info)
 
         obs = self._get_obs()
 
-        # don't write below
-        stage_step = (self.steps + 1) % self.substeps
-        if stage_step == 0:
-            self.obj_id = min(self.obj_id+1, self.num_blocks-1)
-            self.stage_id = 0
-        if stage_step == self.double_stage_steps and self.double_stage:
-            self.stage_id = 1
+        # # don't write below
+        # stage_step = (self.steps + 1) % self.substeps
+        # if stage_step == 0:
+        #     self.obj_id = min(self.obj_id+1, self.num_blocks-1)
+        #     self.stage_id = 0
+        # if stage_step == self.double_stage_steps and self.double_stage:
+        #     self.stage_id = 1
 
         self.steps += 1
 
-        done = (self.steps>=self._max_episode_steps)
-        return obs, reward, done, info
+        # done = (self.steps>=self._max_episode_steps)
+        return obs, reward, False, info
 
     def render(self, mode='human'):
         return self.env.render(mode)
 
-    def state_vector(self):
-        return np.concatenate([self.env.get_state(), [self.obj_id, self.steps]])
+    # def state_vector(self):
+    #     return np.concatenate([self.env.get_state(), [self.obj_id, self.steps]])
 
-    def set_state(self, state):
-        self.obj_id = int(state[-2])
-        self.steps = int(state[-1])
-        self.env.set_state(state[:-2])
+    # def set_state(self, state):
+    #     self.obj_id = int(state[-2])
+    #     self.steps = int(state[-1])
+    #     self.env.set_state(state[:-2])

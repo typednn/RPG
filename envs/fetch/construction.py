@@ -170,7 +170,7 @@ class FetchBlockConstructionEnv(fetch_env.FetchEnv, gym_utils.EzPickle):
 
         self.sim.forward()
 
-    def _reset_sim(self):
+    def _reset_sim(self, init_pos=None):
         assert self.num_blocks <= 17 # Cannot sample collision free block inits with > 17 blocks
         self.sim.set_state(self.initial_state)
 
@@ -186,6 +186,9 @@ class FetchBlockConstructionEnv(fetch_env.FetchEnv, gym_utils.EzPickle):
 
 
             prev_obj_xpos.append(object_xypos)
+
+            if init_pos is not None:
+                object_xypos = init_pos[obj_name]
 
             object_qpos = self.sim.data.get_joint_qpos(F"{obj_name}:joint")
             assert object_qpos.shape == (7,)

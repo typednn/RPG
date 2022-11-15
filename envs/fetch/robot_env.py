@@ -102,7 +102,7 @@ class RobotEnv(gym.GoalEnv):
             raise("Obs_type not recognized")
         return obs, reward, done, info
 
-    def reset(self, sample_goal=True):
+    def reset(self, sample_goal=True, **sim_config):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
         # is possible to get into a state with numerical issues (e.g. due to penetration or
         # Gimbel lock) or we may not achieve an initial condition (e.g. an object is within the hand).
@@ -110,7 +110,7 @@ class RobotEnv(gym.GoalEnv):
         # configuration.
         did_reset_sim = False
         while not did_reset_sim:
-            did_reset_sim = self._reset_sim()
+            did_reset_sim = self._reset_sim(**sim_config)
         if sample_goal:
             self.goal = self._sample_goal().copy()
         obs = self._get_obs()
