@@ -5,17 +5,27 @@ import cv2
 from solver.envs.point_env import PointEnv2
 
 class TripleMove(PointEnv2):
-    def __init__(self, cfg=None, n_goals=3, reward_weight=0.1, action_penalty=0.):
+    def __init__(self, cfg=None, n_goals=3, reward_weight=0.1, action_penalty=0., goal_type=0):
         super().__init__()
 
-        self.goals = totensor(
-            [
-                [0                      , -1.], 
-                [1./2 * 3 ** 0.5 , 1./2],
-                [-1./2 * 3 ** 0.5, 1./2]
-            ], 
-            device='cuda:0'
-        )[:n_goals] * 0.4 + 0.5
+        if goal_type == 0:
+            self.goals = totensor(
+                [
+                    [0                      , -1.], 
+                    [1./2 * 3 ** 0.5 , 1./2],
+                    [-1./2 * 3 ** 0.5, 1./2]
+                ], 
+                device='cuda:0'
+            )[:n_goals] * 0.4 + 0.5
+        else:
+            self.goals = totensor(
+                [
+                    [0                      , 0.8], 
+                    [1./2 * 3 ** 0.5 , 1./2],
+                    [-1./2 * 3 ** 0.5, 1./2]
+                ], 
+                device='cuda:0'
+            )[:n_goals] * 0.4 + 0.5
         print(self.goals)
 
     def sample_state_goal(self, batch_size=1):

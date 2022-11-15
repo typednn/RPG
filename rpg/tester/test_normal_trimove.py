@@ -8,7 +8,7 @@ from rpg.skill import SkillLearning
 
 # max_grad_norm=1.
 N = 1
-env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3)
+env = TorchEnv('TripleMove', N, ignore_truncated_done=True , n_goals=3, goal_type=1)
 
 trainer = SkillLearning.parse(
     env,
