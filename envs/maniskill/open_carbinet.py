@@ -308,6 +308,12 @@ class OpenCabinetEnv(MS1BaseEnv):
                 reward_open.append(reward_qpos)
                 total_success += info[target_link_id]["success"]
 
+            if target_link_id == 1:
+                reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 1
+                reward_open.append(reward_qpos)
+                total_success += info[target_link_id]["success"] * 0.5
+
+
         info.update(success=total_success)
         return np.sum(reward_open) - np.min(ee_to_handles)
 
