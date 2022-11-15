@@ -43,6 +43,7 @@ class InfoNet(Network):
                 cfg=None,
                 mutual_info_weight=0., backbone=None, 
                 action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False, epsilon=0.,
+                std_mode='fix_no_grad',
                 ):
         super().__init__(cfg)
 
@@ -83,7 +84,7 @@ class InfoNet(Network):
     def config_head(self, hidden_space):
         from tools.config import merge_inputs
         discrete = dict(TYPE='Discrete', epsilon=self._cfg.epsilon)  # 0.2 epsilon
-        continuous = dict(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=0.3989)
+        continuous = dict(TYPE='Normal', linear=True, std_mode=self._cfg.std_mode, std_scale=0.3989)
 
         if isinstance(hidden_space, Discrete):
             head = discrete

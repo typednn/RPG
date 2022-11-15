@@ -35,7 +35,7 @@ trainer = SkillLearning.parse(
     path='tmp/normal',
     weights=dict(reward=1000., q_value=100.),
 
-    info=dict(mutual_info_weight=0.003, action_weight=1., obs_weight=1., epsilon=0.01),
+    info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
 
     eval_episode=10,
     batch_size=512,
