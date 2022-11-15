@@ -220,6 +220,8 @@ class GaussianPolicy(PolicyZ):
 
     def loss(self, rollout):
         with torch.no_grad():
-            value = rollout['value'][0].min(axis=-1).values
-        pg = -rollout['logp_z'][0] * (value - value.mean()).detach()
+            value = rollout['value'][..., 0].detach()
+        logp = rollout['logp_z'][0].sum(axis=-1)
+        assert value.shape == logp.shape
+        pg = - logp * (value - value.mean()).detach()
         return pg.mean()

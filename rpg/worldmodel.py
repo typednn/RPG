@@ -144,8 +144,6 @@ class GeneralizedQ(Network):
                 self.done_fn(done_inp if not self._cfg.detach_hidden else done_inp.detach()))
 
         q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self._cfg.gamma)
-        out['q_value'] = q_values
-        out['pred_values'] = values
 
         if dones is not None:
             from tools.utils import logger 
@@ -174,5 +172,8 @@ class GeneralizedQ(Network):
             out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
             out['extra_rewards'] = entropies
             assert out['value'].shape[-1] == 2, "must be double q learning .."
+
+        out['q_value'] = q_values
+        out['pred_values'] = values
 
         return out

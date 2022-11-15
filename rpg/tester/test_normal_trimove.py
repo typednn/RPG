@@ -24,7 +24,7 @@ trainer = SkillLearning.parse(
         std_scale = 0.3,
         squash=True
     ),
-    enta=dict(coef=0.1, target=-2.),
+    enta=dict(coef=0.02, target=-2.),
     entz=dict(coef=4., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
@@ -41,6 +41,7 @@ trainer = SkillLearning.parse(
     batch_size=512,
     qmode='value',
 
-    ir=dict(info_decay=dict(TYPE='exp', gamma=0.1), entz_decay=dict(TYPE='exp', gamma=0.1))
+     ir=dict(entz_decay=dict(TYPE='exp', start=10, end=20000, min_value=0.1)),
+    pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False)),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

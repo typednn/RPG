@@ -41,14 +41,39 @@ class constant(Scheduler):
 
 
 class exp(Scheduler):
-    def __init__(self, cfg=None, gamma=0.99, min_value=0.) -> None:
+    def __init__(self, cfg=None, gamma=0.99, min_value=0., start=0, end=None) -> None:
         super().__init__()
         self.gamma = gamma
         self.min_value = min_value
 
-    def _step(self, cur_epoch, delta):
-        return max(self.min_value, self.value * (self.gamma ** delta))
+        self.start = start
+        self.end = end
 
+        if self.end is not None:
+            # decaying b
+            assert self.end > self.start
+            import numpy as np
+            self.gamma = np.exp((np.log(max(self.min_value, 1e-10)) - np.log(self.init_value))  / (self.end - self.start))
+
+    def _step(self, cur_epoch, delta):
+        if cur_epoch < self.start:
+            return self.init_value
+
+        if self.end is None:
+            return max(self.min_value, self.value * (self.gamma ** delta))
+        return max(self.min_value, self.init_value * (self.gamma ** (cur_epoch - self.start)))
+
+
+# class exp2(Scheduler):
+#     def __init__(self, cfg=None, start=0, end=None, target=0.) -> None:
+#         super().__init__()
+#         self.start = start
+#         assert end is not None, "please specify the ending state of exponetial"
+
+#     def _step(self, cur_epoch, delta):
+#         #return max(self.min_value, self.value * (self.gamma ** delta))
+#         if cur_epoch < self.start:
+#             return self.init_value
 
 class stage(Scheduler):
     def __init__(self, cfg=None, milestones=None, gamma=0.1) -> None:

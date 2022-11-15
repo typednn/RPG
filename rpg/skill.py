@@ -89,40 +89,14 @@ class SkillLearning(Trainer):
 
         # learning the low-level will be similar to the others ..
         obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size)
-        # ---------------------- update dynamics ----------------------
+        reward = reward * self.intrinsic_reward.reward_decay.get()
+
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
-        batch_size = len(obs_seq[0])
         prev_z = z[None, :].expand(len(obs_seq), *z.shape)
         self.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
 
         self.update_pi_a()
         self.update_pi_z()
-
-        # first update the actor 
-
-        # # ---------------------- update actor ----------------------
-        # rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
-
-        # if self.update_step % self.z_delay == 0:
-        #     loss_z = self.nets.pi_z.loss(rollout)
-        #     if self.update_step % self._cfg.actor_delay == 0:
-        #         loss_a = self.nets.pi_a.loss(rollout)
-        #         logger.logkv_mean('a_loss', float(loss_a))
-        #     else:
-        #         loss_a = 0.
-        #     logger.logkv_mean('z_loss', float(loss_z))
-        #     self.actor_optim.optimize(loss_a + loss_z)
-
-        # enta, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
-        # logger.logkv_mean('a_ent', enta.mean())
-        # logger.logkv_mean('z_ent', entz.mean())
-        # if self.update_step % self.z_delay == 0:
-        #     self.entz.update(entz)
-        #     logger.logkv_mean('z_alpha', float(self.entz.alpha))
-        # if self.update_step % self._cfg.actor_delay == 0:
-        #     self.enta.update(enta)
-        #     logger.logkv_mean('a_alpha', float(self.enta.alpha))
-        # self.intrinsic_reward.update(rollout)
 
 
         self.update_step += 1

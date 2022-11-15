@@ -111,6 +111,7 @@ class IntrinsicReward(Configurable):
         cfg=None,
         entz_decay=Scheduler.to_build(TYPE='constant'),
         info_decay=Scheduler.to_build(TYPE='constant'),
+        reward_decay=Scheduler.to_build(TYPE='constant'),
     ):
         super().__init__()
         self.enta = enta
@@ -119,6 +120,7 @@ class IntrinsicReward(Configurable):
 
         self.entz_decay = Scheduler.build(entz_decay)
         self.info_decay = Scheduler.build(info_decay)
+        self.reward_decay = Scheduler.build(reward_decay)
         if info_net is not None:
             # import copy
             # self.info_target = copy.deepcopy(info_net)
@@ -158,6 +160,7 @@ class IntrinsicReward(Configurable):
         logger.logkv_mean('reward_info', info_reward.mean().item())
         logger.logkv_mean('decay_z', self.entz_decay.get())
         logger.logkv_mean('decay_info', self.info_decay.get())
+        logger.logkv_mean('decay_reward', self.reward_decay.get())
 
         assert reward.shape == info_reward.shape
         reward = reward # + info_reward
@@ -167,6 +170,7 @@ class IntrinsicReward(Configurable):
         #s_seq = self.info_net.get_state_seq(samples).detach()
         self.entz_decay.step()
         self.info_decay.step()
+        self.reward_decay.step()
         if self.info_net is not None:
             z_detach = traj['z'].detach()
             mutual_info = self.info_net(traj, detach=True).mean()
