@@ -47,6 +47,7 @@ trainer = SkillLearning.parse(
         smallent2=dict(info=dict(mutual_info_weight=5.), enta=dict(target=-8.), wandb=dict(name='normal_ant')),
 
         small_reward=dict(info=dict(mutual_info_weight=1.), ir=dict(reward_decay=dict(init_value=0.2)), wandb=dict(name='normal_ant', stop=True)),
+        small_reward2=dict(info=dict(mutual_info_weight=1.), ir=dict(reward_decay=dict(init_value=0.4)), wandb=dict(name='normal_ant')),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
