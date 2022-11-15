@@ -196,8 +196,6 @@ class SequentialStack(Configurable, gym.Env):
 
         # print(contact_dists)
 
-        print(contact_dists)
-
         r = - not_reached.sum()
         if len(contact_dists) > 0:
             contact_reward = - np.min(contact_dists)
