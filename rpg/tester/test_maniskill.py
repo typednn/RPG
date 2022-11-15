@@ -26,7 +26,7 @@ trainer = SkillLearning.parse(
     optim=dict(max_grad_norm=1., lr=0.0003),
     horizon=3,
     actor_delay=2, #10,
-    gamma=0.97
+    gamma=0.97,
 
     update_train_step=1,
     hooks=dict(evaluate_pi=dict()),
