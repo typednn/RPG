@@ -193,7 +193,8 @@ class SequentialStack(Configurable, gym.Env):
 
             # obj_goal = np.copy(self.env.goal[obj_id*3:obj_id*3+3])
             # goal_dists.append(np.linalg.norm(self.obs['achieved_goal'][obj_id * 3:obj_id * 3 + 3] - obj_goal, self.norm))
-        print(contact_dists)
+
+        # print(contact_dists)
 
 
         r = - not_reached.sum()
