@@ -53,7 +53,7 @@ trainer = SkillLearning.parse(
             ir=dict(entz_decay=dict(TYPE='exp', start=10, end=1000000, min_value=0.0001), reward_decay=dict(init_value=0.4)),
             pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False)),
             info=dict(mutual_info_weight=2., action_weight=0.),
-        )
+        ),
         entz3 = dict(
             enta=dict(target=-1.),
             ir=dict(entz_decay=dict(TYPE='exp', start=10, end=1000000, min_value=0.0001), reward_decay=dict(init_value=0.4)),
