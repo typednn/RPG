@@ -81,7 +81,7 @@ class SequentialStack(Configurable, gym.Env):
         self.double_stage = double_stage
         self.double_stage_steps = double_stage_steps
 
-        self.observation_space = gym.spaces.Box(-np.inf, np.inf, (len_obs + (self.num_blocks + 1) * 3
+        self.observation_space = gym.spaces.Box(-np.inf, np.inf, (len_obs + self.num_blocks + (self.num_blocks + 1) * 3
                                                                   + int(self.include_step_in_obs),))
         self.observation_space.shared_dim = 10 + int(self.include_step_in_obs)
         self.observation_space.num_blocks = self.num_blocks
@@ -105,9 +105,9 @@ class SequentialStack(Configurable, gym.Env):
         #     stages[self.obj_id, self.stage_id] = 1
         #     block_states = np.concatenate((block_states, stages), 1)
         # if include_stage_id:
-        #     subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
-        #     dist = np.array(subgoal_dists) <= self.distance_threshold
-        #     block_states = np.concatenate((block_states, dist[:, None]), 1)
+        subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
+        dist = np.array(subgoal_dists) <= self.distance_threshold
+        block_states = np.concatenate((block_states, dist[:, None]), 1)
         obs = np.concatenate((robot_state, block_states.reshape(-1), self.obs['desired_goal']))
         return obs
 
