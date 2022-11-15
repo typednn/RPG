@@ -50,6 +50,12 @@ trainer = SkillLearning.parse(
         small_reward2=dict(info=dict(mutual_info_weight=1.), ir=dict(reward_decay=dict(init_value=0.4)), wandb=dict(name='normal_ant')),
 
         mbrl=dict(z_dim=1, z_cont_dim=0),
+
+        maxent0=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=1.)), wandb=dict(name='antmove')),
+        maxent1=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=0.25)), wandb=dict(name='antmove')),
+        maxent2=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=0.5)), wandb=dict(name='antmove')),
+
+        maxent3=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=4.)), wandb=dict(name='antmove')),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
