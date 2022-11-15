@@ -25,7 +25,7 @@ trainer = SkillLearning.parse(
     enta=dict(coef=1., target_mode='auto'),
     entz=dict(coef=10000., target_mode='none'),
     optim=dict(max_grad_norm=1., lr=0.0003),
-    horizon=2,
+    horizon=3,
     actor_delay=4, #10,
 
     update_train_step=1,
@@ -40,6 +40,11 @@ trainer = SkillLearning.parse(
     save_video=300, # save video ..
     batch_size=512,
     qmode='value',
+
+    _variants=dict(
+        mbrl=dict(z_dim=1, z_cont_dim=0),
+        maxent=dict(),
+    )
     
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm(max_epoch=200)
