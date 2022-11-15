@@ -118,8 +118,8 @@ class SequentialStack(Configurable, gym.Env):
 
         sim_config = dict(
             init_pos = dict(
+                object0 = [1.42368875, 0.63464874],
                 object1 = [1.24926771, 0.65516281],
-                object0 = [1.42368875, 0.61464874],
             )
         )
         self.env.reset(self.goal is None or self.random_goal, **sim_config)
@@ -176,14 +176,16 @@ class SequentialStack(Configurable, gym.Env):
         subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
         # contact_dist = self.contact_dist()
         contact_dists = []
-        reached = np.array(subgoal_dists) > self.distance_threshold
+        not_reached = np.array(subgoal_dists) > self.distance_threshold
 
         for obj_id in range(self.num_blocks):
             target_pose = np.copy(self.obs['achieved_goal'][obj_id*3:(obj_id+1)*3][:])
             target_pose[2] += 0.02
 
             to_contact = np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
-            if reached[obj_id]:
+            if not_reached[obj_id]:
+                pass
+            else:
                 to_contact = 0.
 
             contact_dists.append(to_contact) # hand ..
@@ -192,11 +194,14 @@ class SequentialStack(Configurable, gym.Env):
             # goal_dists.append(np.linalg.norm(self.obs['achieved_goal'][obj_id * 3:obj_id * 3 + 3] - obj_goal, self.norm))
 
 
-        r = - reached.sum()
-        contact_reward = - np.min(contact_dists)
+        r = - not_reached.sum()
+        if len(contact_dists) > 0:
+            contact_reward = - np.min(contact_dists)
+        else:
+            contact_dists = 0.
         dist_reward = - subgoal_dists.sum()
 
-        info['success'] = reached.sum()
+        info['success'] = (1-not_reached).sum()
 
         # contact_reward = -contact_dist
         # dist_reward = -goal_dist
