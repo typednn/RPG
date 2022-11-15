@@ -40,7 +40,7 @@ trainer = SkillLearning.parse(
     eval_episode=10,
     save_video=300, # save video ..
     batch_size=512,
-    qmode='value',
+    qmode='Q',
     _variants=dict(
         normal=dict(info=dict(mutual_info_weight=3.), enta=dict(target=-4.), wandb=dict(name='normal_ant')),
         smallent=dict(info=dict(mutual_info_weight=10.), enta=dict(target=-8.), wandb=dict(name='normal_ant')),

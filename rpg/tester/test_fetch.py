@@ -37,7 +37,7 @@ trainer = SkillLearning.parse(
     eval_episode=1,
     save_video=300, # save video ..
     batch_size=512,
-    qmode='value',
+    qmode='Q',
 
     _variants=dict(
         mbrl=dict(z_dim=1),
