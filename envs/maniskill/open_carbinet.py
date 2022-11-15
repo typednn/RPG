@@ -177,6 +177,7 @@ class OpenCabinetEnv(MS1BaseEnv):
         theta = self._episode_rng.uniform(0.9 * np.pi, 1.1 * np.pi)
         direction = np.array([np.cos(theta), np.sin(theta)])
         xy = center + direction * dist
+        print(xy)
 
         # Base orientation
         noise_ori = self._episode_rng.uniform(-0.05 * np.pi, 0.05 * np.pi)
@@ -282,7 +283,7 @@ class OpenCabinetEnv(MS1BaseEnv):
         reward_open = []
         total_success = 0
 
-        target_links = [0] if self.my_target_links is None else self.my_target_links
+        target_links = [0, 1] if self.my_target_links is None else self.my_target_links
 
         for target_link_id in target_links: # just grasp the first ..
             handle_pose = self.target_link[target_link_id].pose

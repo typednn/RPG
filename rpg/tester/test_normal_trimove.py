@@ -41,7 +41,11 @@ trainer = SkillLearning.parse(
     batch_size=512,
     qmode='value',
 
-     ir=dict(entz_decay=dict(TYPE='exp', start=10, end=20000, min_value=0.1)),
+    ir=dict(entz_decay=dict(TYPE='exp', start=10, end=20000, min_value=0.1)),
     pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False)),
+
+    _variants=dict(
+        low_entz=dict(ir=dict(entz_decay=dict(min_value=0.001)), path='tmp/normal2'),
+    ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
