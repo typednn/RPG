@@ -45,7 +45,10 @@ trainer = SkillLearning.parse(
         maxent=dict(z_dim=0, z_cont_dim=4, ir=dict(reward_decay=dict(init_value=0.2))),
         maxent2=dict(z_dim=0, z_cont_dim=4, ir=dict(reward_decay=dict(init_value=1.))),
         maxent3=dict(z_dim=0, z_cont_dim=4, ir=dict(reward_decay=dict(init_value=1.)), info=dict(mutual_info_weight=0.1)),
-        maxent5=dict(z_dim=0, z_cont_dim=12, ir=dict(reward_decay=dict(init_value=1.)), info=dict(mutual_info_weight=0.1)),
+
+        maxent5=dict(z_dim=0, z_cont_dim=12, entz=dict(coef=100.), ir=dict(reward_decay=dict(init_value=1.), entz_decay=dict(TYPE='exp', start=10, end=1000000, min_value=0.00003)), info=dict(mutual_info_weight=0.1)),
+
+        discrete=dict(z_dim=10, z_cont_dim=0, info=dict(mutual_info_weight=3.)),
     )
     
 ) # do not know if we need max_grad_norm

@@ -44,6 +44,8 @@ trainer = SkillLearning.parse(
         mbrl=dict(z_dim=1),
         maxent=dict(z_dim=0, z_cont_dim=4,),
         maxent2=dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=3.)),
+
+        discrete=dict(z_dim=10, z_cont_dim=0, info=dict(mutual_info_weight=3.)),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm(max_epoch=200)
