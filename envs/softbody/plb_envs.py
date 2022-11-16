@@ -353,3 +353,28 @@ class RopeEnv(PlbEnv):
     @property
     def batch_size(self):
         return 1
+
+    def _render_traj_rgb(self, traj, **kwargs):
+        import matplotlib.pyplot
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+        from solver.draw_utils import plot_colored_embedding
+        import torch
+        #states = states.detach().cpu().numpy()
+        states = traj.get_tensor('obs', device='cpu')['agent'].detach().cpu().numpy()
+
+        states = states[..., :3]
+        z = traj.get_tensor('z', device='cpu')
+
+        if z.dtype == torch.float64:
+            print(torch.bincount(z.long().flatten()))
+
+        states = states[..., :2]
+        plt.clf()
+        # plt.imshow(np.uint8(img[...,::-1]*255))
+        plot_colored_embedding(z, states[:, :, :2], s=2)
+
+        # plt.xlim([0, 256])
+        # plt.ylim([0, 256])
+        out = plt_save_fig_array()[:, :, :3]
+        return out
