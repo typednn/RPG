@@ -1,8 +1,8 @@
 import torch
 import numpy as np
-from mpm.simulator import MPMSimulator
+from ..mpm.simulator import MPMSimulator
 from tools import Configurable, as_builder, merge_inputs
-from mpm.utils import rigid_body_motion
+from ..mpm.utils import rigid_body_motion
 from pytorch3d.transforms import quaternion_apply
 
 

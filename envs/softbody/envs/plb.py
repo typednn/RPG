@@ -4,9 +4,9 @@ from tools import CN
 from tools.utils import totensor, tonumpy, lookat
 from gym.spaces import Box
 
-from mpm.simulator import MPMSimulator
-from mpm.renderer import Renderer
-from mpm.torch_wrapper import DiffModel
+from ..mpm.simulator import MPMSimulator
+from ..mpm.renderer import Renderer
+from ..mpm.torch_wrapper import DiffModel
 from .goal_env import GoalEnv
 from .world_state import WorldState
 
@@ -162,6 +162,10 @@ class MultiToolEnv(GoalEnv):
         self.goals = goals
         self.set_state(states)
         return self.get_obs()
+
+    def reset(self):
+        obs = super().reset()
+        return {k:v.detach().cpu().numpy() for k, v in obs[0].items()}
 
     def get_cur_steps(self):
         return self._idx * self.simulator.substeps

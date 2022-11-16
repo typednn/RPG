@@ -10,6 +10,7 @@ from tools import Configurable
 from .loader import load_scene
 from .envs import MultiToolEnv
 from tools.utils import totensor, tonumpy
+from envs.softbody.envs.goal_env import GoalEnv
 
 
 def plot_pcd(*pcds):
@@ -81,7 +82,7 @@ def sample_points(env: MultiToolEnv, num_points, inds, scale=np.ones(3)):
     return (points @ np.linalg.pinv(mat).T)
 
 
-class PlbEnv(Configurable):
+class PlbEnv(GoalEnv):
     def __init__(self, cfg=None,
         task='box_pick',
         render_mode='plt',
@@ -148,7 +149,7 @@ class PlbEnv(Configurable):
         return self.init_state, None
 
     def reset_state_goal(self, states, goals):
-        self.env.set_state(states, requires_grad=True)
+        self.env.set_state(states, requires_grad=False) # NOTE: requires_grad is False
 
     def wrap_action(self, action):
         tool = action.reshape(self.env.action_space.shape) # * self.actor_scale
@@ -158,7 +159,8 @@ class PlbEnv(Configurable):
         return obs[0]['dist'].min(axis=0)[0].sum(axis=-1, keepdim=True) - obs[0]['xyz'][:, 2].mean()
 
     def step(self, action):
-        assert action[0].shape == self.action_space.shape
+        #assert action[0].shape == self.action_space.shape
+        action = totensor([action], device=self.device)
         from tools.utils import clamp
         self.env.step(clamp(action[0], -2., 2.)) # clamp the actions.
         obs = self.get_obs()
@@ -172,7 +174,7 @@ class PlbEnv(Configurable):
         if self._nsteps != self._cfg.low_steps:
             dist = 0. # only compute the loss at the last timestep.
 
-        return obs, -dist * self._cfg.dist_weight + action_penalty, False, {}
+        return {k: v.detach().cpu().numpy() for k, v in obs[0].items()}, float((-dist * self._cfg.dist_weight + action_penalty).item()), False, {}
 
     def _render_rgb(self, index=0, render_plt=True, ray_tracing=True, **kwargs):
         assert index == 0
@@ -327,18 +329,23 @@ class RopeEnv(PlbEnv):
                 # cv2.imwrite('goal.png', img[..., ::-1])
 
 
-        assert action[0].shape == self.action_space.shape
-        from tools.utils import clamp
-        self.env.step(clamp(action[0], -2., 2.)) # clamp the actions.
-        obs = self.get_obs()
+        return super().step(action)
+        # assert action[0].shape == self.action_space.shape
+        # from tools.utils import clamp
+        # self.env.step(clamp(action[0], -2., 2.)) # clamp the actions.
+        # obs = self.get_obs()
 
-        # should be minimized
-        #dist = obs[0]['dist'].min(axis=0)[0].sum(axis=-1, keepdim=True) - obs[0]['xyz'][:, 2].mean()
-        dist = self.get_reward(obs)
+        # # should be minimized
+        # #dist = obs[0]['dist'].min(axis=0)[0].sum(axis=-1, keepdim=True) - obs[0]['xyz'][:, 2].mean()
+        # dist = self.get_reward(obs)
 
-        self._nsteps += 1
-        action_penalty = -(torch.relu(torch.abs(action)-0.9)).sum(axis=-1) * 10.
-        if self._nsteps != self._cfg.low_steps:
-            dist = 0. # only compute the loss at the last timestep.
+        # self._nsteps += 1
+        # action_penalty = -(torch.relu(torch.abs(action)-0.9)).sum(axis=-1) * 10.
+        # if self._nsteps != self._cfg.low_steps:
+        #     dist = 0. # only compute the loss at the last timestep.
 
-        return obs, -dist * self._cfg.dist_weight + action_penalty, False, {}
+        # return obs, -dist * self._cfg.dist_weight + action_penalty, False, {}
+
+    @property
+    def batch_size(self):
+        return 1
