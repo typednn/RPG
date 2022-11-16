@@ -63,7 +63,14 @@ class Trajectory:
 
     def get_tensor(self, key, device='cuda:0', dtype=torch.float32) -> torch.Tensor:
         from tools.utils import totensor, dstack
-        return totensor([i[key] for i in self.traj], device=device, dtype=dtype)
+        if isinstance(self.traj[0][key][0], dict):
+            out = {}
+            for k in self.traj[0][key][0]:
+                value = [[j[k] for j in i[key]] for i in self.traj]
+                out[k] = totensor(value, device='cpu', dtype=dtype)
+            return out
+        else:
+            return totensor([i[key] for i in self.traj], device=device, dtype=dtype)
 
     def get_truncated_done(self, device='cuda:0'):
         # done means that we should ignore the next_value in the end

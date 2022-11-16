@@ -81,7 +81,8 @@ class GeneralizedQ(Network):
     def inference(
         self, obs, z, timestep, step, z_seq=None, a_seq=None):
         # z_seq is obs -> z -> a
-        assert timestep.shape == (len(obs),)
+        if isinstance(obs, torch.Tensor):
+            assert timestep.shape == (len(obs),)
 
         sample_z = (z_seq is None)
         if sample_z:

@@ -64,6 +64,10 @@ class GymVecEnv(VecEnv):
                 from envs.maniskill_env import make
                 return TimeLimit(make(**kwargs), 60)
 
+            elif env_name == 'Rope':
+                from envs.softbody.plb_envs import RopeEnv
+                return TimeLimit(RopeEnv(**kwargs), 50)
+
             return gym.make(env_name)
 
         self.nenv = n

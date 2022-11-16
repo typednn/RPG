@@ -125,7 +125,7 @@ class PlbEnv(GoalEnv):
 
         self.action_space = self.env.action_space
 
-        obs = self.reset()[0]
+        obs = self.reset()
         self.observation_space = dict(
             xyz=gym.spaces.Box(-np.inf, np.inf, shape=obs['xyz'].shape),
             rgb=gym.spaces.Box(-np.inf, np.inf, shape=obs['rgb'].shape),
@@ -157,6 +157,10 @@ class PlbEnv(GoalEnv):
 
     def get_reward(self, obs):
         return obs[0]['dist'].min(axis=0)[0].sum(axis=-1, keepdim=True) - obs[0]['xyz'][:, 2].mean()
+
+    def reset(self):
+        obs = super().reset()
+        return {k: v.detach().cpu().numpy() for k, v in obs[0].items()}
 
     def step(self, action):
         #assert action[0].shape == self.action_space.shape

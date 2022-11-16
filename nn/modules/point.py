@@ -48,6 +48,7 @@ class PointNet(Backbone):
         agent_mlp=LinearMLP.get_default_config(mlp_spec=[]),
         fuse_mlp=LinearMLP.get_default_config(mlp_spec=[512]),
         hidden_dim=None,
+        output_dim=None,
     ):
         super().__init__(space_o)
         inp_dim = self.obs_space['xyz'].shape[-1] + self.obs_space['rgb'].shape[-1]
@@ -60,8 +61,9 @@ class PointNet(Backbone):
         self.agent_mlp = LinearMLP(
             inp_action_dim + self.obs_space['agent'].shape[-1], hidden_dim, cfg=agent_mlp)
 
-        self.fuse_mlp = LinearMLP(hidden_dim * 2, hidden_dim, cfg=fuse_mlp)
-        self._output_shape = (hidden_dim,)
+        output_dim = output_dim or hidden_dim
+        self.fuse_mlp = LinearMLP(hidden_dim * 2, output_dim, cfg=fuse_mlp)
+        self._output_shape = (output_dim,)
 
     def forward(self, x, *, timestep=None):
         x, a = self.preprocess(x, timestep=timestep)

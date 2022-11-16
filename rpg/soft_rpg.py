@@ -98,7 +98,7 @@ class Trainer(Configurable, RLAlgo):
         assert actor_delay % self.z_delay == 0
 
         # buffer samples horizon + 1
-        self.buffer = ReplayBuffer(obs_space.shape, env.action_space, env.max_time_steps, horizon, cfg=buffer)
+        self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
 
         self.nets, self.intrinsic_reward = self.make_network(obs_space, env.action_space, z_space)
         with torch.no_grad():
@@ -124,7 +124,6 @@ class Trainer(Configurable, RLAlgo):
 
         
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
-        batch_size = len(obs_seq[0])
         pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
 
         with torch.no_grad():
@@ -132,7 +131,22 @@ class Trainer(Configurable, RLAlgo):
             gt = dict(reward=reward)
             dyna_loss = dict()
 
-            next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
+            if isinstance(obs_seq, torch.Tensor):
+                batch_size = len(obs_seq[0])
+                next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
+            else:
+                assert isinstance(obs_seq[0], dict)
+                next_obs = {}
+                for k in obs_seq[0]:
+                    # [T, B, ...]
+                    next_obs[k] = torch.stack([v[k] for v in obs_seq[1:]])
+                batch_size = next_obs[k].shape[1]
+
+                for k, v in next_obs.items():
+                     # print(k, v.shape)
+                     next_obs[k] = v.reshape(-1, *v.shape[2:])
+                # exit(0)
+
             z_seq = prev_z[1:].reshape(-1, *prev_z.shape[2:])
             # zz = z_seq.reshape(-1).detach().cpu().numpy().tolist(); print([zz.count(i) for i in range(6)])
             next_timesteps = timesteps[1:].reshape(-1)
@@ -336,7 +350,13 @@ class Trainer(Configurable, RLAlgo):
             enc_s = TimedSeq(Identity(), *args) # encode state with time step ..
             latent_dim = obs_space.shape[0]
         else:
-            enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+            if not isinstance(obs_space, dict):
+                enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), **args) # encode state with time step ..
+            else:
+                from nn.modules.point import PointNet
+                assert not self._cfg.state_layer_norm and not self._cfg.state_batch_norm
+                enc_s = PointNet(obs_space, output_dim=latent_dim)
+
         self.state_dim = latent_dim
         enc_z = ZTransform(z_space)
 

@@ -7,7 +7,7 @@ from .traj import Trajectory
 
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
-    def __init__(self, obs_shape, action_space, episode_length, horizon,
+    def __init__(self, obs_space, action_space, episode_length, horizon,
                        cfg=None, device='cuda:0', max_episode_num=2000, modality='state', store_z=False):
         super().__init__()
 
@@ -15,14 +15,23 @@ class ReplayBuffer(Configurable):
         self.device = torch.device(cfg.device)
         self.episode_length = episode_length
         self.capacity = max_episode_num * episode_length
-        self.obs_shape = obs_shape
         self.horizon = horizon
 
         assert modality == 'state'
         dtype = torch.float32 if cfg.modality == 'state' else torch.uint8
 
-        self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device) # avoid last buggy..
-        self._next_obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
+        if not isinstance(obs_space, dict):
+            obs_shape = obs_space.shape
+            self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device) # avoid last buggy..
+            self._next_obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
+            self.obs_shape = obs_shape
+        else:
+            self._obs = {}
+            self._next_obs = {}
+            for k, v in obs_space.items():
+                self._obs[k] = torch.empty((self.capacity, *v.shape), dtype=dtype, device='cpu') # avoid last buggy..
+                self._next_obs[k] = torch.empty((self.capacity, *v.shape), dtype=dtype, device='cpu')
+
 
         if isinstance(action_space, gym.spaces.Box):
             self._action = torch.empty((self.capacity, *action_space.shape), dtype=torch.float32, device=self.device)
@@ -66,8 +75,14 @@ class ReplayBuffer(Configurable):
             l = min(length, self.capacity - self.idx)
 
 
-            self._obs[self.idx:self.idx+l] = cur_obs[:l, i]
-            self._next_obs[self.idx:self.idx+l] = next_obs[:l, i]
+            if isinstance(self._obs, dict):
+                for k, v in self._obs.items():
+                    v[self.idx:self.idx+l] = cur_obs[k][:l, i]
+                    self._next_obs[k][self.idx:self.idx+l] = next_obs[k][:l, i]
+            else:
+                self._obs[self.idx:self.idx+l] = cur_obs[:l, i]
+                self._next_obs[self.idx:self.idx+l] = next_obs[:l, i]
+
             self._action[self.idx:self.idx+l] = actions[:l, i]
             self._reward[self.idx:self.idx+l] = rewards[:l, i]
             self._dones[self.idx:self.idx+l] = dones[:l, i, None]
@@ -89,7 +104,11 @@ class ReplayBuffer(Configurable):
         total = self.total_size()
         idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
 
-        obs_seq = torch.empty((horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
+        if isinstance(self._obs, dict):
+            obs_seq = []
+        else:
+            obs_seq = torch.empty((horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
+
         timesteps = torch.empty((horizon + 1, batch_size), dtype=torch.float32, device=self.device)
 
         action = torch.empty((horizon, batch_size, *self._action.shape[1:]), dtype=self._action.dtype, device=self.device)
@@ -97,7 +116,10 @@ class ReplayBuffer(Configurable):
         done = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
 
-        obs_seq[0] = self._obs[idxs]
+        if isinstance(self._obs, dict):
+            obs_seq.append({k: v[idxs.cpu()].to(self.device) for k, v in self._obs.items()})
+        else:
+            obs_seq[0] = self._obs[idxs]
         timesteps[0] = self._timesteps[idxs]
 
         if self._z is not None:
@@ -111,7 +133,10 @@ class ReplayBuffer(Configurable):
             done[t] = self._dones[_idxs]
             truncated[t] = self._truncated[_idxs]
 
-            obs_seq[t+1] = self._next_obs[_idxs]
+            if isinstance(self._obs, dict):
+                obs_seq.append({k: v[_idxs.cpu()].to(self.device) for k, v in self._next_obs.items()})
+            else:
+                obs_seq[t+1] = self._next_obs[_idxs]
             timesteps[t+1] = self._timesteps[_idxs] + 1
 
 
@@ -129,4 +154,5 @@ class ReplayBuffer(Configurable):
         idx = torch.where(self._timesteps == 0)[0]
         select = torch.from_numpy(np.random.choice(len(idx), batch_size, replace=not self._full)).to(self.device)
         idx = idx[select]
-        return self._obs[idx], self._z[idx], self._timesteps[idx]
+        obs = self._obs[idx] if not isinstance(self._obs, dict) else {k: v[idx.cpu()].to(self.device) for k, v in self._obs.items()}
+        return obs, self._z[idx], self._timesteps[idx]

@@ -56,6 +56,9 @@ class RLAlgo(abc.ABC):
             if update and self.mode == 'training':
                 self.obs_rms.update(x) # always update during training...
             x = self.obs_rms.normalize(x)
+
+        if isinstance(x[0], dict):
+            x = list(x)  # don't know what happend ..
         return x
 
     def sample(self, p):
