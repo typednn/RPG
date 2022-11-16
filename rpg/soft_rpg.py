@@ -351,7 +351,7 @@ class Trainer(Configurable, RLAlgo):
             latent_dim = obs_space.shape[0]
         else:
             if not isinstance(obs_space, dict):
-                enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), **args) # encode state with time step ..
+                enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
             else:
                 from nn.modules.point import PointNet
                 assert not self._cfg.state_layer_norm and not self._cfg.state_batch_norm

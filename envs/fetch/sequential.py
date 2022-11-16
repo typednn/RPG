@@ -173,9 +173,7 @@ class SequentialStack(Configurable, gym.Env):
     #         self.prev_contact = self.contact_dist()
 
     def compute_reward_info(self, info):
-        # obj_goal = np.copy(self.env.goal[self.obj_id*3:self.obj_id*3+3])
         subgoal_dists = self.subgoal_distances(self.obs['achieved_goal'], self.env.goal)
-        # contact_dist = self.contact_dist()
         contact_dists = []
         not_reached = np.array(subgoal_dists) > self.distance_threshold
 
@@ -183,46 +181,19 @@ class SequentialStack(Configurable, gym.Env):
             target_pose = np.copy(self.obs['achieved_goal'][obj_id*3:(obj_id+1)*3][:])
             target_pose[2] += 0.02
 
-            to_contact = np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
             if not_reached[obj_id]:
-                pass
+                to_contact = np.linalg.norm(self.obs['achieved_goal'][-3:] - target_pose, self.norm)
             else:
                 to_contact = 0.
 
             contact_dists.append(to_contact) # hand ..
 
-            # obj_goal = np.copy(self.env.goal[obj_id*3:obj_id*3+3])
-            # goal_dists.append(np.linalg.norm(self.obs['achieved_goal'][obj_id * 3:obj_id * 3 + 3] - obj_goal, self.norm))
-
-        # print(contact_dists)
 
         r = - not_reached.sum()
-        if len(contact_dists) > 0:
-            contact_reward = - np.min(contact_dists)
-        else:
-            contact_dists = 0.
+        contact_reward = - np.min(contact_dists)
         dist_reward = - subgoal_dists.sum()
-
         info['success'] = (1-not_reached).sum()
 
-
-        # contact_reward = -contact_dist
-        # dist_reward = -goal_dist
-
-        # if self.incremental_reward:
-        #     dist_reward = (dist_reward + self.prev_dist) * 10
-        #     contact_reward = (contact_reward + self.prev_contact) * 10
-
-        # if self.double_stage:
-        #     if self.stage_id == 0:
-        #         dist_reward = 0.0
-        #     else:
-        #         contact_reward *= 0.3
-        # else:
-        #     contact_reward *= 0.3
-
-        # if self.stop_dist_reward and subgoal_dists[self.obj_id]<=self.distance_threshold:
-        #     dist_reward = 0
 
         reward = ((r + self.num_blocks) * self.sparse_scale # bias ..
                   + contact_reward * self.contact_scale
