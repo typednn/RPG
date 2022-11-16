@@ -40,7 +40,7 @@ trainer = SkillLearning.parse(
     batch_size=512,
     qmode='Q',
 
-    gamma=0.97,
+    # gamma=0.97,
 
     _variants=dict(
         mbrl=dict(z_dim=1, z_cont_dim=0),

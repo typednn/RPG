@@ -14,7 +14,7 @@ class SequentialStack(Configurable, gym.Env):
                  frameskip=1,
                  sparse_scale=1.,
                  contact_scale=1.,
-                 dist_scale=10.,
+                 dist_scale=3.,
                  n_contact_scale=0.0,
                  random_init=False,
                  random_goal=False,
@@ -261,3 +261,28 @@ class SequentialStack(Configurable, gym.Env):
     #     self.obj_id = int(state[-2])
     #     self.steps = int(state[-1])
     #     self.env.set_state(state[:-2])
+
+    def _render_traj_rgb(self, traj, **kwargs):
+        import matplotlib.pyplot
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+        from solver.draw_utils import plot_colored_embedding
+        import torch
+        #states = states.detach().cpu().numpy()
+        states = traj.get_tensor('obs', device='cpu')
+
+        states = states[..., :3]
+        z = traj.get_tensor('z', device='cpu')
+
+        if z.dtype == torch.float64:
+            print(torch.bincount(z.long().flatten()))
+
+        states = states[..., :2]
+        plt.clf()
+        # plt.imshow(np.uint8(img[...,::-1]*255))
+        plot_colored_embedding(z, states[:, :, :2], s=2)
+
+        # plt.xlim([0, 256])
+        # plt.ylim([0, 256])
+        out = plt_save_fig_array()[:, :, :3]
+        return out
