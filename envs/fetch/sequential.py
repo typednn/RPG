@@ -24,7 +24,7 @@ class SequentialStack(Configurable, gym.Env):
                  substeps=30,
                  norm=2,
                  include_step_in_obs=True,
-                 distance_threshold=0.05,
+                 distance_threshold=0.03,
                  stop_dist_reward=False):
         super(SequentialStack, self).__init__()
         self.substeps = substeps
