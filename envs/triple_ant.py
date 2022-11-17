@@ -52,7 +52,7 @@ class TripleAntEnv(gym.Env):
         reward = (-dist).max(axis=-1)
 
         reward += 10 * (dist[1] < 0.5)
-        return self.get_obs(), reward * 0.2, False, {}
+        return self.get_obs(), reward * 0.2, False, {'success': dist[1] < 0.5}
 
     def render(self, mode='rgb_array'):
         return self.ant_env.render(mode=mode)
