@@ -20,6 +20,7 @@ trainer = SkillLearning.parse(
     wandb=dict(name='cheetah-rpg'),
     info=dict(mutual_info_weight=0.01),
     _variants=dict(
+        mbrl=dict(z_cont_dim=0, z_dim=1),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
