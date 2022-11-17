@@ -89,7 +89,8 @@ trainer = SkillLearning.parse(
 
         cont4 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.3), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
         mbrl=dict(z_dim=1, z_cont_dim=0),
-        mbrl2=dict(z_dim=1, z_cont_dim=0, enta=dict(coef=1., target=-4.))
+
+        mbrl2=dict(z_dim=1, z_cont_dim=0, enta=dict(coef=1., target=-4.)),
 
         cont5 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.05), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=-4.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
     )
