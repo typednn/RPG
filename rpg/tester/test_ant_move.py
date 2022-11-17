@@ -51,7 +51,6 @@ trainer = SkillLearning.parse(
         small_reward=dict(info=dict(mutual_info_weight=1.), ir=dict(reward_decay=dict(init_value=0.2)), wandb=dict(name='normal_ant', stop=True)),
         small_reward2=dict(info=dict(mutual_info_weight=1.), ir=dict(reward_decay=dict(init_value=0.4)), wandb=dict(name='normal_ant')),
 
-        mbrl=dict(z_dim=1, z_cont_dim=0),
 
         maxent0=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=1.)), wandb=dict(name='antmove')),
         maxent1=dict(z_dim=0, z_cont_dim=4, info=dict(mutual_info_weight=2.), ir=dict(reward_decay=dict(init_value=0.25)), wandb=dict(name='antmove')),
@@ -89,8 +88,10 @@ trainer = SkillLearning.parse(
         cont3 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.1), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
 
         cont4 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.3), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
+        mbrl=dict(z_dim=1, z_cont_dim=0),
+        mbrl2=dict(z_dim=1, z_cont_dim=0, enta=dict(coef=1., target=-4.))
 
-        cont5 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.05), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
+        cont5 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.05), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=-4.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
     )
 
 ) # do not know if we need max_grad_norm
