@@ -19,7 +19,7 @@ trainer = SkillLearning.parse(
             gamma=0.98, horizon=6,
             z_dim=0,
             z_cont_dim=10,
-            info=dict(mutual_info_weight=0.01),
+            info=dict(mutual_info_weight=0.001),
         ), 
     )
 ) # do not know if we need max_grad_norm
