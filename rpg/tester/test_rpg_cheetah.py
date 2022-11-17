@@ -18,7 +18,7 @@ trainer = SkillLearning.parse(
     z_cont_dim=10,
 
     wandb=dict(name='cheetah-rpg'),
-    info=dict(mutual_info_weight=0.1),
+    info=dict(mutual_info_weight=0.01),
     _variants=dict(
     ),
 ) # do not know if we need max_grad_norm

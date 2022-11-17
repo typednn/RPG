@@ -245,8 +245,8 @@ class SequentialStack(Configurable, gym.Env):
         states = states[..., :3]
         z = traj.get_tensor('z', device='cpu')
 
-        if z.dtype == torch.float64:
-            print(torch.bincount(z.long().flatten()))
+        # if z.dtype == torch.float64:
+            # print(torch.bincount(z.long().flatten()))
 
         states = states[..., :2]
         plt.clf()
