@@ -10,6 +10,7 @@ env = GymVecEnv('Humanoid-v3', 1, ignore_truncated_done=True)
 
 trainer = SkillLearning.parse(
     env, buffer=dict(), head=dict(std_mode='statewise', std_scale=1., squash=True), optim=dict(max_grad_norm=1., lr=0.0001), update_train_step=1, have_done=True, hooks=dict(evaluate_pi=dict()), weights=dict(done=100., state=5000.), wandb=dict(name='humanoid-rpg'), qmode='Q', gamma=0.97,
+    z_dim=1, z_cont_imd=0,
 
     _variants = dict(
         gamma97_h3=dict(gamma=0.97, horizon=3),
