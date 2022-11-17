@@ -67,7 +67,7 @@ class exp(Scheduler):
         return max(self.min_value, self.init_value * (self.gamma ** (cur_epoch - self.start)))
 
 class linear(Scheduler):
-    def __init__(self, cfg=None, start=0, min_value=0., end=None, target_value=None, delta=0.) -> None:
+    def __init__(self, cfg=None, start=0, min_value=0., end=None, target_value=None, delta=None) -> None:
         super().__init__()
         self.start = start
         self.end = end
@@ -79,7 +79,8 @@ class linear(Scheduler):
             assert self.end > self.start
             import numpy as np
             target_value = target_value or self.min_value
-            self.gamma = np.exp((np.log(max(target_value, 1e-10)) - np.log(self.init_value))  / (self.end - self.start))
+            #self.gamma = np.exp((np.log(max(target_value, 1e-10)) - np.log(self.init_value))  / (self.end - self.start))
+            self.delta = (target_value - self.init_value) / (self.end - self.start)
 
     def _step(self, cur_epoch, delta):
         if cur_epoch < self.start:

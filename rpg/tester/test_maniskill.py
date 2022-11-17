@@ -52,6 +52,8 @@ trainer = SkillLearning.parse(
 
         maxent4=dict(z_dim=0, z_cont_dim=12, entz=dict(coef=5.), ir=dict(reward_decay=dict(init_value=1.), entz_decay=dict(TYPE='linear', start=20000, end=500000, min_value=0.00003)), info=dict(mutual_info_weight=1.)),
 
+        maxent5=dict(z_dim=0, z_cont_dim=12, entz=dict(coef=5.), ir=dict(reward_decay=dict(init_value=1.), entz_decay=dict(TYPE='linear', start=20000, end=500000, min_value=0.00003)), info=dict(mutual_info_weight=0.1)),
+
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm(max_epoch=200)
