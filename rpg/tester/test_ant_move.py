@@ -84,8 +84,10 @@ trainer = SkillLearning.parse(
                     pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))
                     ),
         cont2 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=1.), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=100000, end=200000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=1.), 
-                    pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))
-                    ),
+                    pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
+
+        cont3 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.1), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.), 
+                    pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
