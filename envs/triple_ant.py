@@ -37,16 +37,23 @@ class TripleAntEnv(gym.Env):
 
         goals = np.array(
             [
-                # [1./2 * 3 ** 0.5 , 1./2],
-                # [-1./2 * 3 ** 0.5, 1./2],
-                [0                      , -1.], 
-                [0                      , 1.], 
-                [-1.                      , -0.], 
-                [1.                      , 0.], 
+                [
+                    [0                      , 0.8], 
+                    [1./2 * 3 ** 0.5 , 1./2],
+                    [-1./2 * 3 ** 0.5, 1./2]
+                ], 
+                # # [1./2 * 3 ** 0.5 , 1./2],
+                # # [-1./2 * 3 ** 0.5, 1./2],
+                # [0                      , -1.], 
+                # [0                      , 1.], 
+                # [-1.                      , -0.], 
+                # [1.                      , 0.], 
             ], 
         )[:self.n_goals] * self.ant_env.MAZE_SIZE_SCALING
-        reward = -np.linalg.norm((self.loc[None, :2] - goals[:, :2]), axis=-1)
-        reward = reward.max(axis=-1)
+        dist = np.linalg.norm((self.loc[None, :2] - goals[:, :2]), axis=-1)
+        reward = (-dist).max(axis=-1)
+
+        reward += 10 * (dist[0] < 0.5)
         return self.get_obs(), reward * 0.2, False, {}
 
     def render(self, mode='rgb_array'):

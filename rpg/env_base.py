@@ -45,7 +45,7 @@ class GymVecEnv(VecEnv):
 
             elif env_name == 'TripleAnt':
                 from envs.triple_ant import TripleAntEnv
-                return TimeLimit(TripleAntEnv( **kwargs), 60)
+                return TimeLimit(TripleAntEnv( **kwargs), 100)
 
             elif env_name == 'BlockPush':
                 import os
