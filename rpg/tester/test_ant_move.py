@@ -89,6 +89,8 @@ trainer = SkillLearning.parse(
         cont3 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.1), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
 
         cont4 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.3), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
+
+        cont5 = dict(z_dim=0, z_cont_dim=12, info=dict(mutual_info_weight=0.05), entz=dict(coef=20.), ir=dict(entz_decay=dict(init_value=1., TYPE='linear', start=20000, end=500000, target_value=0.)), wandb=dict(name='antmove'), enta=dict(coef=1., target=0.),  pi_z=dict(head=dict(std_mode='fix_learnable', std_scale=1., nocenter=False, squash=True, linear=False))),
     )
 
 ) # do not know if we need max_grad_norm
