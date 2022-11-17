@@ -76,6 +76,8 @@ trainer = SkillLearning.parse(
 
         discrete2=dict(z_dim=10, z_cont_dim=0, info=dict(mutual_info_weight=30.), entz=dict(coef=100.), ir=dict(entz_decay=dict(TYPE='linear', start=50000, end=100000, target_value=0.)), wandb=dict(name='antmove')),
         discrete3=dict(z_dim=10, z_cont_dim=0, info=dict(mutual_info_weight=300.), entz=dict(coef=100.), ir=dict(entz_decay=dict(TYPE='linear', start=50000, end=100000, target_value=0.)), wandb=dict(name='antmove')),
+
+        discrete4=dict(z_dim=10, z_cont_dim=0, info=dict(mutual_info_weight=30.), entz=dict(coef=100.), ir=dict(entz_decay=dict(TYPE='linear', start=50000, end=100000, target_value=0.), reward_decay=dict(init_value=0.3)), wandb=dict(name='antmove')),
     )
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()
