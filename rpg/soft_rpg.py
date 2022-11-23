@@ -82,6 +82,10 @@ class Trainer(Configurable, RLAlgo):
         
         state_dim=100,
         ir=None,
+
+        relabel=False,
+
+        # acceleration part,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -108,8 +112,10 @@ class Trainer(Configurable, RLAlgo):
         self.nets.intrinsic_reward = self.intrinsic_reward
         self.target_nets.intrinsic_reward = self.intrinsic_reward
 
-        self.actor_optim = LossOptimizer(self.nets.policies, cfg=optim)
         self.dyna_optim = LossOptimizer(self.nets.dynamics, cfg=optim, **(dyna_optim or {}))
+
+        self.pi_a_optim = LossOptimizer(self.nets.pi_a, cfg=self._cfg.optim)
+        self.pi_z_optim = LossOptimizer(self.nets.pi_z, cfg=self._cfg.optim)
 
         self.update_step = 0
         self.z = None
@@ -194,40 +200,57 @@ class Trainer(Configurable, RLAlgo):
         logger.logkv_mean('state_max', float(s.max()))
 
 
+
+    def update_pi_a(self):
+        if self.update_step % self._cfg.actor_delay == 0:
+            obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
+            rollout = self.nets.inference(obs_seq[0], z, timesteps[0], self.horizon)
+
+            loss_a = self.nets.pi_a.loss(rollout)
+            logger.logkv_mean('a_loss', float(loss_a))
+            self.pi_a_optim.optimize(loss_a)
+
+            enta, _ = self.intrinsic_reward.get_ent_from_traj(rollout)
+            self.enta.update(enta)
+            logger.logkv_mean('a_alpha', float(self.enta.alpha))
+            logger.logkv_mean('a_ent', float(enta.mean()))
+
+            self.intrinsic_reward.update(rollout)
+
+    def update_pi_z(self):
+        if self.update_step % self.z_delay == 0:
+            o, z, t = self.buffer.sample_start(self._cfg.batch_size)
+            assert (t < 1).all()
+            rollout = self.nets.inference(o, z, t, self.horizon)
+
+            loss_z = self.nets.pi_z.loss(rollout)
+            logger.logkv_mean('z_loss', float(loss_z))
+            self.pi_z_optim.optimize(loss_z)
+
+            _, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
+            self.entz.update(entz)
+            logger.logkv_mean('z_alpha', float(self.entz.alpha))
+            logger.logkv_mean('z_ent', float(entz.mean()))
+
+
+
     def update(self):
         self.nets.train()
         self.sync_alpha()
-        obs_seq, timesteps, action, reward, done_gt, truncated_mask = self.buffer.sample(self._cfg.batch_size)
 
-        # ---------------------- update dynamics ----------------------
+        obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size)
+        reward = reward * self.intrinsic_reward.reward_decay.get()
+
+        # with torch.no_grad():
+        #     prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, action, timesteps)
+        assert not self._cfg.relabel, "if relabel "
+
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
-        with torch.no_grad():
-            prev_z = self.intrinsic_reward.sample_posterior_z(self.nets.enc_s, obs_seq, action, timesteps)
+        prev_z = z[None, :].expand(len(obs_seq), *z.shape)
         self.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
 
-        # ---------------------- update actor ----------------------
-        rollout = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon)
-
-        if self.update_step % self.z_delay == 0:
-            loss_z = self.nets.pi_z.loss(rollout)
-            if self.update_step % self._cfg.actor_delay == 0:
-                loss_a = self.nets.pi_a.loss(rollout)
-                logger.logkv_mean('a_loss', float(loss_a))
-            else:
-                loss_a = 0.
-            logger.logkv_mean('z_loss', float(loss_z))
-            self.actor_optim.optimize(loss_a + loss_z)
-
-        enta, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
-        logger.logkv_mean('a_ent', enta.mean())
-        logger.logkv_mean('z_ent', entz.mean())
-        if self.update_step % self.z_delay == 0:
-            self.entz.update(entz)
-            logger.logkv_mean('z_alpha', float(self.entz.alpha))
-        if self.update_step % self._cfg.actor_delay == 0:
-            self.enta.update(enta)
-            logger.logkv_mean('a_alpha', float(self.enta.alpha))
-        self.intrinsic_reward.update(rollout)
+        self.update_pi_a()
+        self.update_pi_z()
 
 
         self.update_step += 1
@@ -378,14 +401,8 @@ class Trainer(Configurable, RLAlgo):
             else:
                 enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
                 a_dim = hidden_dim
-
             init_h = torch.nn.Linear(latent_dim, hidden_dim)
             dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
-            # class Duplicate(torch.nn.Module):
-            #     def forward(self, x):
-            #         return x, x
-            # dynamics = Seq(mlp(a_dim + latent_dim, hidden_dim, latent_dim), Duplicate())
-            #state_dec = Identity()
             state_dec = torch.nn.Linear(hidden_dim, latent_dim)
         else:
             raise NotImplementedError

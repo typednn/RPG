@@ -14,14 +14,6 @@ class BufferItem:
             self._full = False
             self.idx = 0
 
-    # def __setitem__(self, key, value):
-    #     assert isinstance(key, slice)
-    #     if isinstance(self._space, dict):
-    #         for k, v in value.items():
-    #             self._data[k][key] = v
-    #     else:
-    #         self._data[key] = value
-
     def __getitem__(self, key):
         if isinstance(self._data, dict):
             return {k: v[key] for k, v in self._data.items()}
@@ -29,9 +21,6 @@ class BufferItem:
             return self._data[key]
 
     def append(self, data):
-        #idx = (idx + horizon) % capacity
-        #    idx = min(idx + horizon, capacity)
-        #return idx, full
         if isinstance(self._data, dict):
             for k, v in data.items():
                 self._data[k].append(v)
@@ -68,7 +57,7 @@ class BufferItem:
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
     def __init__(self, obs_space, action_space, episode_length, horizon,
-                       cfg=None, device='cuda:0', max_episode_num=2000, modality='state', store_z=False):
+                       cfg=None, device='cuda:0', max_episode_num=2000, modality='state'):
         super().__init__()
 
         self.cfg = cfg
@@ -129,10 +118,9 @@ class ReplayBuffer(Configurable):
         dones, truncated = traj.get_truncated_done(self.device)
         assert truncated[-1].all()
 
-        if self._cfg.store_z:
-            z = traj.get_tensor('z', self.device, dtype=None)
-            if self._z is None:
-                self._z = torch.empty((self.capacity, *z.shape[2:]), dtype=z.dtype, device=self.device)
+        z = traj.get_tensor('z', self.device, dtype=None)
+        if self._z is None:
+            self._z = torch.empty((self.capacity, *z.shape[2:]), dtype=z.dtype, device=self.device)
 
         for i in range(traj.nenv):
             l = min(length, self.capacity - self.idx)
