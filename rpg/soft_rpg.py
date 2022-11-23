@@ -86,6 +86,7 @@ class Trainer(Configurable, RLAlgo):
         relabel=False,
 
         # acceleration part,
+        target_horizon = None,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -157,7 +158,7 @@ class Trainer(Configurable, RLAlgo):
             # zz = z_seq.reshape(-1).detach().cpu().numpy().tolist(); print([zz.count(i) for i in range(6)])
             next_timesteps = timesteps[1:].reshape(-1)
 
-            samples = self.target_nets.inference(next_obs, z_seq, next_timesteps, self.horizon)
+            samples = self.target_nets.inference(next_obs, z_seq, next_timesteps, self._cfg.target_horizon or self.horizon)
             qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
             assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
 
