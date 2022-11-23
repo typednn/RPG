@@ -5,24 +5,35 @@ from tools.nn_base import Network
 from diffusers import DDPMScheduler, DDIMScheduler
 import torch.nn.functional as F
 from .diffusion_utils import HiddenDDIM, gaussian_kl
+from tools.config import Configurable
 
 
-class DiagGaussian:
-    def __init__(self):
+class DiagGaussian(Configurable, torch.nn.Module):
+    def __init__(self, cfg=None, latent_dim=16):
+        Configurable.__init__(self)
+        torch.nn.Module.__init__(self)
+
         self.device = 'cuda:0'
+        self.latent_dim = latent_dim
 
     def sample(self, latents, context):
         return latents
 
     def sample_init_latents(self, batch_size, context):
-        return torch.randn((batch_size, *self.latent_shape), device=self.device)
+        return torch.randn((batch_size, self.latent_dim), device=self.device)
 
     def __call__(self, latent_input, context):
         #raise NotImplementedError
         mu, log_sigma = torch.chunk(latent_input, 2, dim=-1)
         sigma = log_sigma.exp()
-        self.latent_shape = mu.shape[1:]
+        #self.latent_shape = mu.shape[1:]
         return torch.randn_like(mu) * sigma + mu,   {'kl': gaussian_kl(mu, log_sigma)}
+
+    def get_input_dim(self):
+        return self.latent_dim * 2
+
+    def embed_dim(self):
+        return self.latent_dim
 
 
 
@@ -35,6 +46,7 @@ class VAE(Network):
         self.latent = latent
 
     def sample(self, batch_size, context):
+        assert context is None or context.shape[0] == batch_size
         init_latent = self.latent.sample_init_latents(batch_size, context)
         return self.decoder(self.latent.sample(init_latent, context), context)
     

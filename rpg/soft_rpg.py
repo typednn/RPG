@@ -373,19 +373,20 @@ class Trainer(Configurable, RLAlgo):
             state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
         elif self._cfg.dynamic_type == 'tiny':
             if isinstance(action_space, gym.spaces.Box):
-                enc_a = Identity()
-                a_dim = action_space.shape[0]
+                enc_a = torch.nn.Linear(action_space.shape[0], hidden_dim)
+                a_dim = hidden_dim
             else:
                 enc_a = torch.nn.Embedding(action_space.n, hidden_dim)
-                a_dim = action_space.n
+                a_dim = hidden_dim
 
-            init_h = Identity()
-            #dynamics = torch.nn.GRU(a_dim, latent_dim, layer)
-            class Duplicate(torch.nn.Module):
-                def forward(self, x):
-                    return x, x
-            dynamics = Seq(mlp(a_dim + latent_dim, hidden_dim, latent_dim), Duplicate())
-            state_dec = Identity()
+            init_h = torch.nn.Linear(latent_dim, hidden_dim)
+            dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
+            # class Duplicate(torch.nn.Module):
+            #     def forward(self, x):
+            #         return x, x
+            # dynamics = Seq(mlp(a_dim + latent_dim, hidden_dim, latent_dim), Duplicate())
+            #state_dec = Identity()
+            state_dec = torch.nn.Linear(hidden_dim, latent_dim)
         else:
             raise NotImplementedError
 

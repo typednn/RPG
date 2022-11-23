@@ -264,3 +264,6 @@ class TorchEnv(VecEnv):
             'episode': episode
         }
         
+
+    def render_traj(self, traj, **kwargs):
+        return self.goal_env._render_traj_rgb(traj=traj, **kwargs)

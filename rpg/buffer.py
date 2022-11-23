@@ -2,7 +2,67 @@ import torch
 import gym
 import numpy as np
 from tools.config import Configurable
-from .traj import Trajectory
+
+class BufferItem:
+    def __init__(self, capacity: int, space: dict) -> None:
+        self._capacity = capacity
+        self._space = space
+        if '_shape' not in space:
+            self._data = {k: BufferItem(capacity, v) for k, v in space.items()}
+        else:
+            self._data = torch.empty((capacity, *space['_shape']), dtype=space.get('_dtype', torch.float32), device=space.get('_device', 'cuda:0'))
+            self._full = False
+            self.idx = 0
+
+    # def __setitem__(self, key, value):
+    #     assert isinstance(key, slice)
+    #     if isinstance(self._space, dict):
+    #         for k, v in value.items():
+    #             self._data[k][key] = v
+    #     else:
+    #         self._data[key] = value
+
+    def __getitem__(self, key):
+        if isinstance(self._data, dict):
+            return {k: v[key] for k, v in self._data.items()}
+        else:
+            return self._data[key]
+
+    def append(self, data):
+        #idx = (idx + horizon) % capacity
+        #    idx = min(idx + horizon, capacity)
+        #return idx, full
+        if isinstance(self._data, dict):
+            for k, v in data.items():
+                self._data[k].append(v)
+        else:
+            horizon = len(data)
+            end = min(self.idx + horizon, self._capacity)
+            self._data[self.idx:end] = data[:end-self.idx]
+
+            new_idx = (self.idx + horizon) % self._capacity
+            if self.idx + horizon >= self._capacity:
+                self._full = True
+                if new_idx != 0:
+                    self._data[:new_idx] = data[end-self.idx:]
+            self.idx = new_idx
+
+    def __len__(self):
+        if isinstance(self._data, dict):
+            for k, v in self._data.items():
+                return len(v)
+        else:
+            return self._capacity if self._full else self.idx
+
+    @property
+    def device(self):
+        if isinstance(self._data, dict):
+            for k, v in self._data.items():
+                return v.device
+        return self._data.device
+
+    def sample_idx(self, batch_size):
+        return torch.from_numpy(np.random.choice(len(self), batch_size)).to(self.device)
 
 
 class ReplayBuffer(Configurable):
@@ -55,7 +115,10 @@ class ReplayBuffer(Configurable):
         return self.idx
 
     @torch.no_grad()
-    def add(self, traj: Trajectory):
+    def add(self, traj):
+        from .traj import Trajectory
+        traj: Trajectory
+
         # assert self.episode_length == traj.timesteps, "episode length mismatch"
         length = traj.timesteps
         cur_obs = traj.get_tensor('obs', self.device)

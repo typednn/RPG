@@ -21,39 +21,39 @@ class SkillLearning(Trainer):
         self.pi_z_optim = LossOptimizer(self.nets.pi_z, cfg=self._cfg.optim)
 
 
-    def make_network(self, obs_space, action_space, z_space):
-        hidden_dim = 256
-        state_dim = 100
-        action_dim = action_space.shape[0]
+    # def make_network(self, obs_space, action_space, z_space):
+    #     hidden_dim = 256
+    #     state_dim = 100
+    #     action_dim = action_space.shape[0]
 
-        enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec = self.make_dynamic_network(
-            obs_space, action_space, z_space, hidden_dim, state_dim)
-        state_dim = self.state_dim
+    #     enc_s, enc_z, enc_a, init_h, dynamics, reward_predictor, done_fn, state_dec = self.make_dynamic_network(
+    #         obs_space, action_space, z_space, hidden_dim, state_dim)
+    #     state_dim = self.state_dim
 
-        q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
+    #     q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
 
-        head = DistHead.build(action_space, cfg=self._cfg.head)
-        pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
+    #     head = DistHead.build(action_space, cfg=self._cfg.head)
+    #     pi_a = PolicyA(state_dim, hidden_dim, enc_z, head)
 
-        if self._cfg.z_dim == 0:
-            pi_z = GaussianPolicy(state_dim, hidden_dim, self.z_space, cfg=self._cfg.pi_z)
-        else:
-            pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
+    #     if self._cfg.z_dim == 0:
+    #         pi_z = GaussianPolicy(state_dim, hidden_dim, self.z_space, cfg=self._cfg.pi_z)
+    #     else:
+    #         pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
 
-        network = GeneralizedQ(
-            enc_s, enc_a, pi_a, pi_z,
-            init_h, dynamics, state_dec, reward_predictor, q_fn,
-            done_fn, None, cfg=self._cfg.worldmodel, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, horizon=self._cfg.horizon
-        )
-        network.apply(orthogonal_init)
-        info_net = self.make_intrinsic_reward(
-            obs_space, action_space, z_space, hidden_dim, state_dim
-        )
-        return network.cuda(), info_net
+    #     network = GeneralizedQ(
+    #         enc_s, enc_a, pi_a, pi_z,
+    #         init_h, dynamics, state_dec, reward_predictor, q_fn,
+    #         done_fn, None, cfg=self._cfg.worldmodel, gamma=self._cfg.gamma, lmbda=self._cfg.lmbda, horizon=self._cfg.horizon
+    #     )
+    #     network.apply(orthogonal_init)
+    #     info_net = self.make_intrinsic_reward(
+    #         obs_space, action_space, z_space, hidden_dim, state_dim
+    #     )
+    #     return network.cuda(), info_net
 
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
-            obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
+            obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size * self._cfg.horizon, horizon=1)
             rollout = self.nets.inference(obs_seq[0], z, timesteps[0], self.horizon)
 
             loss_a = self.nets.pi_a.loss(rollout)

@@ -22,6 +22,7 @@ trainer = Trainer.parse(
         ln3=dict(state_layer_norm=True, path='tmp/cheetah_ln', weights=dict(state=50000.)),
 
         bn=dict(state_batch_norm=True, path='tmp/cheetah_bn', weights=dict(state=3000.)),
+        tiny=dict(dynamic_type='tiny'),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

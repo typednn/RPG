@@ -36,7 +36,7 @@ def get_intersect(A, B, C, D):
 class LargeMaze(Configurable):
     """Continuous maze environment."""
     SIZE = 12
-    ACTION_SCALE=0.3
+    ACTION_SCALE=1.
     RESOLUTION = 512
 
     walls = torch.tensor(np.array(
@@ -118,21 +118,29 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False) -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch') -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
         self.device = device
+        if mode != 'batch':
+            batch_size = 1
         self.batch_size = batch_size
+
 
 
         self.action_space = spaces.Box(-1, 1, (2,))
         self.observation_space = spaces.Box(-12, 12, (2,))
         self.walls = self.walls.to(device).float()
+        self.mode = mode
         self.render_wall()
 
 
     def step(self, action):
+        if self.mode != 'batch':
+            action = torch.tensor(action, device=self.device).float()[None, :]
+        else:
+            action = torch.tensor(action, device=self.device).float()
         assert self.pos.shape == action.shape
 
         new_pos = self.pos + action.clip(-1., 1.) * self.ACTION_SCALE
@@ -158,7 +166,13 @@ class LargeMaze(Configurable):
 
         self.pos = new_pos
 
-        return self.pos.clone(), torch.zeros(self.batch_size, device=self.device) + self.get_reward(), False, {}
+        reward = torch.zeros(self.batch_size, device=self.device) + self.get_reward()
+        if self.mode == 'batch':
+            return self.pos.clone(), reward, False, {}
+        else:
+            o, r = self.pos.clone().detach().cpu().numpy()[0], reward.detach().cpu().numpy().reshape(-1)[0]
+            return o, r, False, {}
+
 
     def get_reward(self):
         if self._cfg.reward:
@@ -171,7 +185,12 @@ class LargeMaze(Configurable):
             self.batch_size = batch_size
 
         self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float32)
-        return self.pos.clone()
+
+        if self.mode == 'batch':
+            return self.pos.clone()
+        else:
+            return self.pos.clone().detach().cpu().numpy()[0]
+
 
     def render_wall(self):
         import cv2
@@ -194,10 +213,15 @@ class LargeMaze(Configurable):
             cv2.circle(img, tuple(pos[i]), 3, (0, 255, 0), 1)
         return img
 
-    def  _render_traj_rgb(self, obs, z=None, **kwargs):
+    def _render_traj_rgb(self, traj, z=None, **kwargs):
         # assert z is None
         from tools.utils import plt_save_fig_array
         import matplotlib.pyplot as plt
+
+        if isinstance(traj, dict):
+            obs = traj['obs']
+        else:
+            raise NotImplementedError
 
         plt.clf()
         img = self.screen.copy()/255.
