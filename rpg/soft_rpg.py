@@ -289,9 +289,9 @@ class Trainer(Configurable, RLAlgo):
                 transition.update(**data, a=a, z=prevz)
                 transitions.append(transition)
                 timestep = transition['next_timestep']
-                for idx in range(len(obs)):
-                    if timestep[idx] == 0:
-                        self.z[idx] = self.z_space.sample() * 0
+                for j in range(len(obs)):
+                    if timestep[j] == 0:
+                        self.z[j] = self.z_space.sample() * 0
 
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
