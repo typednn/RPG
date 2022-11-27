@@ -6,7 +6,6 @@ from envs.mp_envs import make
 from generative.vae_trainer import RandomTrainer
 
 env = make('LargeMaze')
-random = RandomTrainer(env)
+random = RandomTrainer.parse(env)
 
 random.start()
-

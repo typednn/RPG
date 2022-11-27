@@ -15,9 +15,8 @@ from torch.nn.functional import binary_cross_entropy as bce
 from .utils import masked_temporal_mse, create_hidden_space
 from .worldmodel import GeneralizedQ
 
-from .intrinsic import IntrinsicReward
+from .auxiliary import IntrinsicReward, EntropyLearner, InfoNet
 from .soft_actor_critic import SoftQPolicy, PolicyA, SoftPolicyZ, ValuePolicy
-from .intrinsic import EntropyLearner, InfoNet
 
 
 class Trainer(Configurable, RLAlgo):
@@ -79,10 +78,8 @@ class Trainer(Configurable, RLAlgo):
         dynamic_type='normal',
         save_video=0,
 
-        
         state_dim=100,
         ir=None,
-
         relabel=False,
 
         # acceleration part,
@@ -128,7 +125,6 @@ class Trainer(Configurable, RLAlgo):
         alpha_z = self.entz.alpha
         self.nets.set_alpha(alpha_a, alpha_z)
         self.target_nets.set_alpha(alpha_a, alpha_z)
-
         
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
         pred_traj = self.nets.inference(obs_seq[0], prev_z[0], timesteps[0], self.horizon, a_seq=action, z_seq=prev_z[1:]) 
@@ -201,7 +197,6 @@ class Trainer(Configurable, RLAlgo):
         logger.logkv_mean('state_max', float(s.max()))
 
 
-
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
             obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
@@ -213,10 +208,9 @@ class Trainer(Configurable, RLAlgo):
 
             enta, _ = self.intrinsic_reward.get_ent_from_traj(rollout)
             self.enta.update(enta)
-            logger.logkv_mean('a_alpha', float(self.enta.alpha))
-            logger.logkv_mean('a_ent', float(enta.mean()))
 
             self.intrinsic_reward.update(rollout)
+
 
     def update_pi_z(self):
         if self.update_step % self.z_delay == 0:
@@ -230,9 +224,6 @@ class Trainer(Configurable, RLAlgo):
 
             _, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
             self.entz.update(entz)
-            logger.logkv_mean('z_alpha', float(self.entz.alpha))
-            logger.logkv_mean('z_ent', float(entz.mean()))
-
 
 
     def update(self):
@@ -258,7 +249,6 @@ class Trainer(Configurable, RLAlgo):
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
             self.intrinsic_reward.ema(self._cfg.tau)
-
 
 
     def inference(self, n_step, mode='training'):

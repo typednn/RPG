@@ -110,20 +110,32 @@ class ValuePolicy(AlphaPolicyBase):
         return values * gamma * mask + r, values
 
 
-Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
-Aout = namedtuple('Aout', ['a', 'logp_a'])
+Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
 
-class PolicyA(AlphaPolicyBase):
-    def __init__(self, state_dim, hidden_dim, enc_hidden, head, cfg=None, mode='gd'):
+from nn.distributions import Normal, DistHead
+
+@as_builder
+class PolicyBase(AlphaPolicyBase):
+    def __init__(self, cfg=None):
         super().__init__()
+
+class DiffPolicy(PolicyBase):
+    def __init__(self, state_dim, z_dim, hidden_dim, action_space,
+                 cfg=None, head=Normal.gdc(), mode='gd'):
+        super().__init__()
+
+        head = DistHead.build(action_space, cfg=head)
+        from .soft_actor_critic import DiffPolicy
+
         self.head = head
-        self.enc_hidden = enc_hidden
         self.mode = mode
         self.backbone = self.build_backbone(
-            state_dim + enc_hidden.output_dim, hidden_dim, head.get_input_dim())
+            state_dim + z_dim,  hidden_dim,
+            head.get_input_dim()
+        )
 
-    def forward(self, state_emebd, hidden):
-        inp = self.add_alpha(state_emebd, self.enc_hidden(hidden))
+    def forward(self, state_embed, hidden):
+        inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
         dist = self.head(self.backbone(inp))
 
         from nn.distributions import NormalAction
@@ -132,7 +144,8 @@ class PolicyA(AlphaPolicyBase):
             logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
 
         if self.mode == 'gd':
-            return Aout(*dist.rsample())
+            a, logp = dist.rsample()
+            return Aout(a, logp, -logp)
         else:
             raise NotImplementedError
 
@@ -141,8 +154,9 @@ class PolicyA(AlphaPolicyBase):
         return -rollout['value'][..., 0].mean()
 
 
-class PolicyZ(AlphaPolicyBase):
-    def __init__(self, cfg=None, K=1000000000) -> None:
+Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
+class HiddenPolicy(AlphaPolicyBase):
+    def __init__(self, policy, cfg=None, K=1000000000) -> None:
         super().__init__()
 
 
@@ -163,65 +177,62 @@ class PolicyZ(AlphaPolicyBase):
             entropy[new_action] = -newz_logp
         return Zout(z, logp_z, new_action, new_action_prob, entropy)
 
-    def policy(self, state):
-        raise NotImplementedError
 
 
+# class SoftPolicyZ(PolicyZ):
+#     def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, epsilon=0.) -> None:
+#         super().__init__()
+#         self.enc_z = enc_z
+#         self.zdim = self.enc_z.output_dim
+#         self.qnet = self.build_backbone(state_dim, hidden_dim, self.zdim)
 
-class SoftPolicyZ(PolicyZ):
-    def __init__(self, state_dim, hidden_dim, enc_z, cfg=None, epsilon=0.) -> None:
-        super().__init__()
-        self.enc_z = enc_z
-        self.zdim = self.enc_z.output_dim
-        self.qnet = self.build_backbone(state_dim, hidden_dim, self.zdim)
+#     def q_value(self, state):
+#         return self.qnet(self.add_alpha(state))
 
-    def q_value(self, state):
-        return self.qnet(self.add_alpha(state))
+#     def policy(self, state):
+#         q = self.q_value(state)
+#         logits = q / self.alpha[1]
 
-    def policy(self, state):
-        q = self.q_value(state)
-        logits = q / self.alpha[1]
+#         from nn.distributions import CategoricalAction
+#         out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
+#         return out
 
-        from nn.distributions import CategoricalAction
-        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
-        return out
+#     def loss(self, rollout):
+#         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
+#         state = rollout['state'].detach()
+#         q_value = rollout['q_value'].detach()
+#         z = rollout['z'].detach()
+#         entropies = rollout['extra_rewards'].detach()
 
-    def loss(self, rollout):
-        # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
-        state = rollout['state'].detach()
-        q_value = rollout['q_value'].detach()
-        z = rollout['z'].detach()
-        entropies = rollout['extra_rewards'].detach()
+#         # replicate the q value to the pi_z ..
+#         q_value = q_value.min(axis=-1, keepdims=True).values
+#         with torch.no_grad():
+#             q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
 
-        # replicate the q value to the pi_z ..
-        q_value = q_value.min(axis=-1, keepdims=True).values
-        with torch.no_grad():
-            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
-
-        q_val = self.q_value(state[:-1])
-        q_predict = batch_select(q_val, z)
-        assert q_predict.shape == q_target.shape
-        # assert torch.allclose(q_predict, batch_select(self.q_value(state), z))
-        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
+#         q_val = self.q_value(state[:-1])
+#         q_predict = batch_select(q_val, z)
+#         assert q_predict.shape == q_target.shape
+#         # assert torch.allclose(q_predict, batch_select(self.q_value(state), z))
+#         return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
 
 
 
 
-class GaussianPolicy(PolicyZ):
-    def __init__(
-        self, state_dim, hidden_dim, z_space, cfg=None, K=1000000000, head=Normal.gdc(std_scale=1., std_mode='fix_no_grad', nocenter=True)
-    ) -> None:
-        super().__init__()
-        self.head = Normal(z_space, cfg=head)
-        self.qnet = self.build_backbone(state_dim, hidden_dim, self.head.get_input_dim())
+# class GaussianPolicy(PolicyZ):
+#     def __init__(
+#         self, state_dim, hidden_dim, z_space, cfg=None, K=1000000000, head=Normal.gdc(std_scale=1., std_mode='fix_no_grad', nocenter=True)
+#     ) -> None:
+#         super().__init__()
+#         self.head = Normal(z_space, cfg=head)
+#         self.qnet = self.build_backbone(state_dim, hidden_dim, self.head.get_input_dim())
 
-    def policy(self, state):
-        return self.head(self.qnet(state))
+#     def policy(self, state):
+#         return self.head(self.qnet(state))
 
-    def loss(self, rollout):
-        with torch.no_grad():
-            value = rollout['value'][..., 0].detach()
-        logp = rollout['logp_z'][0].sum(axis=-1)
-        assert value.shape == logp.shape
-        pg = - logp * (value - value.mean()).detach()
-        return pg.mean()
+#     def loss(self, rollout):
+#         with torch.no_grad():
+#             value = rollout['value'][..., 0].detach()
+#         logp = rollout['logp_z'][0].sum(axis=-1)
+#         assert value.shape == logp.shape
+#         pg = - logp * (value - value.mean()).detach()
+#         return pg.mean()

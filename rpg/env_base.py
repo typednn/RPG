@@ -267,3 +267,10 @@ class TorchEnv(VecEnv):
 
     def render_traj(self, traj, **kwargs):
         return self.goal_env._render_traj_rgb(traj=traj, **kwargs)
+
+        
+def make(env_name, n, **kwargs):
+    if env_name in ['LargeMaze']:
+        return TorchEnv(env_name, n, **kwargs)
+    else:
+        return GymVecEnv(env_name, n, **kwargs)

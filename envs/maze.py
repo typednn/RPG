@@ -221,7 +221,7 @@ class LargeMaze(Configurable):
         if isinstance(traj, dict):
             obs = traj['obs']
         else:
-            raise NotImplementedError
+            obs = traj.get_tensor('obs')
 
         plt.clf()
         img = self.screen.copy()/255.
