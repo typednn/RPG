@@ -15,7 +15,8 @@ class InfoNet(Network):
                 state_dim, action_dim, hidden_dim, hidden_space,
                 cfg=None,
                 mutual_info_weight=0., backbone=None, 
-                action_weight=1., noise=0.0, obs_weight=1., head=None, use_next_state=False, epsilon=0.,
+                action_weight=1., noise=0.0, obs_weight=1.,
+                head=None, use_next_state=False, epsilon=0.,
                 std_mode='fix_no_grad',
                 ):
         super().__init__(cfg)
@@ -25,10 +26,10 @@ class InfoNet(Network):
         self.zhead = zhead
         self.info_net = Seq(backbone, zhead)
 
+        # the posterior of p(z|s), for off-policy training..
         zhead2 = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
         backbone = Seq(mlp(state_dim, hidden_dim, zhead2.get_input_dim()))
-        self.posterior_z = Seq(backbone, zhead) # the posterior of p(z|s), for off-policy training..
-
+        self.posterior_z = Seq(backbone, zhead) 
 
     def compute_info_dist(self, states, a_seq):
         states = states * self._cfg.obs_weight
@@ -68,7 +69,6 @@ class InfoNet(Network):
         if self._cfg.head is not None:
             head = merge_inputs(head, **self._cfg.head)
         return head
-
 
     def enc_s(self, obs, timestep):
         return self.enc_s(obs, timestep=timestep)

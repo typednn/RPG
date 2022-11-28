@@ -153,30 +153,60 @@ class DiffPolicy(PolicyBase):
         assert rollout['value'].shape[-1] == 2
         return -rollout['value'][..., 0].mean()
 
-
-Zout = namedtuple('Zout', ['z', 'logp_z', 'new', 'logp_new', 'entropy'])
-class HiddenPolicy(AlphaPolicyBase):
-    def __init__(self, policy, cfg=None, K=1000000000) -> None:
+class DiscreteSoftPolicy(PolicyBase):
+    def __init__(self, state_dim, z_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
+                 use_prevz=False) -> None:
         super().__init__()
+        assert not use_prevz
+        self.qnet = self.build_backbone(state_dim + (z_dim if use_prevz else 0), hidden_dim, action_space.n)
+
+    def q_value(self, state):
+        return self.qnet(self.add_alpha(state))
+
+    def forward(self, state, hidden):
+        assert not self._cfg.use_prevz
+        q = self.q_value(state)
+        logits = q / self.alpha[1]
+        from nn.distributions import CategoricalAction
+        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
+        return out
+
+    def loss(self, rollout):
+        # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
+        state = rollout['state'].detach()
+        q_value = rollout['q_value'].detach()
+        z = rollout['z'].detach()
+        entropies = rollout['extra_rewards'].detach()
+
+        # replicate the q value to the pi_z ..
+        q_value = q_value.min(axis=-1, keepdims=True).values
+        with torch.no_grad():
+            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
+
+        q_val = self.q_value(state[:-1])
+        q_predict = batch_select(q_val, z)
+        assert q_predict.shape == q_target.shape
+        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
 
 
-    def forward(self, state, prevz, timestep):
-        new_action = (timestep % self._cfg.K == 0)
-        new_action_prob = torch.zeros_like(new_action).float()
-        z = prevz.clone()
 
+Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
 
-        logp_z = torch.zeros_like(new_action_prob)
-        entropy = torch.zeros_like(new_action_prob) 
+def select_newz(policy, state, z, timestep, K):
+    new = (timestep % K == 0)
+    log_new_prob = torch.zeros_like(new).float()
+    z = z.clone()
 
-        if new_action.any():
-            pi_z = self.policy(state[new_action])
-            newz, newz_logp = pi_z.sample()
-            z[new_action] = newz
-            logp_z[new_action] = newz_logp
-            entropy[new_action] = -newz_logp
-        return Zout(z, logp_z, new_action, new_action_prob, entropy)
+    logp_z = torch.zeros_like(log_new_prob)
+    entropy = torch.zeros_like(log_new_prob) 
 
+    if new.any():
+        pi = policy(state[new])
+        newz, newz_logp, ent = pi.sample()
+        z[new] = newz
+        logp_z[new] = newz_logp
+        entropy[new] = ent
+    return Zout(z, logp_z, entropy, new, log_new_prob)
 
 
 # class SoftPolicyZ(PolicyZ):

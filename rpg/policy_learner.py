@@ -1,15 +1,13 @@
 import torch
-from tools.utils import logger
-from tools.nn_base import Network
 from nn.distributions import DistHead, NormalAction
+from nn.space import Discrete
+from gym.spaces import Box
 from tools.utils import Seq, mlp
 from tools.optim import LossOptimizer
 from tools.config import Configurable
 from tools.utils import totensor
-from nn.space import Discrete
-from gym.spaces import Box
-
-
+from tools.utils import logger
+from tools.nn_base import Network
 from tools.utils.scheduler import Scheduler
 
 
@@ -73,22 +71,11 @@ class PolicyLearner(LossOptimizer):
         self.freq = 1
 
     def update(self, rollout):
-        # update policy and the entropy module ..
         loss, ent = self.policy.loss(rollout)
         logger.logkv_mean(self.name + '_loss', float(loss))
         self.optimize(loss)
         self.ent.update(ent)
 
-    # @classmethod
-    # def build_linear_agent_from_cfg(
-    #     name, policy_type,
-    #     state_dim, z_dim, hidden_dim, action_space,
-    #     cfg=None, 
-    # ):
-    #     # make up for now ..
-    #     from .soft_actor_critic import DiffPolicy
-    #     policy = eval(policy_type)(state_dim, z_dim, hidden_dim, action_space)
-    #     return PolicyLearner(name, policy, cfg)
     @classmethod
     def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
         from .soft_actor_critic import PolicyBase
