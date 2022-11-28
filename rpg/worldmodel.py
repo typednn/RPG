@@ -30,14 +30,7 @@ class GeneralizedQ(torch.nn.Module):
         reward_predictor,
         q_fn,
         done_fn,
-
         gamma,
-
-        # gamma=0.99,
-        # lmbda=0.97,
-        # lmbda_last=False,
-        # horizon=1,
-        # detach_hidden=True,  # don't let the done to affect the hidden learning ..
     ) -> None:
         super().__init__()
         # self.pi_a, self.pi_z = pi_a, pi_z
@@ -52,10 +45,6 @@ class GeneralizedQ(torch.nn.Module):
 
         self.done_fn = done_fn
         self.gamma = gamma
-
-    @property
-    def weights(self):
-        return torch.softmax(self._weights, 0)
 
     def policy(self, obs, prevz, timestep, pi_z, pi_a):
         obs = totensor(obs, self.device)
@@ -201,7 +190,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         have_done=False,
         hidden_dim=256,
     ):
-
         # Encoder
         # TODO: layer norm?
         from .utils import ZTransform
@@ -219,16 +207,17 @@ class HiddenDynamicNet(Network, GeneralizedQ):
                     return self.bn(x.transpose(1, 2)).transpose(1, 2)
                 return self.bn(x)
 
-        if state_layer_norm:
-            args.append(torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
-        if state_batch_norm:
-            args.append(BN(latent_dim))
-        # assert len(args) == 0
 
         if no_state_encoder:
             enc_s = TimedSeq(Identity(), *args) # encode state with time step ..
             latent_dim = obs_space.shape[0]
         else:
+            latent_dim = state_dim
+            if state_layer_norm:
+                args.append(torch.nn.LayerNorm(latent_dim, elementwise_affine=False))
+            if state_batch_norm:
+                args.append(BN(latent_dim))
+
             if not isinstance(obs_space, dict):
                 enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
             else:
@@ -271,22 +260,23 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         done_fn = mlp(latent_dim, hidden_dim, 1) if have_done else None
 
         # Q
-        self.enc_z = ZTransform(z_space)
+        enc_z = ZTransform(z_space)
         from .soft_actor_critic import SoftQPolicy, ValuePolicy
 
 
         action_dim = action_space.shape[0]
         if qmode == 'Q':
-            q_fn = SoftQPolicy(state_dim, action_dim, z_space, self.enc_z, hidden_dim)
+            q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
         else:
-            q_fn = ValuePolicy(state_dim, action_dim, z_space, self.enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
+            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
 
 
         weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
         self.weights = torch.softmax(torch.log(weights), -1)
         
         Network.__init__(self, cfg)
-        GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn)
+        GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
+        self.enc_z = enc_z
 
     def inference(self, obs, z, timestep, step, pi_z=None, pi_a=None, z_seq=None, a_seq=None, intrinsic_reward=None):
         out = super().inference(obs, z, timestep, step, pi_z, pi_a, z_seq, a_seq, intrinsic_reward)

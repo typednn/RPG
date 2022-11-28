@@ -8,8 +8,6 @@ from tools.utils import Seq, mlp, logger
 from nn.distributions import CategoricalAction, Normal
 from tools.nn_base import Network
 from gym import spaces
-from tools.config import Configurable, as_builder
-from collections import namedtuple
 
 
 class AlphaPolicyBase(Network):
@@ -109,104 +107,6 @@ class ValuePolicy(AlphaPolicyBase):
             mask = 1. # ignore the done in the end ..
         return values * gamma * mask + r, values
 
-
-Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
-
-from nn.distributions import Normal, DistHead
-
-@as_builder
-class PolicyBase(AlphaPolicyBase):
-    def __init__(self, cfg=None):
-        super().__init__()
-
-class DiffPolicy(PolicyBase):
-    def __init__(self, state_dim, z_dim, hidden_dim, action_space,
-                 cfg=None, head=Normal.gdc(), mode='gd'):
-        super().__init__()
-
-        head = DistHead.build(action_space, cfg=head)
-        from .soft_actor_critic import DiffPolicy
-
-        self.head = head
-        self.mode = mode
-        self.backbone = self.build_backbone(
-            state_dim + z_dim,  hidden_dim,
-            head.get_input_dim()
-        )
-
-    def forward(self, state_embed, hidden):
-        inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
-        dist = self.head(self.backbone(inp))
-
-        from nn.distributions import NormalAction
-        if isinstance(dist, NormalAction):
-            scale = dist.dist.scale
-            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-
-        if self.mode == 'gd':
-            a, logp = dist.rsample()
-            return Aout(a, logp, -logp)
-        else:
-            raise NotImplementedError
-
-    def loss(self, rollout):
-        assert rollout['value'].shape[-1] == 2
-        return -rollout['value'][..., 0].mean()
-
-class DiscreteSoftPolicy(PolicyBase):
-    def __init__(self, state_dim, z_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
-                 use_prevz=False) -> None:
-        super().__init__()
-        assert not use_prevz
-        self.qnet = self.build_backbone(state_dim + (z_dim if use_prevz else 0), hidden_dim, action_space.n)
-
-    def q_value(self, state):
-        return self.qnet(self.add_alpha(state))
-
-    def forward(self, state, hidden):
-        assert not self._cfg.use_prevz
-        q = self.q_value(state)
-        logits = q / self.alpha[1]
-        from nn.distributions import CategoricalAction
-        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
-        return out
-
-    def loss(self, rollout):
-        # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
-        state = rollout['state'].detach()
-        q_value = rollout['q_value'].detach()
-        z = rollout['z'].detach()
-        entropies = rollout['extra_rewards'].detach()
-
-        # replicate the q value to the pi_z ..
-        q_value = q_value.min(axis=-1, keepdims=True).values
-        with torch.no_grad():
-            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
-
-        q_val = self.q_value(state[:-1])
-        q_predict = batch_select(q_val, z)
-        assert q_predict.shape == q_target.shape
-        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
-
-
-
-Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
-
-def select_newz(policy, state, z, timestep, K):
-    new = (timestep % K == 0)
-    log_new_prob = torch.zeros_like(new).float()
-    z = z.clone()
-
-    logp_z = torch.zeros_like(log_new_prob)
-    entropy = torch.zeros_like(log_new_prob) 
-
-    if new.any():
-        pi = policy(state[new])
-        newz, newz_logp, ent = pi.sample()
-        z[new] = newz
-        logp_z[new] = newz_logp
-        entropy[new] = ent
-    return Zout(z, logp_z, entropy, new, log_new_prob)
 
 
 # class SoftPolicyZ(PolicyZ):

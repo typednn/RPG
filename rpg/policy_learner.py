@@ -9,12 +9,23 @@ from tools.utils import totensor
 from tools.utils import logger
 from tools.nn_base import Network
 from tools.utils.scheduler import Scheduler
+from tools.config import Configurable, as_builder
+from collections import namedtuple
+from nn.distributions import Normal, DistHead
+from .soft_actor_critic import AlphaPolicyBase
 
+
+def batch_select(values, z=None):
+    if z is None:
+        return values
+    else:
+        out = torch.gather(values, -1, z.unsqueeze(-1))
+        return out
 
 class EntropyLearner(Configurable):
     def __init__(
         self,
-        space, name,
+        name, space,
         cfg=None,
         coef=1.,
         target_mode='auto',
@@ -63,11 +74,11 @@ class EntropyLearner(Configurable):
         
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, policy, cfg=None, ent=EntropyLearner.dc, freq=1):
+    def __init__(self, name, action_space, policy, cfg=None, ent=EntropyLearner.dc, freq=1):
         super().__init__(policy, cfg)
         self.name = name
         self.policy = policy
-        self.ent = EntropyLearner(cfg=ent)
+        self.ent = EntropyLearner(name, action_space, cfg=ent)
         self.freq = 1
 
     def update(self, rollout):
@@ -76,8 +87,124 @@ class PolicyLearner(LossOptimizer):
         self.optimize(loss)
         self.ent.update(ent)
 
-    @classmethod
-    def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
-        from .soft_actor_critic import PolicyBase
-        policy = PolicyBase.build(*args, cfg=policy_cfg, **kwargs)
-        return PolicyLearner(name, policy, cfg=learner_cfg)
+    # @classmethod
+    # def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
+    #     from .soft_actor_critic import PolicyBase
+    #     policy = PolicyBase.build(*args, cfg=policy_cfg, **kwargs)
+    #     return PolicyLearner(name, policy, cfg=learner_cfg)
+
+
+
+Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
+
+@as_builder
+class PolicyBase(AlphaPolicyBase):
+    def __init__(self, cfg=None):
+        super().__init__()
+
+class DiffPolicy(PolicyBase):
+    def __init__(self, state_dim, z_dim, hidden_dim, action_space,
+                 cfg=None, head=Normal.gdc(), mode='gd'):
+        super().__init__()
+        head = Normal(action_space, cfg=head)
+        self.head = head
+        self.mode = mode
+        self.backbone = self.build_backbone(
+            state_dim + z_dim,
+            hidden_dim,
+            head.get_input_dim()
+        )
+
+    def forward(self, state_embed, hidden):
+        inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
+        dist = self.head(self.backbone(inp))
+
+        from nn.distributions import NormalAction
+        if isinstance(dist, NormalAction):
+            scale = dist.dist.scale
+            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
+
+        if self.mode == 'gd':
+            a, logp = dist.rsample()
+            return Aout(a, logp, -logp)
+        else:
+            raise NotImplementedError
+
+    def loss(self, rollout):
+        assert rollout['value'].shape[-1] == 2
+        return -rollout['value'][..., 0].mean()
+
+class DiscreteSoftPolicy(PolicyBase):
+    def __init__(self, state_dim, z_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
+                 use_prevz=False) -> None:
+        super().__init__()
+        assert not use_prevz
+        self.qnet = self.build_backbone(state_dim + (z_dim if use_prevz else 0), hidden_dim, action_space.n)
+
+    def q_value(self, state):
+        return self.qnet(self.add_alpha(state))
+
+    def forward(self, state, hidden):
+        assert not self._cfg.use_prevz
+        q = self.q_value(state)
+        logits = q / self.alpha[1]
+        from nn.distributions import CategoricalAction
+        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
+        return out
+
+    def loss(self, rollout):
+        # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
+        state = rollout['state'].detach()
+        q_value = rollout['q_value'].detach()
+        z = rollout['z'].detach()
+        entropies = rollout['extra_rewards'].detach()
+
+        # replicate the q value to the pi_z ..
+        q_value = q_value.min(axis=-1, keepdims=True).values
+        with torch.no_grad():
+            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
+
+        q_val = self.q_value(state[:-1])
+        q_predict = batch_select(q_val, z)
+        assert q_predict.shape == q_target.shape
+        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
+
+
+
+Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
+
+def select_newz(policy, state, z, timestep, K):
+    new = (timestep % K == 0)
+    log_new_prob = torch.zeros_like(new).float()
+    z = z.clone()
+
+    logp_z = torch.zeros_like(log_new_prob)
+    entropy = torch.zeros_like(log_new_prob) 
+
+    if new.any():
+        pi = policy(state[new])
+        newz, newz_logp, ent = pi.sample()
+        z[new] = newz
+        logp_z[new] = newz_logp
+        entropy[new] = ent
+    return Zout(z, logp_z, entropy, new, log_new_prob)
+
+        
+class DiffPolicyLearner(PolicyLearner):
+    def __init__(
+        self, name, state_dim, z_dim, hidden_dim, action_space,
+        # TODO: not sure if this will be ok ..
+        cfg=None,
+        pi=DiffPolicy.dc,
+    ):
+        policy = DiffPolicy(state_dim, z_dim, hidden_dim, action_space, cfg=pi)
+        super().__init__(name, action_space, policy, cfg=cfg)
+
+        
+class DiscretePolicyLearner(PolicyLearner):
+    def __init__(
+        self, name, state_dim, z_dim, hidden_dim, action_space,
+        cfg=None, pi=DiscreteSoftPolicy.dc
+    ):
+        policy = DiscreteSoftPolicy(state_dim, z_dim, hidden_dim, action_space, cfg=pi)
+        super().__init__(name, action_space, policy, cfg=cfg)

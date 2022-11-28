@@ -15,9 +15,13 @@ from torch.nn.functional import binary_cross_entropy as bce
 from .utils import masked_temporal_mse, create_hidden_space
 from .worldmodel import GeneralizedQ
 
-from .auxiliary import IntrinsicReward, EntropyLearner, InfoNet
-from .soft_actor_critic import SoftQPolicy, ValuePolicy
+# from .auxiliary import IntrinsicReward, EntropyLearner, InfoNet
+# from .soft_actor_critic import SoftQPolicy, ValuePolicy
+# from .policy_learner import PolicyLearner
 from .buffer import ReplayBuffer
+from .info_net import InfoNet
+
+from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -29,12 +33,14 @@ class Trainer(Configurable, RLAlgo):
 
         z_dim=1, z_cont_dim=0,
 
+        # model
         buffer=ReplayBuffer.dc,
         model=HiddenDynamicNet.dc,
         trainer=DynamicsLearner.dc,
 
-        # gamma=0.99, lmbda=0.97,
-        # weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
+        # policy
+        pi_a=DiffPolicyLearner.dc,
+        pi_z=DiscretePolicyLearner.dc,
 
         # mutual information term ..
         info = InfoNet.dc,
@@ -68,6 +74,16 @@ class Trainer(Configurable, RLAlgo):
         self.device = 'cuda:0'
         self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
         self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, cfg=model)
+
+        state_dim = self.dynamics_net.state_dim
+        z_dim = self.dynamics_net.enc_z.output_dim
+        hidden_dim = 256
+        self.pi_a = DiffPolicyLearner(
+            'a', state_dim, z_dim, hidden_dim, env.action_space, cfg=pi_a
+        )
+        self.pi_z = DiscretePolicyLearner(
+            'z', state_dim, z_dim, hidden_dim, env.action_space, cfg=pi_z
+        )
         # hidden_dim = 256
         # state_dim = self.dynamics_net.state_dim
         # enc_z = self.dynamics_net.enc_z
@@ -85,6 +101,7 @@ class Trainer(Configurable, RLAlgo):
         # self.update_step = 0
         # self.z = None
         # self.sync_alpha()
+        exit(0)
 
     def sync_alpha(self):
         #self.nets.intrinsic_reward.sync_alpha()
