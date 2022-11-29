@@ -10,14 +10,8 @@ from .buffer import ReplayBuffer
 from .traj import Trajectory
 from typing import Union
 from .env_base import GymVecEnv, TorchEnv
-from nn.distributions import DistHead, NormalAction
 from torch.nn.functional import binary_cross_entropy as bce
 from .utils import masked_temporal_mse, create_hidden_space
-from .worldmodel import GeneralizedQ
-
-# from .auxiliary import IntrinsicReward, EntropyLearner, InfoNet
-# from .soft_actor_critic import SoftQPolicy, ValuePolicy
-# from .policy_learner import PolicyLearner
 from .buffer import ReplayBuffer
 from .info_net import InfoNet
 
@@ -72,8 +66,13 @@ class Trainer(Configurable, RLAlgo):
         self.horizon = horizon
         self.env = env
         self.device = 'cuda:0'
-        self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
-        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, cfg=model)
+        self.buffer = ReplayBuffer(
+            obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
+        self.dynamics_net = HiddenDynamicNet(
+            obs_space, env.action_space, z_space, cfg=model).cuda()
+
+        with torch.no_grad():
+            self.target_dynamics_net = copy.deepcopy(self.dynamics_net)
 
         state_dim = self.dynamics_net.state_dim
         z_dim = self.dynamics_net.enc_z.output_dim
@@ -82,33 +81,14 @@ class Trainer(Configurable, RLAlgo):
             'a', state_dim, z_dim, hidden_dim, env.action_space, cfg=pi_a
         )
         self.pi_z = DiscretePolicyLearner(
-            'z', state_dim, z_dim, hidden_dim, env.action_space, cfg=pi_z
+            'z', state_dim, z_dim, hidden_dim, self.z_space, cfg=pi_z
         )
-        # hidden_dim = 256
-        # state_dim = self.dynamics_net.state_dim
-        # enc_z = self.dynamics_net.enc_z
+        self.z = None
 
-        # #pi_z = SoftPolicyZ(state_dim, hidden_dim, enc_z, cfg=self._cfg.pi_z)
+        self.info_net = lambda x: x['rewards'], 0, 0
+        self.model_learner = DynamicsLearner(
+            self.dynamics_net, self.pi_a, self.pi_z, self.info_net, self.target_dynamics_net, cfg=trainer)
 
-        # with torch.no_grad():
-        #     self.target_nets = copy.deepcopy(self.dynamics_net)
-
-
-        # self.dyna_optim = DynamicsLearner(self.dynamics_net, cfg=dynamic_learner)
-        # self.pi_a_optim = LossOptimizer(self.nets.pi_a, cfg=self._cfg.optim)
-        # self.pi_z_optim = LossOptimizer(self.nets.pi_z, cfg=self._cfg.optim)
-
-        # self.update_step = 0
-        # self.z = None
-        # self.sync_alpha()
-        exit(0)
-
-    def sync_alpha(self):
-        #self.nets.intrinsic_reward.sync_alpha()
-        alpha_a = self.enta.alpha
-        alpha_z = self.entz.alpha
-        self.nets.set_alpha(alpha_a, alpha_z)
-        self.target_nets.set_alpha(alpha_a, alpha_z)
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
@@ -135,12 +115,11 @@ class Trainer(Configurable, RLAlgo):
 
     def update(self):
         # TODO: train the nteworks
-        self.sync_alpha()
+        # self.sync_alpha()
 
         obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size)
         # TODO: reward decay
-        assert not self._cfg.relabel, "if relabel "
-
+        # assert not self._cfg.relabel, "if relabel "
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
         prev_z = z[None, :].expand(len(obs_seq), *z.shape)
 
@@ -154,6 +133,25 @@ class Trainer(Configurable, RLAlgo):
         if self.update_step % self._cfg.update_target_freq == 0:
             ema(self.nets, self.target_nets, self._cfg.tau)
             self.intrinsic_reward.ema(self._cfg.tau)
+
+    def eval(self):
+        #print("Eval is not implemented")
+        # eval not implemented
+        return
+
+    def train(self):
+        # train
+        return
+
+
+    def policy(self, obs, prevz, timestep):
+        obs = totensor(obs, self.device)
+        prevz = totensor(prevz, self.device, dtype=None)
+        timestep = totensor(timestep, self.device, dtype=None)
+        s = self.dynamics_net.enc_s(obs, timestep=timestep)
+        z = self.pi_z(s, self.dynamics_net.enc_z(prevz), prev_action=prevz, timestep=timestep).a
+        a = self.pi_a(s, self.dynamics_net.enc_z(z)).a
+        return a, z.detach().cpu().numpy()
 
 
     def inference(self, n_step, mode='training'):
@@ -170,10 +168,10 @@ class Trainer(Configurable, RLAlgo):
         images = []
         for idx in r(n_step):
             with torch.no_grad():
-                self.nets.eval()
+                self.eval()
                 transition = dict(obs = obs, timestep=timestep)
                 prevz = totensor(self.z, device=self.device, dtype=None)
-                a, self.z = self.nets.policy(obs, self.z, timestep)
+                a, self.z = self.policy(obs, self.z, timestep)
                 data, obs = self.step(self.env, a)
 
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps
@@ -195,7 +193,7 @@ class Trainer(Configurable, RLAlgo):
 
         return Trajectory(transitions, len(obs), n_step)
 
-    def run_rpgm(self, max_epoch=None):
+    def setup_logger(self):
         format_strs = ["stdout", "log", "csv", 'tensorboard']
         kwargs = {}
         if self._cfg.wandb is not None:
@@ -212,10 +210,11 @@ class Trainer(Configurable, RLAlgo):
                     name = None
                 kwargs['name'] = wandb_cfg.get('name', None) + (('_' + name) if name is not None else '')
 
-
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
+
+    def run_rpgm(self, max_epoch=None):
+        self.setup_logger()
         env = self.env
-        self.sync_alpha()
 
         steps = self._cfg.steps_per_epoch or self.env.max_time_steps
         epoch_id = 0

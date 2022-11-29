@@ -46,15 +46,6 @@ class GeneralizedQ(torch.nn.Module):
         self.done_fn = done_fn
         self.gamma = gamma
 
-    def policy(self, obs, prevz, timestep, pi_z, pi_a):
-        obs = totensor(obs, self.device)
-        prevz = totensor(prevz, self.device, dtype=None)
-        timestep = totensor(timestep, self.device, dtype=None)
-        s = self.enc_s(obs, timestep=timestep)
-        z = pi_z(s, prevz, timestep).z
-        a = pi_a(s, z).a
-        return a, z.detach().cpu().numpy()
-
     def inference(
         self, obs, z, timestep, step,
         pi_z=None, pi_a=None, z_seq=None, a_seq=None, 

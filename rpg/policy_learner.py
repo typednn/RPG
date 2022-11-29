@@ -68,31 +68,10 @@ class EntropyLearner(Configurable):
 
     @property
     def alpha(self):
-        if self.target is not None:
+        if self.target is None:
             return self.schedule.get() * self._cfg.coef
         return float(self.log_alpha.exp() * self._cfg.coef)
         
-
-class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, cfg=None, ent=EntropyLearner.dc, freq=1):
-        super().__init__(policy, cfg)
-        self.name = name
-        self.policy = policy
-        self.ent = EntropyLearner(name, action_space, cfg=ent)
-        self.freq = 1
-
-    def update(self, rollout):
-        loss, ent = self.policy.loss(rollout)
-        logger.logkv_mean(self.name + '_loss', float(loss))
-        self.optimize(loss)
-        self.ent.update(ent)
-
-    # @classmethod
-    # def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
-    #     from .soft_actor_critic import PolicyBase
-    #     policy = PolicyBase.build(*args, cfg=policy_cfg, **kwargs)
-    #     return PolicyLearner(name, policy, cfg=learner_cfg)
-
 
 
 Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
@@ -103,20 +82,20 @@ class PolicyBase(AlphaPolicyBase):
         super().__init__()
 
 class DiffPolicy(PolicyBase):
-    def __init__(self, state_dim, z_dim, hidden_dim, action_space,
+    def __init__(self, state_dim, hidden_dim, action_space,
                  cfg=None, head=Normal.gdc(), mode='gd'):
         super().__init__()
         head = Normal(action_space, cfg=head)
         self.head = head
         self.mode = mode
         self.backbone = self.build_backbone(
-            state_dim + z_dim,
+            state_dim,
             hidden_dim,
             head.get_input_dim()
         )
 
-    def forward(self, state_embed, hidden):
-        inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
+    def forward(self, inp, alpha):
+        #inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
         dist = self.head(self.backbone(inp))
 
         from nn.distributions import NormalAction
@@ -135,22 +114,23 @@ class DiffPolicy(PolicyBase):
         return -rollout['value'][..., 0].mean()
 
 class DiscreteSoftPolicy(PolicyBase):
-    def __init__(self, state_dim, z_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
+    def __init__(self, state_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
                  use_prevz=False) -> None:
         super().__init__()
         assert not use_prevz
-        self.qnet = self.build_backbone(state_dim + (z_dim if use_prevz else 0), hidden_dim, action_space.n)
+        self.qnet = self.build_backbone(state_dim, hidden_dim, action_space.n)
 
     def q_value(self, state):
         return self.qnet(self.add_alpha(state))
 
-    def forward(self, state, hidden):
+    def forward(self, state, alpha):
         assert not self._cfg.use_prevz
         q = self.q_value(state)
-        logits = q / self.alpha[1]
+        logits = q / alpha
         from nn.distributions import CategoricalAction
         out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
-        return out
+        a, logp = out.sample()
+        return Aout(a, logp, out.entropy())
 
     def loss(self, rollout):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
@@ -173,7 +153,7 @@ class DiscreteSoftPolicy(PolicyBase):
 
 Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
 
-def select_newz(policy, state, z, timestep, K):
+def select_newz(policy, state, alpha, z, timestep, K):
     new = (timestep % K == 0)
     log_new_prob = torch.zeros_like(new).float()
     z = z.clone()
@@ -182,12 +162,46 @@ def select_newz(policy, state, z, timestep, K):
     entropy = torch.zeros_like(log_new_prob) 
 
     if new.any():
-        pi = policy(state[new])
-        newz, newz_logp, ent = pi.sample()
+        newz, newz_logp, ent = policy(state[new], alpha)
         z[new] = newz
         logp_z[new] = newz_logp
         entropy[new] = ent
     return Zout(z, logp_z, entropy, new, log_new_prob)
+
+
+class PolicyLearner(LossOptimizer):
+    def __init__(self, name, action_space, policy, cfg=None, ent=EntropyLearner.dc, freq=1, use_hidden=True):
+        super().__init__(policy, cfg)
+        assert use_hidden
+
+        self.name = name
+        self.policy = policy
+        self.ent = EntropyLearner(name, action_space, cfg=ent)
+        self.freq = 1
+
+    def update(self, rollout):
+        loss, ent = self.policy.loss(rollout)
+        logger.logkv_mean(self.name + '_loss', float(loss))
+        self.optimize(loss)
+        self.ent.update(ent)
+
+    def __call__(self, s, hidden, prev_action=None, timestep=None):
+        s = self.policy.add_alpha(s, hidden) # concatenate the two
+        alpha = self.ent.alpha
+
+        if prev_action is not None:
+            assert timestep is not None
+            # TODO: allow to ignore the previous? not need now
+            return select_newz(self.policy, s, alpha, prev_action, timestep, self.freq)
+        else:
+            return self.policy(s, alpha)
+
+    # @classmethod
+    # def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
+    #     from .soft_actor_critic import PolicyBase
+    #     policy = PolicyBase.build(*args, cfg=policy_cfg, **kwargs)
+    #     return PolicyLearner(name, policy, cfg=learner_cfg)
+
 
         
 class DiffPolicyLearner(PolicyLearner):
@@ -197,7 +211,7 @@ class DiffPolicyLearner(PolicyLearner):
         cfg=None,
         pi=DiffPolicy.dc,
     ):
-        policy = DiffPolicy(state_dim, z_dim, hidden_dim, action_space, cfg=pi)
+        policy = DiffPolicy(state_dim + z_dim, hidden_dim, action_space, cfg=pi).cuda()
         super().__init__(name, action_space, policy, cfg=cfg)
 
         
@@ -206,5 +220,5 @@ class DiscretePolicyLearner(PolicyLearner):
         self, name, state_dim, z_dim, hidden_dim, action_space,
         cfg=None, pi=DiscreteSoftPolicy.dc
     ):
-        policy = DiscreteSoftPolicy(state_dim, z_dim, hidden_dim, action_space, cfg=pi)
+        policy = DiscreteSoftPolicy(state_dim + z_dim, hidden_dim, action_space, cfg=pi).cuda()
         super().__init__(name, action_space, policy, cfg=cfg)
