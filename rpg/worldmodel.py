@@ -20,6 +20,13 @@ from tools.utils import logger
 from torch.nn.functional import binary_cross_entropy as bce
 from tools.utils import print_input_args
 
+from typing import  Union
+from .soft_actor_critic import SoftQPolicy, ValuePolicy
+
+
+from dataclasses import dataclass
+
+
 class GeneralizedQ(torch.nn.Module):
     def __init__(
         self,
@@ -41,10 +48,17 @@ class GeneralizedQ(torch.nn.Module):
 
         self.state_dec = state_dec
         self.reward_predictor = reward_predictor
-        self.q_fn = q_fn
+        self.q_fn: Union[SoftQPolicy, ValuePolicy] = q_fn
 
         self.done_fn = done_fn
         self.gamma = gamma
+
+    def core(self, h, a):
+        a_embed = self.enc_a(a)
+        o, h = self.dynamic_fn(a_embed[None, :], h)
+        assert torch.allclose(o[-1], h)
+        s = self.state_dec(h[-1]) # predict the next hidden state ..
+        return h, s, a_embed
 
     def inference(
         self, obs, z, timestep, step,
@@ -86,14 +100,9 @@ class GeneralizedQ(torch.nn.Module):
                 a, _logp_a, _enta = pi_a(s, z)
                 logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
-
-            a_embed = self.enc_a(a_seq[idx])
+            
+            h, s, a_embed = self.core(h, a_seq[idx])
             a_embeds.append(a_embed)
-            o, h = self.dynamic_fn(a_embed[None, :], h)
-            assert torch.allclose(o[-1], h)
-            s = self.state_dec(h[-1]) # predict the next hidden state ..
-
-            # hidden.append(h[-1])
             states.append(s)
 
             timestep = timestep + 1
@@ -120,25 +129,19 @@ class GeneralizedQ(torch.nn.Module):
             if detach_hidden:
                 done_inp = done_inp.detach()
             out['done'] = dones = torch.sigmoid(self.done_fn(done_inp))
-
-        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self.gamma)
-
-        if dones is not None:
             from tools.utils import logger 
             logger.logkv_mean('mean_pred_done', dones.mean().item())
 
+        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self.gamma)
+
         if sample_z:
             if intrinsic_reward is not None:
-                rewards, extra_rewards, infos = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
+                rewards, extra_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
             else:
                 rewards = out['reward']
                 extra_rewards = torch.zeros_like(rewards)
-                infos = {}
-            #assert extra_rewards.shape[-1] == 3, "enta, entz, info"
-            out.update(infos)
 
             vpreds = []
-
             discount = 1
             prefix = 0.
             for i in range(len(rewards)):
@@ -160,8 +163,6 @@ class GeneralizedQ(torch.nn.Module):
         out['pred_values'] = values
 
         return out
-
-
 
 
 class HiddenDynamicNet(Network, GeneralizedQ):
@@ -263,22 +264,16 @@ class HiddenDynamicNet(Network, GeneralizedQ):
             q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
         else:
             q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
+            raise NotImplementedError
 
-
-        #weights = lmbda_decay_weight(lmbda, horizon, lmbda_last=lmbda_last)
-        #self.weights = torch.softmax(torch.log(weights), -1)
-        
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
         self.enc_z = enc_z
 
-
-    # @print_input_args
-    def inference(self, obs, z, timestep, step, pi_z=None, pi_a=None, z_seq=None, a_seq=None, intrinsic_reward=None):
-        out = super().inference(obs, z, timestep, step, pi_z, pi_a, z_seq, a_seq, intrinsic_reward)
+    def inference(self, *args, **kwargs):
+        out = super().inference(*args, **kwargs)
         if 'vpreds' in out:
             out['value'] = out['vpreds'].mean(axis=0)
-
             assert out['value'].shape[-1] == 2, "must be double q learning .."
         return out
 
@@ -287,20 +282,23 @@ class DynamicsLearner(LossOptimizer):
     # optimizer of the dynamics model ..
     def __init__(
         self, models: HiddenDynamicNet,
-        pi_a, pi_z, intrinsic_reward, target_net,
+        pi_a, pi_z, intrinsic_reward,
         
         cfg=None,
         target_horizon=None, zero_done_value=False, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
 
+        tau=0.005,
     ):
         super().__init__(models, cfg)
-        self.nets = models
-
         self.pi_a = pi_a
         self.pi_z = pi_z
         self.intrinsic_reward = intrinsic_reward
-        self.target_net = target_net
+
+        self.nets = models
+        with torch.no_grad():
+            import copy
+            self.target_net = copy.deepcopy(self.nets)
 
 
     def get_flatten_next_obs(self, obs_seq):
@@ -320,6 +318,7 @@ class DynamicsLearner(LossOptimizer):
         horizon = len(obs_seq) - 1
         pred_traj = self.nets.inference(
             obs_seq[0], prev_z[0], timesteps[0], len(action), a_seq=action, z_seq=prev_z[1:]) 
+        qnet = self.nets.q_fn
 
         with torch.no_grad():
 
@@ -338,15 +337,13 @@ class DynamicsLearner(LossOptimizer):
             qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
             assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
 
-            gt['q_value'] = self.nets.q_fn.compute_target(qtarg, reward, done_gt.float(), self.nets.gamma)
+            gt['q_value'] = qnet.compute_target(qtarg, reward, done_gt.float(), self.nets.gamma)
             gt['state'] = samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
 
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
 
-        output = dict(state=pred_traj['state'][1:], q_value=pred_traj['q_value'],  reward=pred_traj['reward'])
-        #if self._cfg.qmode == 'value':
-        #    output['q_value'] = pred_traj['pred_values']
+        output = dict(state=pred_traj['state'][1:], q_value=qnet.get_predict(pred_traj),  reward=pred_traj['reward'])
         for k in ['state', 'q_value', 'reward']:
             dyna_loss[k] = masked_temporal_mse(output[k], gt[k], truncated_mask) / horizon
 
@@ -368,3 +365,7 @@ class DynamicsLearner(LossOptimizer):
         logger.logkv_mean('state_mean', float(s.mean()))
         logger.logkv_mean('state_min', float(s.min()))
         logger.logkv_mean('state_max', float(s.max()))
+
+    def update_target(self):
+        from tools.utils import ema
+        ema(self.nets, self.target_net, self._cfg.tau)

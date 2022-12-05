@@ -204,11 +204,13 @@ class PolicyLearner(LossOptimizer):
         else:
             return self.policy(s, alpha)
 
-    # @classmethod
-    # def build_from_cfg(self, name, policy_cfg, learner_cfg, *args, **kwargs):
-    #     from .soft_actor_critic import PolicyBase
-    #     policy = PolicyBase.build(*args, cfg=policy_cfg, **kwargs)
-    #     return PolicyLearner(name, policy, cfg=learner_cfg)
+    def intrinsic_reward(self, rollout):
+        with torch.no_grad():
+            alpha = self.ent.alpha
+        return rollout['ent_{}'.format(self.name)] * alpha
+
+    def update_intrinsic(self):
+        pass
 
 
         

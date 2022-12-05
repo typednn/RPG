@@ -54,6 +54,22 @@ class BufferItem:
         return torch.from_numpy(np.random.choice(len(self), batch_size)).to(self.device)
 
 
+
+from typing import Union, Optional
+from dataclasses import dataclass
+
+@dataclass
+class TrajSeg:
+    obs_seq: Union[torch.Tensor, dict]
+    timesteps: torch.LongTensor
+    action: torch.Tensor
+    reward: torch.Tensor
+    done: torch.Tensor
+    truncated_mask: torch.Tensor
+    done: torch.Tensor
+    z: Optional[torch.Tensor]
+
+
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
     def __init__(self, obs_space, action_space, episode_length, horizon,
@@ -193,10 +209,12 @@ class ReplayBuffer(Configurable):
 
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
-        # raise NotImplementedError("The truncation seems incorrect in the end, need to be fixed")
-        output = (obs_seq, timesteps, action, reward, done, truncated_mask[..., 0])
+
+        output = TrajSeg(obs_seq, timesteps, action, reward, done, truncated_mask[..., 0], None)
+
         if self._z is not None:
-            output += (z,) #NOTE: this is the z before the state ..
+            output.z = z
+            #output += (z,) #NOTE: this is the z before the state ..
         return output
 
     

@@ -16,6 +16,7 @@ from .buffer import ReplayBuffer
 from .info_net import InfoNet
 
 from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
+from .intrinsic import IntrinsicMotivation
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -46,7 +47,6 @@ class Trainer(Configurable, RLAlgo):
         update_train_step=1,
         warmup_steps=1000,
         steps_per_epoch=None,
-        tau=0.005,
         z_delay=None,
         actor_delay=2,
         eval_episode=10,
@@ -71,9 +71,6 @@ class Trainer(Configurable, RLAlgo):
         self.dynamics_net = HiddenDynamicNet(
             obs_space, env.action_space, z_space, cfg=model).cuda()
 
-        with torch.no_grad():
-            self.target_dynamics_net = copy.deepcopy(self.dynamics_net)
-
         state_dim = self.dynamics_net.state_dim
         enc_z = self.dynamics_net.enc_z
         hidden_dim = 256
@@ -83,23 +80,19 @@ class Trainer(Configurable, RLAlgo):
         self.pi_z = DiscretePolicyLearner(
             'z', state_dim, enc_z, hidden_dim, self.z_space, cfg=pi_z
         )
-        self.z = None
-
         #self.info_net = lambda x: x['rewards'], 0, 0
-        self.intrinsic_reward = None
-        self.model_learner = DynamicsLearner(
-            self.dynamics_net, self.pi_a, self.pi_z, self.intrinsic_reward,
-            self.target_dynamics_net, cfg=trainer
-        )
+        self.intrinsic_reward = IntrinsicMotivation(self.pi_a, self.pi_z)
+        self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, self.intrinsic_reward, cfg=trainer)
 
+        self.z = None
         self.update_step = 0
 
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
-            obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
-            rollout = self.dynamics_net.inference(obs_seq[0], z, timesteps[0], self.horizon, self.pi_z, self.pi_a, self.intrinsic_reward)
-            from tools.utils import dshape
+            seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
+            rollout = self.dynamics_net.inference(
+                seg.obs_seq[0], seg.z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
             self.pi_a.update(rollout)
 
 
@@ -117,28 +110,20 @@ class Trainer(Configurable, RLAlgo):
             #_, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
             #self.entz.update(entz)
 
-
     def update(self):
         # TODO: train the nteworks
-        # self.sync_alpha()
-
-        obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size)
+        seg = self.buffer.sample(self._cfg.batch_size)
         # TODO: reward decay
-        # assert not self._cfg.relabel, "if relabel "
-        assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
-        prev_z = z[None, :].expand(len(obs_seq), *z.shape)
-
-        self.model_learner.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
+        prev_z = seg.z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
+        self.model_learner.learn_dynamics(
+            seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
 
         self.update_pi_a()
         self.update_pi_z()
 
-
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
-            ema(self.dynamics_net, self.target_dynamics_net, self._cfg.tau)
-            if self.intrinsic_reward is not None:
-                self.intrinsic_reward.ema(self._cfg.tau)
+            self.model_learner.update_target()
 
     def eval(self):
         #print("Eval is not implemented")
