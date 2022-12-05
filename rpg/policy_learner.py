@@ -83,11 +83,17 @@ class PolicyBase(AlphaPolicyBase):
 
 class DiffPolicy(PolicyBase):
     def __init__(self, state_dim, hidden_dim, action_space,
-                 cfg=None, head=Normal.gdc(), mode='gd'):
+                 cfg=None,
+                 head=Normal.gdc(
+                    linear=False,
+                    std_mode='statewise',
+                    std_scale=1.,
+                    squash=True,
+                )
+    ):
         super().__init__()
         head = Normal(action_space, cfg=head)
         self.head = head
-        self.mode = mode
         self.backbone = self.build_backbone(
             state_dim,
             hidden_dim,
@@ -103,11 +109,9 @@ class DiffPolicy(PolicyBase):
             scale = dist.dist.scale
             logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
 
-        if self.mode == 'gd':
-            a, logp = dist.rsample()
-            return Aout(a, logp, -logp)
-        else:
-            raise NotImplementedError
+        a, logp = dist.rsample()
+        return Aout(a, logp, -logp)
+
 
     def loss(self, rollout):
         assert rollout['value'].shape[-1] == 2
@@ -170,22 +174,26 @@ def select_newz(policy, state, alpha, z, timestep, K):
 
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, cfg=None, ent=EntropyLearner.dc, freq=1, use_hidden=True):
+    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, use_hidden=True):
         super().__init__(policy, cfg)
         assert use_hidden
 
         self.name = name
         self.policy = policy
+        self.enc_z = enc_z
         self.ent = EntropyLearner(name, action_space, cfg=ent)
         self.freq = 1
 
     def update(self, rollout):
-        loss, ent = self.policy.loss(rollout)
+        ent = rollout[f'ent_{self.name}']
+        loss = self.policy.loss(rollout)
         logger.logkv_mean(self.name + '_loss', float(loss))
         self.optimize(loss)
         self.ent.update(ent)
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
+        hidden = self.enc_z(hidden)
+
         s = self.policy.add_alpha(s, hidden) # concatenate the two
         alpha = self.ent.alpha
 
@@ -206,19 +214,19 @@ class PolicyLearner(LossOptimizer):
         
 class DiffPolicyLearner(PolicyLearner):
     def __init__(
-        self, name, state_dim, z_dim, hidden_dim, action_space,
+        self, name, state_dim, enc_z, hidden_dim, action_space,
         # TODO: not sure if this will be ok ..
         cfg=None,
         pi=DiffPolicy.dc,
     ):
-        policy = DiffPolicy(state_dim + z_dim, hidden_dim, action_space, cfg=pi).cuda()
-        super().__init__(name, action_space, policy, cfg=cfg)
+        policy = DiffPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
+        super().__init__(name, action_space, policy, enc_z, cfg=cfg)
 
         
 class DiscretePolicyLearner(PolicyLearner):
     def __init__(
-        self, name, state_dim, z_dim, hidden_dim, action_space,
+        self, name, state_dim, enc_z, hidden_dim, action_space,
         cfg=None, pi=DiscreteSoftPolicy.dc
     ):
-        policy = DiscreteSoftPolicy(state_dim + z_dim, hidden_dim, action_space, cfg=pi).cuda()
-        super().__init__(name, action_space, policy, cfg=cfg)
+        policy = DiscreteSoftPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
+        super().__init__(name, action_space, policy, enc_z, cfg=cfg)

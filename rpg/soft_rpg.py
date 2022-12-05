@@ -75,31 +75,36 @@ class Trainer(Configurable, RLAlgo):
             self.target_dynamics_net = copy.deepcopy(self.dynamics_net)
 
         state_dim = self.dynamics_net.state_dim
-        z_dim = self.dynamics_net.enc_z.output_dim
+        enc_z = self.dynamics_net.enc_z
         hidden_dim = 256
         self.pi_a = DiffPolicyLearner(
-            'a', state_dim, z_dim, hidden_dim, env.action_space, cfg=pi_a
+            'a', state_dim, enc_z, hidden_dim, env.action_space, cfg=pi_a
         )
         self.pi_z = DiscretePolicyLearner(
-            'z', state_dim, z_dim, hidden_dim, self.z_space, cfg=pi_z
+            'z', state_dim, enc_z, hidden_dim, self.z_space, cfg=pi_z
         )
         self.z = None
 
-        self.info_net = lambda x: x['rewards'], 0, 0
+        #self.info_net = lambda x: x['rewards'], 0, 0
+        self.intrinsic_reward = None
         self.model_learner = DynamicsLearner(
-            self.dynamics_net, self.pi_a, self.pi_z, self.info_net, self.target_dynamics_net, cfg=trainer)
+            self.dynamics_net, self.pi_a, self.pi_z, self.intrinsic_reward,
+            self.target_dynamics_net, cfg=trainer
+        )
+
+        self.update_step = 0
 
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
             obs_seq, timesteps, action, reward, done_gt, truncated_mask, z = self.buffer.sample(self._cfg.batch_size, horizon=1)
-            rollout = self.nets.inference(obs_seq[0], z, timesteps[0], self.horizon)
-
-
-            self.intrinsic_reward.update(rollout)
+            rollout = self.dynamics_net.inference(obs_seq[0], z, timesteps[0], self.horizon, self.pi_z, self.pi_a, self.intrinsic_reward)
+            from tools.utils import dshape
+            self.pi_a.update(rollout)
 
 
     def update_pi_z(self):
+        return
         if self.update_step % self.z_delay == 0:
             o, z, t = self.buffer.sample_start(self._cfg.batch_size)
             assert (t < 1).all()
@@ -109,8 +114,8 @@ class Trainer(Configurable, RLAlgo):
             logger.logkv_mean('z_loss', float(loss_z))
             self.pi_z_optim.optimize(loss_z)
 
-            _, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
-            self.entz.update(entz)
+            #_, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
+            #self.entz.update(entz)
 
 
     def update(self):
@@ -123,7 +128,7 @@ class Trainer(Configurable, RLAlgo):
         assert len(obs_seq) == len(timesteps) == len(action) + 1 == len(reward) + 1 == len(done_gt) + 1 == len(truncated_mask) + 1
         prev_z = z[None, :].expand(len(obs_seq), *z.shape)
 
-        self.dyna_optim.update(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
+        self.model_learner.learn_dynamics(obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z)
 
         self.update_pi_a()
         self.update_pi_z()
@@ -131,8 +136,9 @@ class Trainer(Configurable, RLAlgo):
 
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
-            ema(self.nets, self.target_nets, self._cfg.tau)
-            self.intrinsic_reward.ema(self._cfg.tau)
+            ema(self.dynamics_net, self.target_dynamics_net, self._cfg.tau)
+            if self.intrinsic_reward is not None:
+                self.intrinsic_reward.ema(self._cfg.tau)
 
     def eval(self):
         #print("Eval is not implemented")
@@ -149,8 +155,8 @@ class Trainer(Configurable, RLAlgo):
         prevz = totensor(prevz, self.device, dtype=None)
         timestep = totensor(timestep, self.device, dtype=None)
         s = self.dynamics_net.enc_s(obs, timestep=timestep)
-        z = self.pi_z(s, self.dynamics_net.enc_z(prevz), prev_action=prevz, timestep=timestep).a
-        a = self.pi_a(s, self.dynamics_net.enc_z(z)).a
+        z = self.pi_z(s, prevz, prev_action=prevz, timestep=timestep).a
+        a = self.pi_a(s, z).a
         return a, z.detach().cpu().numpy()
 
 

@@ -214,7 +214,8 @@ def dshape(a):
     elif isinstance(a, dict):
         return {k: dshape(v) for k, v in a.items()}
     else:
-        raise NotImplementedError
+        #raise NotImplementedError
+        return a.__class__.__name__
 
 def dstack(a, device):
     if isinstance(a[0], list):
@@ -518,3 +519,12 @@ class Identity(torch.nn.Module):
     def forward(self, x):
         return x
 
+
+
+def print_input_args(func):
+    import inspect
+    signature = inspect.signature(func)
+    def wrapper(*args, **kwargs):
+        print('calling', func.__name__, 'with', {k: dshape(v) for k, v in signature.bind(*args, **kwargs).arguments.items()})
+        return func(*args, **kwargs)
+    return wrapper

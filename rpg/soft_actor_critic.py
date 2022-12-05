@@ -52,6 +52,9 @@ class SoftQPolicy(AlphaPolicyBase):
         self.q2 = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
         self.action_dim = action_dim
 
+    from tools.utils import print_input_args
+
+    # @print_input_args
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         """
         Potential (Anyway, this is just different way of value estimate.)
@@ -73,6 +76,12 @@ class SoftQPolicy(AlphaPolicyBase):
         q2 = self.q2(inp)
         value = torch.cat((q1, q2), dim=-1)
         return value, None
+
+    def get_predict(self, rollout):
+        return rollout['q_value']
+
+    def compute_target(self, vtarg, reward, done_gt, gamma):
+        return reward + (1-done_gt.float()) * gamma * vtarg
 
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
@@ -106,6 +115,12 @@ class ValuePolicy(AlphaPolicyBase):
         if self._cfg.zero_done_value:
             mask = 1. # ignore the done in the end ..
         return values * gamma * mask + r, values
+
+    def get_predict(self, rollout):
+        return rollout['pred_values']
+
+    def compute_target(self, vtarg, reward, done_gt, gamma):
+        return vtarg * (1 - done_gt.float())
 
 
 
