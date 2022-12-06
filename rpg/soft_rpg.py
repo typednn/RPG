@@ -82,11 +82,14 @@ class Trainer(Configurable, RLAlgo):
             'z', state_dim, enc_z, hidden_dim, self.z_space, cfg=pi_z
         )
         #self.info_net = lambda x: x['rewards'], 0, 0
-        self.intrinsic_reward = IntrinsicMotivation(self.pi_a, self.pi_z)
+        self.intrinsic_reward = IntrinsicMotivation(*self.get_intrinsic())
         self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, self.intrinsic_reward, cfg=trainer)
 
         self.z = None
         self.update_step = 0
+
+    def get_intrinsic(self):
+        return [self.pi_a, self.pi_z]
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)

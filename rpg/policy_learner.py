@@ -196,7 +196,6 @@ class PolicyLearner(LossOptimizer):
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
         hidden = self.enc_z(hidden)
-
         s = self.policy.add_alpha(s, hidden) # concatenate the two
         with torch.no_grad():
             alpha = self.ent.alpha

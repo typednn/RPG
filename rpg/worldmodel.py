@@ -128,7 +128,7 @@ class GeneralizedQ(torch.nn.Module):
             timestep = timestep + 1
 
         out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds))
-        reward = self.pred_rewards(out)
+        self.pred_rewards(out)
 
         if sample_a:
             a_seq = out['a'] = torch.stack(a_seq)
@@ -173,7 +173,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         cfg=None, 
         qmode='Q',
         gamma=0.99,
-        lmbda_last=False,
+        # lmbda_last=False,
         detach_hidden=True,  # don't let the done to affect the hidden learning ..
 
 
@@ -225,7 +225,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         self.state_dim = latent_dim
         # enc_z = ZTransform(z_space)
 
-
         # dynamics
         layer = 1 # gru layers ..
         if dynamic_type == 'normal':
@@ -239,6 +238,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
             dynamics = torch.nn.GRU(hidden_dim, hidden_dim, layer)
             state_dec = mlp(hidden_dim, hidden_dim, latent_dim) # reconstruct obs ..
         elif dynamic_type == 'tiny':
+            raise NotImplementedError
             if isinstance(action_space, gym.spaces.Box):
                 enc_a = torch.nn.Linear(action_space.shape[0], hidden_dim)
                 a_dim = hidden_dim
@@ -257,7 +257,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
         # Q
         enc_z = ZTransform(z_space)
-
         action_dim = action_space.shape[0]
         q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, enc_z, hidden_dim)
 
@@ -268,7 +267,16 @@ class HiddenDynamicNet(Network, GeneralizedQ):
     def inference(self, *args, **kwargs):
         out = super().inference(*args, **kwargs)
         if 'vpreds' in out:
-            out['value'] = out['vpreds'].mean(axis=0)
+            #out['value'] = out['vpreds'].mean(axis=0)
+            lmbda = 1.
+            s = 0.
+            total = 0
+            #for i in range(len(out['vpreds'])):
+            for v in out['vpreds']:
+                total = total + lmbda * v
+                s += lmbda
+                lmbda = lmbda * 0.97
+            out['value'] = total / s
             assert out['value'].shape[-1] == 2, "must be double q learning .."
         return out
 
@@ -308,6 +316,7 @@ class DynamicsLearner(LossOptimizer):
                 next_obs[k] = torch.stack([v[k] for v in obs_seq[1:]])
             for k, v in next_obs.items():
                     next_obs[k] = v.reshape(-1, *v.shape[2:])
+            raise NotImplementedError
         return next_obs
 
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
@@ -353,7 +362,6 @@ class DynamicsLearner(LossOptimizer):
             loss = bce(pred_traj['done'], done_gt, reduction='none').mean(axis=-1) # predict done all the way ..
             dyna_loss['done'] = (loss * truncated_mask).sum(axis=0)
             logger.logkv_mean('done_acc', ((pred_traj['done'] > 0.5) == done_gt).float().mean())
-
 
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.optimize(dyna_loss_total)

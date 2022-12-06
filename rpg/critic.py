@@ -71,6 +71,7 @@ class SoftQPolicy(AlphaPolicyBase):
         return rollout['q_value']
 
     def compute_target(self, vtarg, reward, done_gt, gamma):
+        assert vtarg.shape == reward.shape == done_gt.shape
         return reward + (1-done_gt.float()) * gamma * vtarg
 
 
@@ -105,6 +106,7 @@ class ValuePolicy(AlphaPolicyBase):
         return rollout['pred_values']
 
     def compute_target(self, vtarg, reward, done_gt, gamma):
+        assert vtarg.shape == done_gt.shape
         if self._cfg.zero_done_value:
             vtarg = vtarg * (1 - done_gt.float())
         return vtarg

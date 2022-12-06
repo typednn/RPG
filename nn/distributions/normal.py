@@ -27,7 +27,6 @@ class NormalAction(ActionDistr):
             action = torch.tanh(action)
             #logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
 
-
         logp = logp.sum(axis=-1)
         return action * self.act_scale, logp
 
