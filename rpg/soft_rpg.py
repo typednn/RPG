@@ -63,6 +63,7 @@ class Trainer(Configurable, RLAlgo):
 
         obs_space = env.observation_space
         self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)
+        self.use_z = z_dim > 1 or z_cont_dim > 0
 
         self.horizon = horizon
         self.env = env
@@ -75,6 +76,10 @@ class Trainer(Configurable, RLAlgo):
         state_dim = self.dynamics_net.state_dim
         enc_z = self.dynamics_net.enc_z
         hidden_dim = 256
+
+        if self.use_z:
+            self.info_learner = InfoNet(state_dim, env.action_space.shape[0], hidden_dim, z_space, cfg=info)
+
         self.pi_a = DiffPolicyLearner(
             'a', state_dim, enc_z, hidden_dim, env.action_space, cfg=pi_a
         )
@@ -89,7 +94,10 @@ class Trainer(Configurable, RLAlgo):
         self.update_step = 0
 
     def get_intrinsic(self):
-        return [self.pi_a, self.pi_z]
+        intrinsics = [self.pi_a, self.pi_z]
+        if self.use_z:
+            intrinsics.append(self.info_net)
+        return intrinsics
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
@@ -104,6 +112,9 @@ class Trainer(Configurable, RLAlgo):
             rollout = self.dynamics_net.inference(
                 seg.obs_seq[0], seg.z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
             self.pi_a.update(rollout)
+
+            # update intrinsic reward
+            self.intrinsic_reward.update(rollout)
 
 
     def update_pi_z(self):

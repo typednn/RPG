@@ -122,7 +122,8 @@ class PointEnv(StateEnv):
         return img
 
 
-    def _render_traj_rgb(self, states, **kwargs):
+    def _render_traj_rgb(self, traj, **kwargs):
+        states = traj.get_tensor('obs', device='cpu')
 
 
 

@@ -106,7 +106,7 @@ class DiffPolicy(PolicyBase):
         return Aout(a, logp, None)
 
 
-    def loss(self, rollout):
+    def loss(self, rollout, alpha):
         assert rollout['value'].shape[-1] == 2
         return -rollout['value'][..., 0].mean()
 
@@ -128,17 +128,19 @@ class DiscreteSoftPolicy(PolicyBase):
         a, logp = out.sample()
         return Aout(a, logp, out.entropy())
 
-    def loss(self, rollout):
+    def loss(self, rollout, alpha):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
         state = rollout['state'].detach()
         q_value = rollout['q_value'].detach()
         z = rollout['z'].detach()
-        entropies = rollout['extra_rewards'].detach()
 
-        # replicate the q value to the pi_z ..
         q_value = q_value.min(axis=-1, keepdims=True).values
         with torch.no_grad():
-            q_target = q_value + entropies[..., 0:1] + entropies[..., 2:3]
+            q_target = q_value
+            extra_rewards = rollout['extra_rewards']
+            for k, v in extra_rewards.items():
+                if k!='ent_z':
+                    q_target = q_target + v.detach()
 
         q_val = self.q_value(state[:-1])
         q_predict = batch_select(q_val, z)
@@ -165,7 +167,10 @@ def select_newz(policy, state, alpha, z, timestep, K):
 
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, max_grad_norm=1., lr=3e-4):
+    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, max_grad_norm=1., lr=3e-4, ignore_hidden=False):
+        from tools.utils import orthogonal_init
+        policy.apply(orthogonal_init)
+
         super().__init__(policy, cfg)
         self.name = name
         self._policy = policy
@@ -178,7 +183,7 @@ class PolicyLearner(LossOptimizer):
 
     def update(self, rollout):
         ent = rollout[f'ent_{self.name}']
-        loss = self.policy.loss(rollout)
+        loss = self.policy.loss(rollout, self.ent.alpha)
         logger.logkv_mean(self.name + '_loss', float(loss))
         self.optimize(loss)
         self.ent.update(ent)
@@ -195,8 +200,10 @@ class PolicyLearner(LossOptimizer):
         ema(self._policy, self._target_policy, decay)
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
-        hidden = self.enc_z(hidden)
-        s = self.policy.add_alpha(s, hidden) # concatenate the two
+        if not self._cfg.ignore_hidden:
+            hidden = self.enc_z(hidden)
+            s = self.policy.add_alpha(s, hidden) # concatenate the two
+
         with torch.no_grad():
             alpha = self.ent.alpha
 
@@ -210,7 +217,8 @@ class PolicyLearner(LossOptimizer):
     def intrinsic_reward(self, rollout):
         with torch.no_grad():
             alpha = self.ent.alpha
-        return rollout['ent_{}'.format(self.name)] * alpha
+        name = 'ent_{}'.format(self.name)
+        return name, rollout[name] * alpha
 
     def update_intrinsic(self):
         pass
@@ -232,5 +240,6 @@ class DiscretePolicyLearner(PolicyLearner):
         self, name, state_dim, enc_z, hidden_dim, action_space,
         cfg=None, pi=DiscreteSoftPolicy.dc
     ):
-        policy = DiscreteSoftPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
-        super().__init__(name, action_space, policy, enc_z, cfg=cfg)
+        # ignore previous z ..
+        policy = DiscreteSoftPolicy(state_dim, hidden_dim, action_space, cfg=pi).cuda()
+        super().__init__(name, action_space, policy, enc_z, cfg=cfg, ignore_hidden=True)

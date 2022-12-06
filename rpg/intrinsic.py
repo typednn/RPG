@@ -6,11 +6,15 @@ class IntrinsicMotivation:
         self.args = args
 
     def __call__(self, rollout):
-        outs = []
+        outs = {}
         reward = rollout['reward']
 
         for i in self.args:
-            intrinsic = i.intrinsic_reward(rollout)
+            name, intrinsic = i.intrinsic_reward(rollout)
             assert reward.shape == intrinsic.shape
-            outs.append(intrinsic)
-        return reward, torch.cat(outs, dim=-1)
+            outs[name] = intrinsic
+        return reward, outs
+
+    def update(self, rollout):
+        for i in self.args:
+            i.update_intrinsic()

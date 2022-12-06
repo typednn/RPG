@@ -47,7 +47,6 @@ class SoftQPolicy(AlphaPolicyBase):
         AlphaPolicyBase.__init__(self)
         self.z_space = z_space
         self.enc_z = enc_z
-        assert isinstance(z_space, spaces.Discrete)
         self.q = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
         self.q2 = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
         self.action_dim = action_dim

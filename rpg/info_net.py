@@ -86,3 +86,7 @@ class InfoLearner(LossOptimizer):
     def build_from_cfgs(self, net_cfg, learner_cfg, *args, **kwargs):
         net = InfoNet(*args, cfg=net_cfg, **kwargs)
         return InfoLearner(net, cfg=learner_cfg)
+
+    
+    def update_intrinsic(self):
+        pass

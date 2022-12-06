@@ -4,6 +4,7 @@ from .utils import masked_temporal_mse
 from tools.optim import LossOptimizer
 from tools.utils import logger
 from torch.nn.functional import binary_cross_entropy as bce
+from tools.utils import orthogonal_init
 
 from typing import  Union
 from .critic import SoftQPolicy, ValuePolicy
@@ -149,7 +150,12 @@ class GeneralizedQ(torch.nn.Module):
         q_values = self.pred_q_value(out)
 
         if sample_z:
-            rewards, extra_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
+            rewards, aux_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
+            out['extra_rewards'] = aux_rewards
+
+            extra_rewards = sum(aux_rewards.values())
+
+
             vpreds = []
             discount = 1
             prefix = 0.
@@ -263,6 +269,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
         self.enc_z = enc_z
+        self.apply(orthogonal_init)
 
     def inference(self, *args, **kwargs):
         out = super().inference(*args, **kwargs)

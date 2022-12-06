@@ -56,7 +56,7 @@ class GoalEnv(Configurable, gym.Env):
     def _render_rgb(self, index=0):
         raise NotImplementedError
 
-    def _render_traj_rgb(self, states, **kwargs):
+    def _render_traj_rgb(self, **kwargs):
         # used to render the trajectories/ a set of states together .. useful to visualize the trajectories. 
         raise NotImplementedError("traj renderer does not implemented yet.. ")
 
