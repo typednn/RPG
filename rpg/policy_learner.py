@@ -8,7 +8,7 @@ from tools.utils.scheduler import Scheduler
 from tools.config import Configurable, as_builder
 from collections import namedtuple
 from nn.distributions import Normal
-from .soft_actor_critic import AlphaPolicyBase
+from .critic import AlphaPolicyBase
 
 
 def batch_select(values, z=None):
@@ -103,7 +103,7 @@ class DiffPolicy(PolicyBase):
             logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
 
         a, logp = dist.rsample()
-        return Aout(a, logp, -logp)
+        return Aout(a, logp, None)
 
 
     def loss(self, rollout):
@@ -121,7 +121,6 @@ class DiscreteSoftPolicy(PolicyBase):
         return self.qnet(self.add_alpha(state))
 
     def forward(self, state, alpha):
-        assert not self._cfg.use_prevz
         q = self.q_value(state)
         logits = q / alpha
         from nn.distributions import CategoricalAction
@@ -169,10 +168,13 @@ class PolicyLearner(LossOptimizer):
     def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, max_grad_norm=1., lr=3e-4):
         super().__init__(policy, cfg)
         self.name = name
-        self.policy = policy
+        self._policy = policy
         self.enc_z = enc_z
         self.ent = EntropyLearner(name, action_space, cfg=ent)
         self.freq = 1
+        import copy
+        self._target_policy = copy.deepcopy(self._policy)
+        self.mode = 'train'
 
     def update(self, rollout):
         ent = rollout[f'ent_{self.name}']
@@ -180,6 +182,17 @@ class PolicyLearner(LossOptimizer):
         logger.logkv_mean(self.name + '_loss', float(loss))
         self.optimize(loss)
         self.ent.update(ent)
+
+    @property
+    def policy(self):
+        return self._policy if self.mode == 'train' else self._target_policy
+
+    def set_mode(self, mode):
+        self.mode = mode
+
+    def ema(self, decay=0.999):
+        from tools.utils import ema
+        ema(self._policy, self._target_policy, decay)
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
         hidden = self.enc_z(hidden)

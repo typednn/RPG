@@ -1,6 +1,6 @@
 # test the soft q ..
-from .soft_rpg import *
-from .soft_actor_critic import Aout
+from .soft_rpg_old import *
+from .critic import Aout
 
 class IdentityPolicy(torch.nn.Module):
     def forward(self, state_embed, hidden):

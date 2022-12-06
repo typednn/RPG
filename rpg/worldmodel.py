@@ -6,7 +6,7 @@ from tools.utils import logger
 from torch.nn.functional import binary_cross_entropy as bce
 
 from typing import  Union
-from .soft_actor_critic import SoftQPolicy, ValuePolicy
+from .critic import SoftQPolicy, ValuePolicy
 
 
 class GeneralizedQ(torch.nn.Module):
@@ -257,7 +257,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
         # Q
         enc_z = ZTransform(z_space)
-        from .soft_actor_critic import SoftQPolicy, ValuePolicy
 
         action_dim = action_space.shape[0]
         q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, enc_z, hidden_dim)
@@ -283,7 +282,6 @@ class DynamicsLearner(LossOptimizer):
         cfg=None,
         target_horizon=None, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
-        tau=0.005,
 
         max_grad_norm=1.,
         lr=3e-4,
@@ -324,16 +322,19 @@ class DynamicsLearner(LossOptimizer):
             z_seq = prev_z[1:].reshape(-1, *prev_z.shape[2:])
             next_timesteps = timesteps[1:].reshape(-1)
 
+            self.pi_a.set_mode('target'); self.pi_z.set_mode('target')
             samples = self.target_net.inference(
                 next_obs, z_seq, next_timesteps, self._cfg.target_horizon or horizon,
                 pi_z=self.pi_z, pi_a=self.pi_a, intrinsic_reward = self.intrinsic_reward,
             )
-            qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
-            assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
+            self.pi_a.set_mode('train'); self.pi_z.set_mode('train')
+
+            vtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
+            assert reward.shape == vtarg.shape == done_gt.shape, (reward.shape, vtarg.shape, done_gt.shape)
 
             gt = dict(
                 reward=reward,
-                q_value=qnet.compute_target(qtarg, reward, done_gt.float(), self.nets.gamma),
+                q_value=qnet.compute_target(vtarg, reward, done_gt.float(), self.nets.gamma),
                 state=samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
             )
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
@@ -356,6 +357,7 @@ class DynamicsLearner(LossOptimizer):
 
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
         self.optimize(dyna_loss_total)
+
         info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}
         logger.logkv_mean('dyna_total_loss', float(dyna_loss_total.mean()))
         logger.logkvs_mean(info)
@@ -365,6 +367,6 @@ class DynamicsLearner(LossOptimizer):
         logger.logkv_mean('state_min', float(s.min()))
         logger.logkv_mean('state_max', float(s.max()))
 
-    def update_target(self):
+    def ema(self, tau):
         from tools.utils import ema
-        ema(self.nets, self.target_net, self._cfg.tau)
+        ema(self.nets, self.target_net, tau)

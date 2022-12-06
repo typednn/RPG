@@ -77,7 +77,7 @@ class SoftQPolicy(AlphaPolicyBase):
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
         self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
-        zero_done_value=False,
+        zero_done_value=True,
     ) -> None:
         #nn.Module.__init__(self)
         AlphaPolicyBase.__init__(self)
@@ -98,7 +98,8 @@ class ValuePolicy(AlphaPolicyBase):
         values = torch.cat((v1, v2), dim=-1)
         if self._cfg.zero_done_value:
             mask = 1. # ignore the done in the end ..
-        return values * gamma * mask + r, values
+        q_value = values * gamma * mask + r
+        return q_value, values
 
     def get_predict(self, rollout):
         return rollout['pred_values']
