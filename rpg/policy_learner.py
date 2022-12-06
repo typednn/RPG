@@ -1,17 +1,13 @@
 import torch
-from nn.distributions import DistHead, NormalAction
 from nn.space import Discrete
 from gym.spaces import Box
-from tools.utils import Seq, mlp
 from tools.optim import LossOptimizer
 from tools.config import Configurable
-from tools.utils import totensor
 from tools.utils import logger
-from tools.nn_base import Network
 from tools.utils.scheduler import Scheduler
 from tools.config import Configurable, as_builder
 from collections import namedtuple
-from nn.distributions import Normal, DistHead
+from nn.distributions import Normal
 from .soft_actor_critic import AlphaPolicyBase
 
 
@@ -19,8 +15,7 @@ def batch_select(values, z=None):
     if z is None:
         return values
     else:
-        out = torch.gather(values, -1, z.unsqueeze(-1))
-        return out
+        return torch.gather(values, -1, z.unsqueeze(-1))
 
 class EntropyLearner(Configurable):
     def __init__(
@@ -72,7 +67,6 @@ class EntropyLearner(Configurable):
         return float(self.log_alpha.exp() * self._cfg.coef)
         
 
-
 Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
 
 @as_builder
@@ -85,9 +79,9 @@ class DiffPolicy(PolicyBase):
                  cfg=None,
                  head=Normal.gdc(
                     linear=False,
+                    squash=True,
                     std_mode='statewise',
                     std_scale=1.,
-                    squash=True,
                 )
     ):
         super().__init__()
@@ -153,7 +147,6 @@ class DiscreteSoftPolicy(PolicyBase):
         return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
 
 
-
 Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
 
 def select_newz(policy, state, alpha, z, timestep, K):
@@ -209,7 +202,6 @@ class PolicyLearner(LossOptimizer):
 
     def update_intrinsic(self):
         pass
-
 
         
 class DiffPolicyLearner(PolicyLearner):

@@ -1,30 +1,12 @@
-"""
-# model-based verison RPG
-s      a_1    a_2    ...
-|      |      |
-h_0 -> h_1 -> h_2 -> h_3 -> h_4
-        |      |      |      |   
-        o_1    o_2    o_3    o_4
-        / |  
-    s1 r1    
-    |
-    v1
-"""
 import torch
-from tools.utils import totensor
 from tools.nn_base import Network
-from .utils import lmbda_decay_weight, masked_temporal_mse
-from tools.config import Configurable
+from .utils import masked_temporal_mse
 from tools.optim import LossOptimizer
 from tools.utils import logger
 from torch.nn.functional import binary_cross_entropy as bce
-from tools.utils import print_input_args
 
 from typing import  Union
 from .soft_actor_critic import SoftQPolicy, ValuePolicy
-
-
-from dataclasses import dataclass
 
 
 class GeneralizedQ(torch.nn.Module):
@@ -49,6 +31,54 @@ class GeneralizedQ(torch.nn.Module):
         assert torch.allclose(o[-1], h)
         s = self.state_dec(h[-1]) # predict the next hidden state ..
         return h, s, a_embed
+
+    def pred_done(self, traj):
+        dones = None
+        if self.done_fn is not None:
+            states = traj['state']
+            #done_inp = torch.concat((states[1:], a_embeds), -1)
+            done_inp = states[1:]
+            detach_hidden = True
+            if detach_hidden:
+                done_inp = done_inp.detach()
+            dones = torch.sigmoid(self.done_fn(done_inp))
+            from tools.utils import logger 
+            logger.logkv_mean('mean_pred_done', dones.mean().item())
+
+        traj['done'] = dones
+        return dones
+
+    def pred_rewards(self, traj):
+        traj['reward'] = self.reward_predictor(traj['state'][1:], traj['a_embed'])
+        return traj['reward']
+
+    def pred_q_value(self, traj):
+        states = traj['state']
+        z_seq = traj['z']
+        a_seq = traj['a']
+        reward = traj['reward']
+        dones = traj['done']
+        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma)
+
+        traj['q_value'] = q_values
+        traj['pred_values'] = values
+        return q_values
+
+    def inference_with_actions(self, obs, timestep, step, z_seq, a_seq):
+        s = self.enc_s(obs, timestep=timestep)
+        states = [s]
+        # for dynamics part ..
+        h = self.init_h(s)[None,:]
+        a_embeds = []
+        for idx in range(step):
+            h, s, a_embed = self.core(h, a_seq[idx])
+            a_embeds.append(a_embed)
+            states.append(s)
+        out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds), z=z_seq)
+        self.pred_done(out)
+        self.pred_rewards(out)
+        self.pred_q_value(out)
+        return out
 
     def inference(
         self, obs, z, timestep, step,
@@ -97,33 +127,26 @@ class GeneralizedQ(torch.nn.Module):
 
             timestep = timestep + 1
 
-        states = torch.stack(states)
-        a_embeds = torch.stack(a_embeds)
-        out = dict(state=states, reward=self.reward_predictor(states[1:], a_embeds))
+        out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds))
+        reward = self.pred_rewards(out)
 
         if sample_a:
             a_seq = out['a'] = torch.stack(a_seq)
             out['logp_a'] = torch.stack(logp_a)
             out['ent_a'] = -out['logp_a']
+        else:
+            out['a'] = a_seq
 
         if sample_z:
             z_seq = out['z'] = torch.stack(z_seq)
             out['logp_z'] = torch.stack(logp_z)
             out['ent_z'] = torch.stack(entz)
+        else:
+            out['z'] = z_seq
             
-        dones = None
-        if self.done_fn is not None:
-            #done_inp = torch.concat((states[1:], a_embeds), -1)
-            done_inp = states[1:]
-            detach_hidden = True
-            if detach_hidden:
-                done_inp = done_inp.detach()
-            out['done'] = dones = torch.sigmoid(self.done_fn(done_inp))
-            from tools.utils import logger 
-            logger.logkv_mean('mean_pred_done', dones.mean().item())
-            raise NotImplementedError
-
-        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self.gamma)
+        dones = self.pred_done(out)
+        #q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma)
+        q_values = self.pred_q_value(out)
 
         if sample_z:
             rewards, extra_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
@@ -140,9 +163,6 @@ class GeneralizedQ(torch.nn.Module):
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
             vpreds = torch.stack(vpreds)
             out['vpreds'] = vpreds
-
-        out['q_value'] = q_values
-        out['pred_values'] = values
 
         return out
 
@@ -240,11 +260,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         from .soft_actor_critic import SoftQPolicy, ValuePolicy
 
         action_dim = action_space.shape[0]
-        if qmode == 'Q':
-            q_fn = SoftQPolicy(state_dim, action_dim, z_space, enc_z, hidden_dim)
-        else:
-            q_fn = ValuePolicy(state_dim, action_dim, z_space, enc_z, hidden_dim, zero_done_value=self._cfg.zero_done_value)
-            raise NotImplementedError
+        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, enc_z, hidden_dim)
 
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
@@ -265,7 +281,7 @@ class DynamicsLearner(LossOptimizer):
         pi_a, pi_z, intrinsic_reward,
         
         cfg=None,
-        target_horizon=None, zero_done_value=False, have_done=False,
+        target_horizon=None, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
         tau=0.005,
 
@@ -298,8 +314,6 @@ class DynamicsLearner(LossOptimizer):
 
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
         horizon = len(obs_seq) - 1
-        print(horizon)
-        exit(0)
         qnet = self.nets.q_fn
 
         with torch.no_grad():

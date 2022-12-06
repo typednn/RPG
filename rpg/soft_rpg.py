@@ -6,15 +6,13 @@ from tools.config import Configurable
 from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, TimedSeq, logger, Identity, ema, CatNet, totensor
 from tools.optim import LossOptimizer
 from .common_hooks import RLAlgo, build_hooks
-from .buffer import ReplayBuffer
-from .traj import Trajectory
 from typing import Union
 from .env_base import GymVecEnv, TorchEnv
 from torch.nn.functional import binary_cross_entropy as bce
 from .utils import masked_temporal_mse, create_hidden_space
 from .buffer import ReplayBuffer
 from .info_net import InfoNet
-
+from .traj import Trajectory
 from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 from .intrinsic import IntrinsicMotivation
 
@@ -47,8 +45,9 @@ class Trainer(Configurable, RLAlgo):
         update_train_step=1,
         warmup_steps=1000,
         steps_per_epoch=None,
-        z_delay=None,
+
         actor_delay=2,
+        z_delay=0,
         eval_episode=10,
 
         # trainer utils ..
@@ -103,18 +102,11 @@ class Trainer(Configurable, RLAlgo):
 
 
     def update_pi_z(self):
-        return
-        if self.update_step % self.z_delay == 0:
+        if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
             o, z, t = self.buffer.sample_start(self._cfg.batch_size)
             assert (t < 1).all()
-            rollout = self.nets.inference(o, z, t, self.horizon)
-
-            loss_z = self.nets.pi_z.loss(rollout)
-            logger.logkv_mean('z_loss', float(loss_z))
-            self.pi_z_optim.optimize(loss_z)
-
-            #_, entz = self.intrinsic_reward.get_ent_from_traj(rollout)
-            #self.entz.update(entz)
+            rollout = self.dynamics_net.inference(o, z, t, self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
+            self.pi_z.update(rollout)
 
     def update(self):
         self.update_dynamcis()

@@ -98,11 +98,12 @@ class ValuePolicy(AlphaPolicyBase):
         values = torch.cat((v1, v2), dim=-1)
         if self._cfg.zero_done_value:
             mask = 1. # ignore the done in the end ..
-        raise NotImplementedError("case of zero value is not implemented for get predict.. ")
         return values * gamma * mask + r, values
 
     def get_predict(self, rollout):
         return rollout['pred_values']
 
     def compute_target(self, vtarg, reward, done_gt, gamma):
-        return vtarg * (1 - done_gt.float())
+        if self._cfg.zero_done_value:
+            vtarg = vtarg * (1 - done_gt.float())
+        return vtarg

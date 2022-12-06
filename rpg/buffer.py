@@ -73,7 +73,7 @@ class TrajSeg:
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
     def __init__(self, obs_space, action_space, episode_length, horizon,
-                       cfg=None, device='cuda:0', max_episode_num=2000, modality='state'):
+                       cfg=None, device='cuda:0', max_episode_num=1000, modality='state'):
         super().__init__()
 
         self.cfg = cfg
