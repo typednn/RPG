@@ -11,7 +11,7 @@ from .env_base import GymVecEnv, TorchEnv
 from torch.nn.functional import binary_cross_entropy as bce
 from .utils import masked_temporal_mse, create_hidden_space
 from .buffer import ReplayBuffer
-from .info_net import InfoNet
+from .info_net import InfoLearner
 from .traj import Trajectory
 from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 from .intrinsic import IntrinsicMotivation
@@ -36,7 +36,7 @@ class Trainer(Configurable, RLAlgo):
         pi_z=DiscretePolicyLearner.dc,
 
         # mutual information term ..
-        info = InfoNet.dc,
+        info = InfoLearner.dc,
 
         # update parameters..
         horizon=6,
@@ -78,7 +78,7 @@ class Trainer(Configurable, RLAlgo):
         hidden_dim = 256
 
         if self.use_z:
-            self.info_learner = InfoNet(state_dim, env.action_space.shape[0], hidden_dim, z_space, cfg=info)
+            self.info_learner = InfoLearner(state_dim, env.action_space, hidden_dim, z_space, cfg=info)
 
         self.pi_a = DiffPolicyLearner(
             'a', state_dim, enc_z, hidden_dim, env.action_space, cfg=pi_a
@@ -96,7 +96,7 @@ class Trainer(Configurable, RLAlgo):
     def get_intrinsic(self):
         intrinsics = [self.pi_a, self.pi_z]
         if self.use_z:
-            intrinsics.append(self.info_net)
+            intrinsics.append(self.info_learner)
         return intrinsics
 
     def update_dynamcis(self):
@@ -110,11 +110,16 @@ class Trainer(Configurable, RLAlgo):
         if self.update_step % self._cfg.actor_delay == 0:
             seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
             rollout = self.dynamics_net.inference(
-                seg.obs_seq[0], seg.z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
+                seg.obs_seq[0], seg.z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
+                intrinsic_reward=self.intrinsic_reward
+            )
             self.pi_a.update(rollout)
 
             # update intrinsic reward
             self.intrinsic_reward.update(rollout)
+
+            for k, v in rollout['extra_rewards'].items():
+                logger.logkv_mean(f'reward_{k}', float(v.mean()))
 
 
     def update_pi_z(self):

@@ -220,7 +220,7 @@ class PolicyLearner(LossOptimizer):
         name = 'ent_{}'.format(self.name)
         return name, rollout[name] * alpha
 
-    def update_intrinsic(self):
+    def update_intrinsic(self, *args, **kwargs):
         pass
 
         

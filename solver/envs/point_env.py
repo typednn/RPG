@@ -135,37 +135,39 @@ class PointEnv(StateEnv):
 
         states = states * 128 + 64 
 
-        if 'traj' in kwargs:
-            traj = kwargs['traj']
+        # if 'traj' in kwargs:
+        #     traj = kwargs['traj']
 
-            if self._cfg.save_traj:
-                from tools.utils import logger
-                logger.torch_save([traj], f'traj{self.traj_idx}.th')
-                self.traj_idx += 1
-        else:
-            traj = kwargs
+        #     if self._cfg.save_traj:
+        #         from tools.utils import logger
+        #         logger.torch_save([traj], f'traj{self.traj_idx}.th')
+        #         self.traj_idx += 1
+        # else:
+        #     traj = kwargs
+        z = traj.get_tensor('z', device='cpu')
 
         from ..draw_utils import plot_colored_embedding
         plt.clf()
-        if 'z' in traj:
-            #x = traj['z'].detach().cpu().numpy()
-            if traj['z'].dtype == torch.int64:
-                print(torch.bincount(traj['z'].long().flatten()))
-            plt.imshow(np.uint8(img[...,::-1]*255))
-            plot_colored_embedding(traj['z'], states[:, :, :2], s=2)
-        else:
-            plt.imshow(img[...,::-1])
-            states = states.reshape(-1, 3)
-            plt.scatter(states[:, 0], states[:, 1], s=2)
+
+        #x = traj['z'].detach().cpu().numpy()
+        if z.dtype == torch.int64:
+            print(torch.bincount(z.long().flatten()))
+        plt.imshow(np.uint8(img[...,::-1]*255))
+        plot_colored_embedding(z, states[:, :, :2], s=2)
+        # else:
+        #     plt.imshow(img[...,::-1])
+        #     states = states.reshape(-1, 3)
+        #     plt.scatter(states[:, 0], states[:, 1], s=2)
+
         plt.xlim([0, 256])
         plt.ylim([0, 256])
         img2 = plt_save_fig_array()[:, :, :3]
 
-        if 'a' in traj and traj['a'].shape[-1] == 2:
-            plt.clf()
-            plot_colored_embedding(traj['z'], traj['a'])
-            from tools.utils import logger
-            logger.savefig('z-a.png')
+        a = traj.get_tensor('a', dtype=None)
+        plt.clf()
+        plot_colored_embedding(z, a)
+        from tools.utils import logger
+        logger.savefig('z-a.png')
         return img2
 
 class PointEnv2(PointEnv):

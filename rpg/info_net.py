@@ -12,7 +12,7 @@ from gym.spaces import Box
 
 class InfoNet(Network):
     def __init__(self, 
-                state_dim, action_dim, hidden_dim, hidden_space,
+                state_dim, action_space, hidden_dim, hidden_space,
                 cfg=None,
                 mutual_info_weight=0., backbone=None, 
                 action_weight=1., noise=0.0, obs_weight=1.,
@@ -20,6 +20,7 @@ class InfoNet(Network):
                 std_mode='fix_no_grad',
                 ):
         super().__init__(cfg)
+        action_dim = action_space.shape[0]
 
         zhead = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
         backbone = Seq(mlp(state_dim + action_dim, hidden_dim, zhead.get_input_dim()))
@@ -77,16 +78,40 @@ class InfoNet(Network):
         return self.posterior_z(states)
 
 
+from tools.utils.scheduler import Scheduler
 class InfoLearner(LossOptimizer):
-    def __init__(self, net, cfg=None):
-        self.net = net
+    def __init__(self, state_dim, action_space, hidden_dim, hidden_space, cfg=None,
+                 net=InfoNet.dc,
+                 coef=1.,
+                 weight=Scheduler.to_build(TYPE='constant'),
+        ):
+        net = InfoNet(
+            state_dim, action_space, hidden_dim, hidden_space, cfg=net
+        ).cuda()
+        self.coef = coef
+        self.info_decay = Scheduler.build(weight)
         super().__init__(net)
+        self.net = net
 
     @classmethod
     def build_from_cfgs(self, net_cfg, learner_cfg, *args, **kwargs):
         net = InfoNet(*args, cfg=net_cfg, **kwargs)
         return InfoLearner(net, cfg=learner_cfg)
 
+    def get_coef(self):
+        return self.coef * self.info_decay.get()
+
+    def intrinsic_reward(self, traj):
+        info_reward = self.net(traj, detach=False)
+        return 'info', info_reward * self.get_coef()
     
-    def update_intrinsic(self):
-        pass
+    def update_intrinsic(self, rollout):
+        z_detach = rollout['z'].detach()
+
+        mutual_info = self.net(rollout, detach=True).mean()
+        posterior = self.net.get_posterior(rollout['state'][1:].detach()).log_prob(z_detach).mean()
+
+        self.optimize(-mutual_info - posterior)
+
+        logger.logkv_mean('info_ce_loss', float(-mutual_info))
+        logger.logkv_mean('info_posterior_loss', float(-posterior))

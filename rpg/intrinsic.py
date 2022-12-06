@@ -17,4 +17,4 @@ class IntrinsicMotivation:
 
     def update(self, rollout):
         for i in self.args:
-            i.update_intrinsic()
+            i.update_intrinsic(rollout)

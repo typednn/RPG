@@ -4,12 +4,12 @@ from tools.config import Configurable, as_builder
 
 @as_builder
 class Scheduler(Configurable, abc.ABC):
-    def __init__(self, cfg=None, init_value=1.) -> None:
+    def __init__(self, cfg=None, init=1.) -> None:
         super().__init__()
 
         self.epoch = 0
-        self.init_value = init_value
-        self.value = init_value
+        self.init_value = init
+        self.value = init
 
     def step(self, epoch=None):
         if epoch is None:

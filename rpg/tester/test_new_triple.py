@@ -21,20 +21,13 @@ trainer = Trainer.parse(
     actor_delay=4, #10,
     z_delay=4,
 
-    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),
+
+    trainer=dict(weights=dict(reward=1000., q_value=100.)),
+    pi_a=dict(ent=dict(coef=0.02),),
+    pi_z=dict(ent=dict(coef=10., target_mode='none'),),
+
     path='tmp/new',
-
-    trainer=dict(
-        weights=dict(reward=1000., q_value=100.)
-    ),
-
-    pi_a=dict(
-        ent=dict(coef=0.02),
-    ),
-    pi_z=dict(
-        ent=dict(coef=10., target_mode='none'),
-    ),
-
+    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),
     # info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
 
     _variants=dict(
