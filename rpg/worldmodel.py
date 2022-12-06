@@ -231,7 +231,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         else:
             raise NotImplementedError
 
-
         # reawrd and done
         reward_predictor = Seq(mlp(a_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
         done_fn = mlp(latent_dim, hidden_dim, 1) if have_done else None
@@ -239,7 +238,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         # Q
         enc_z = ZTransform(z_space)
         from .soft_actor_critic import SoftQPolicy, ValuePolicy
-
 
         action_dim = action_space.shape[0]
         if qmode == 'Q':
@@ -270,6 +268,9 @@ class DynamicsLearner(LossOptimizer):
         target_horizon=None, zero_done_value=False, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
         tau=0.005,
+
+        max_grad_norm=1.,
+        lr=3e-4,
     ):
         super().__init__(models, cfg)
         self.pi_a = pi_a
@@ -297,8 +298,8 @@ class DynamicsLearner(LossOptimizer):
 
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
         horizon = len(obs_seq) - 1
-        pred_traj = self.nets.inference(
-            obs_seq[0], prev_z[0], timesteps[0], len(action), a_seq=action, z_seq=prev_z[1:]) 
+        print(horizon)
+        exit(0)
         qnet = self.nets.q_fn
 
         with torch.no_grad():
@@ -323,6 +324,9 @@ class DynamicsLearner(LossOptimizer):
             )
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
+
+        pred_traj = self.nets.inference(
+            obs_seq[0], prev_z[0], timesteps[0], len(action), a_seq=action, z_seq=prev_z[1:]) 
 
         output = dict(state=pred_traj['state'][1:], q_value=qnet.get_predict(pred_traj),  reward=pred_traj['reward'])
         for k in ['state', 'q_value', 'reward']:

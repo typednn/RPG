@@ -54,15 +54,7 @@ class SoftQPolicy(AlphaPolicyBase):
 
     from tools.utils import print_input_args
 
-    # @print_input_args
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
-        """
-        Potential (Anyway, this is just different way of value estimate.)
-            V(s, prevz)
-            Q(s, z): and then use the average of Q(s, z) to estimate V(s, prevz)
-            Q(s, z, a): use pure sampling based method to estiamte
-            Note that the entropy of the current step is not included ..
-        """
         z = self.enc_z(z)
         if self.action_dim > 0:
             inp = self.add_alpha(s, a, z)
@@ -72,14 +64,15 @@ class SoftQPolicy(AlphaPolicyBase):
 
         q1 = self.q(inp)
         q2 = self.q2(inp)
-        value = torch.cat((q1, q2), dim=-1)
-        return value, None
+        q_value = torch.cat((q1, q2), dim=-1)
+        return q_value, None
 
     def get_predict(self, rollout):
         return rollout['q_value']
 
     def compute_target(self, vtarg, reward, done_gt, gamma):
         return reward + (1-done_gt.float()) * gamma * vtarg
+
 
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
@@ -95,14 +88,6 @@ class ValuePolicy(AlphaPolicyBase):
         self.q2 = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
-        """
-        Potential (Anyway, this is just different way of value estimate.)
-            V(s, prevz)
-            Q(s, z): and then use the average of Q(s, z) to estimate V(s, prevz)
-            Q(s, z, a): use pure sampling based method to estiamte
-            Note that the entropy of the current step is not included ..
-        """
-        raise NotImplementedError
         # return the Q value .. if it's value, return self._cfg.gamma
         z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())
@@ -113,6 +98,7 @@ class ValuePolicy(AlphaPolicyBase):
         values = torch.cat((v1, v2), dim=-1)
         if self._cfg.zero_done_value:
             mask = 1. # ignore the done in the end ..
+        raise NotImplementedError("case of zero value is not implemented for get predict.. ")
         return values * gamma * mask + r, values
 
     def get_predict(self, rollout):
