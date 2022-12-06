@@ -23,9 +23,7 @@ class NormalAction(ActionDistr):
         if self.tanh:
             # https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/sac/core.py
             logp -= (2*(np.log(2) - action - F.softplus(-2*action)))
-
             action = torch.tanh(action)
-            #logp -= torch.log(1. * (1 - action.pow(2)) + 1e-6)
 
         logp = logp.sum(axis=-1)
         return action * self.act_scale, logp
