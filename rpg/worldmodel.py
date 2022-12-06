@@ -29,27 +29,17 @@ from dataclasses import dataclass
 
 class GeneralizedQ(torch.nn.Module):
     def __init__(
-        self,
-        enc_s, enc_a,
-        init_h,
-        dynamic_fn,
-        state_dec,
-        reward_predictor,
-        q_fn,
-        done_fn,
-        gamma,
+        self, enc_s, enc_a, init_h, dynamic_fn, state_dec, reward_predictor, q_fn, done_fn, gamma,
     ) -> None:
         super().__init__()
         # self.pi_a, self.pi_z = pi_a, pi_z
-        self.enc_s, self.enc_a = enc_s, enc_a
-
+        self.enc_s = enc_s
+        self.enc_a = enc_a
         self.init_h = init_h
         self.dynamic_fn: torch.nn.GRU = dynamic_fn
-
         self.state_dec = state_dec
         self.reward_predictor = reward_predictor
         self.q_fn: Union[SoftQPolicy, ValuePolicy] = q_fn
-
         self.done_fn = done_fn
         self.gamma = gamma
 
@@ -114,7 +104,7 @@ class GeneralizedQ(torch.nn.Module):
         if sample_a:
             a_seq = out['a'] = torch.stack(a_seq)
             out['logp_a'] = torch.stack(logp_a)
-            out['ent_a'] = - out['logp_a']
+            out['ent_a'] = -out['logp_a']
 
         if sample_z:
             z_seq = out['z'] = torch.stack(z_seq)
@@ -131,16 +121,12 @@ class GeneralizedQ(torch.nn.Module):
             out['done'] = dones = torch.sigmoid(self.done_fn(done_inp))
             from tools.utils import logger 
             logger.logkv_mean('mean_pred_done', dones.mean().item())
+            raise NotImplementedError
 
         q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=out['reward'], done=dones, gamma=self.gamma)
 
         if sample_z:
-            if intrinsic_reward is not None:
-                rewards, extra_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
-            else:
-                rewards = out['reward']
-                extra_rewards = torch.zeros_like(rewards)
-
+            rewards, extra_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
             vpreds = []
             discount = 1
             prefix = 0.
@@ -148,16 +134,12 @@ class GeneralizedQ(torch.nn.Module):
                 prefix = prefix + extra_rewards[i].sum(axis=-1, keepdims=True) * discount
                 vpreds.append(prefix + q_values[i] * discount)
                 prefix = prefix + rewards[i] * discount
-
                 discount = discount * self.gamma
                 if dones is not None:
                     assert dones.shape[-1] == 1
                     discount = discount * (1 - dones[i]) # the probablity of not done ..
-
             vpreds = torch.stack(vpreds)
-            #out['value'] = (vpreds * self.weights[:, None, None]).sum(axis=0)
             out['vpreds'] = vpreds
-            out['extra_rewards'] = extra_rewards
 
         out['q_value'] = q_values
         out['pred_values'] = values
@@ -287,7 +269,6 @@ class DynamicsLearner(LossOptimizer):
         cfg=None,
         target_horizon=None, zero_done_value=False, have_done=False,
         weights=dict(state=1000., reward=0.5, q_value=0.5, done=1.),
-
         tau=0.005,
     ):
         super().__init__(models, cfg)
@@ -321,8 +302,6 @@ class DynamicsLearner(LossOptimizer):
         qnet = self.nets.q_fn
 
         with torch.no_grad():
-
-            gt = dict(reward=reward)
             dyna_loss = dict()
 
             batch_size = action.shape[1]
@@ -332,14 +311,16 @@ class DynamicsLearner(LossOptimizer):
 
             samples = self.target_net.inference(
                 next_obs, z_seq, next_timesteps, self._cfg.target_horizon or horizon,
-                pi_z = self.pi_z, pi_a = self.pi_a, intrinsic_reward = self.intrinsic_reward,
+                pi_z=self.pi_z, pi_a=self.pi_a, intrinsic_reward = self.intrinsic_reward,
             )
             qtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
             assert reward.shape == qtarg.shape == done_gt.shape, (reward.shape, qtarg.shape, done_gt.shape)
 
-            gt['q_value'] = qnet.compute_target(qtarg, reward, done_gt.float(), self.nets.gamma)
-            gt['state'] = samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
-
+            gt = dict(
+                reward=reward,
+                q_value=qnet.compute_target(qtarg, reward, done_gt.float(), self.nets.gamma),
+                state=samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
+            )
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
             logger.logkv_mean('reward_step_mean', float(reward.mean()))
 

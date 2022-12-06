@@ -63,8 +63,6 @@ class SoftQPolicy(AlphaPolicyBase):
             Q(s, z, a): use pure sampling based method to estiamte
             Note that the entropy of the current step is not included ..
         """
-        # return the Q value .. if it's value, return self._cfg.gamma
-        # assert torch.allclose(a, z)
         z = self.enc_z(z)
         if self.action_dim > 0:
             inp = self.add_alpha(s, a, z)
@@ -104,6 +102,7 @@ class ValuePolicy(AlphaPolicyBase):
             Q(s, z, a): use pure sampling based method to estiamte
             Note that the entropy of the current step is not included ..
         """
+        raise NotImplementedError
         # return the Q value .. if it's value, return self._cfg.gamma
         z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())

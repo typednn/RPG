@@ -13,7 +13,6 @@ trainer = Trainer.parse(
     update_train_step=1,
     horizon=3,
     hooks=dict(evaluate_pi=dict()),
-
     # wandb=dict(),
     _variants=dict(
     ),

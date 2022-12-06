@@ -87,6 +87,12 @@ class Trainer(Configurable, RLAlgo):
         self.z = None
         self.update_step = 0
 
+    def update_dynamcis(self):
+        seg = self.buffer.sample(self._cfg.batch_size)
+        prev_z = seg.z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
+        self.model_learner.learn_dynamics(
+            seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
+
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
@@ -111,16 +117,9 @@ class Trainer(Configurable, RLAlgo):
             #self.entz.update(entz)
 
     def update(self):
-        # TODO: train the nteworks
-        seg = self.buffer.sample(self._cfg.batch_size)
-        # TODO: reward decay
-        prev_z = seg.z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
-        self.model_learner.learn_dynamics(
-            seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
-
+        self.update_dynamcis()
         self.update_pi_a()
         self.update_pi_z()
-
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             self.model_learner.update_target()

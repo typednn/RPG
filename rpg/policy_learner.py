@@ -40,8 +40,6 @@ class EntropyLearner(Configurable):
         self.name = name
 
         if target is not None or target_mode == 'auto':
-            self.log_alpha = torch.nn.Parameter(
-                torch.zeros(1, requires_grad=(target is not None), device=device))
             if target == None:
                 if isinstance(space, Box):
                     target = -space.shape[0]
@@ -50,6 +48,7 @@ class EntropyLearner(Configurable):
                 else:
                     raise NotImplementedError
             self.target  = target
+            self.log_alpha = torch.nn.Parameter(torch.zeros(1, device=device))
             self.optim = LossOptimizer(self.log_alpha, lr=lr) #TODO: change the optim ..
         else:
             self.target = None
@@ -174,10 +173,8 @@ def select_newz(policy, state, alpha, z, timestep, K):
 
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, use_hidden=True):
+    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, max_grad_norm=1., lr=3e-4):
         super().__init__(policy, cfg)
-        assert use_hidden
-
         self.name = name
         self.policy = policy
         self.enc_z = enc_z
@@ -195,7 +192,8 @@ class PolicyLearner(LossOptimizer):
         hidden = self.enc_z(hidden)
 
         s = self.policy.add_alpha(s, hidden) # concatenate the two
-        alpha = self.ent.alpha
+        with torch.no_grad():
+            alpha = self.ent.alpha
 
         if prev_action is not None:
             assert timestep is not None
