@@ -45,6 +45,7 @@ class GeneralizedQ(torch.nn.Module):
             dones = torch.sigmoid(self.done_fn(done_inp))
             from tools.utils import logger 
             logger.logkv_mean('mean_pred_done', dones.mean().item())
+            raise NotImplementedError
 
         traj['done'] = dones
         return dones
@@ -108,7 +109,7 @@ class GeneralizedQ(torch.nn.Module):
         h = self.init_h(s)[None,:]
         a_embeds = []
 
-
+        out = dict(timestep=timestep)
         for idx in range(step):
             if len(z_seq) <= idx:
                 z, _logp_z, z_new, logp_z_new, _entz = pi_z(s, z, prev_action=z, timestep=timestep)
@@ -128,7 +129,7 @@ class GeneralizedQ(torch.nn.Module):
 
             timestep = timestep + 1
 
-        out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds))
+        out.update(state=torch.stack(states), a_embed=torch.stack(a_embeds))
         self.pred_rewards(out)
 
         if sample_a:
@@ -311,7 +312,6 @@ class DynamicsLearner(LossOptimizer):
             import copy
             self.target_net = copy.deepcopy(self.nets)
 
-
     def get_flatten_next_obs(self, obs_seq):
         if isinstance(obs_seq, torch.Tensor):
             next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
@@ -338,12 +338,12 @@ class DynamicsLearner(LossOptimizer):
             z_seq = prev_z[1:].reshape(-1, *prev_z.shape[2:])
             next_timesteps = timesteps[1:].reshape(-1)
 
-            self.pi_a.set_mode('target'); self.pi_z.set_mode('target')
+            # self.pi_a.set_mode('target'); self.pi_z.set_mode('target')
             samples = self.target_net.inference(
                 next_obs, z_seq, next_timesteps, self._cfg.target_horizon or horizon,
                 pi_z=self.pi_z, pi_a=self.pi_a, intrinsic_reward = self.intrinsic_reward,
             )
-            self.pi_a.set_mode('train'); self.pi_z.set_mode('train')
+            # self.pi_a.set_mode('train'); self.pi_z.set_mode('train')
 
             vtarg = samples['value'].min(axis=-1)[0].reshape(-1, batch_size, 1)
             assert reward.shape == vtarg.shape == done_gt.shape, (reward.shape, vtarg.shape, done_gt.shape)

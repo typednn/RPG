@@ -132,7 +132,7 @@ class Trainer(Configurable, RLAlgo):
     def update(self):
         self.update_dynamcis()
         self.update_pi_a()
-        self.update_pi_z()
+        # self.update_pi_z()
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             self.model_learner.ema(self._cfg.tau)
@@ -175,8 +175,8 @@ class Trainer(Configurable, RLAlgo):
             with torch.no_grad():
                 self.eval()
                 transition = dict(obs = obs, timestep=timestep)
-                prevz = totensor(self.z, device=self.device, dtype=None)
                 a, self.z = self.policy(obs, self.z, timestep)
+                prevz = totensor(self.z, device=self.device, dtype=None)
                 data, obs = self.step(self.env, a)
 
                 if mode != 'training' and self._cfg.save_video > 0 and idx < self._cfg.save_video: # save video steps

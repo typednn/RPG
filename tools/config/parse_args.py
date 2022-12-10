@@ -44,6 +44,18 @@ def _parse_args(default_cfg='', parser=None):
     return args
 
 
+def inherit(key, variants):
+    assert key in variants, f"key {key} not found in variants definition."
+    import copy
+    var = copy.copy(variants[key])
+    if '_inherit' in var:
+        father = inherit(var.pop('_inherit'), variants)
+        father.set_new_allowed(True)
+        now = CN(var)
+        return merge_a_into_b_builder(now, father)
+    return CN(var)
+
+
 def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False, _update=None, _variants=None):
     # remember if we use this to decorate a configurable
     # it works with the initial __init__
@@ -83,7 +95,8 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
                     raise KeyError(f"Experiment management configs not in cfg")
                 if opts.var not in _variants:
                     raise KeyError(f"Exp {opts.var} not in {_variants.keys()}")
-                base = CN(_variants[opts.var])
+                #base = CN(_variants[opts.var])
+                base = inherit(opts.var, _variants)
                 if update is not None:
                     merge_a_into_b_builder(CN(update), base)
                 update = base

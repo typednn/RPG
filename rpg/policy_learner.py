@@ -167,7 +167,7 @@ def select_newz(policy, state, alpha, z, timestep, K):
 
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1, max_grad_norm=1., lr=3e-4, ignore_hidden=False):
+    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1000000, max_grad_norm=1., lr=3e-4, ignore_hidden=False):
         from tools.utils import orthogonal_init
         policy.apply(orthogonal_init)
 
@@ -176,7 +176,7 @@ class PolicyLearner(LossOptimizer):
         self._policy = policy
         self.enc_z = enc_z
         self.ent = EntropyLearner(name, action_space, cfg=ent)
-        self.freq = 1
+        self.freq = freq
         import copy
         self._target_policy = copy.deepcopy(self._policy)
         self.mode = 'train'
