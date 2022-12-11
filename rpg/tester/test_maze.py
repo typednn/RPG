@@ -1,0 +1,58 @@
+import tqdm
+import numpy as np
+from rpg.env_base import GymVecEnv, TorchEnv
+from rpg.soft_rpg import Trainer
+
+
+N = 100
+env = TorchEnv('SmallMaze', N, ignore_truncated_done=True, reward=True)
+# 150000
+
+trainer = Trainer.parse(
+    env, 
+    steps_per_epoch=200,
+
+    buffer=dict(max_episode_num=100000),
+    z_dim=6,
+    z_cont_dim=0,
+
+    model=dict(qmode='value'),
+    update_train_step=1,
+    horizon=3,
+    actor_delay=4, #10,
+    z_delay=4,
+
+
+    trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
+    pi_a=dict(
+        ent=dict(coef=0.005),
+        pi=dict(head=dict(
+            linear=False,
+            squash=True,
+            std_mode='fix_no_grad',
+            std_scale = 0.1
+        ))
+    ),
+    pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
+
+    path='tmp/maze',
+    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),
+    info=dict(coef=0.0),
+    # info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
+
+    _variants=dict(
+        default='z2',
+        value=dict(model=dict(qmode='value'), horizon=1),
+        value3=dict(model=dict(qmode='value'), horizon=3, z_dim=1, pi_a=dict(pi=dict(head=dict(std_scale=0.2)))),
+        #z=dict(model=dict(qmode='value'), horizon=3, z_dim=6, info=dict(coef=1.), pi_a=dict(pi=dict(head=dict(std_scale=0.1)))),
+        z = dict(_inherit='value3', z_dim=6, info=dict(coef=0.1)),
+        z2=dict(_inherit='z', pi_a=dict(pi=dict(head=dict(std_scale=0.05)))),
+        relabelz=dict(_inherit='z2', relabel=0.8),
+        rnd = dict(
+            _inherit='z2',
+            rnd=dict(rnd_scale=1.),
+        )
+    ),
+) # do not know if we need max_grad_norm
+
+trainer.run_rpgm()

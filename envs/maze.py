@@ -219,33 +219,23 @@ class LargeMaze(Configurable):
         import matplotlib.pyplot as plt
 
         if isinstance(traj, dict):
-            obs = traj['obs']
+            obs = traj['next_obs']
         else:
-            obs = traj.get_tensor('obs')
+            obs = traj.get_tensor('next_obs')
 
         plt.clf()
         img = self.screen.copy()/255.
         #obs = ((obs  + self.SIZE)/ (self.SIZE * 2)).detach().cpu().numpy()
         obs = obs / self.SIZE / 2 + 0.5
         obs = obs.detach().cpu().numpy() * self.RESOLUTION
-
-
-        from solver.draw_utils import plot_colored_embedding
-        plt.clf()
-        if z is not None and (z.max() < 100 or z.dtype != torch.int64):
-            plt.imshow(np.uint8(img[...,::-1]*255))
-            plot_colored_embedding(z, obs[1:, :, :2], s=3)
-        else:
-            plt.imshow(img[...,::-1])
-            obs = obs.reshape(-1, 2)
-            plt.scatter(obs[:, 0], obs[:, 1], s=3)
-
-        plt.xlim([0, self.RESOLUTION])
-        plt.ylim([0, self.RESOLUTION])
-        plt.axis('off')
-        plt.tight_layout(rect=[0.,0.,1., 1.])
-        img2 = plt_save_fig_array()[:, :, :3]
-        return img2
+        return {
+            'state': obs,
+            'background': {
+                'image':  img,
+                'xlim': [0, self.RESOLUTION],
+                'ylim': [0, self.RESOLUTION],
+            },
+        }
 
 
 class SmallMaze(LargeMaze):

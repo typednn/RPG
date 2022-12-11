@@ -147,6 +147,12 @@ class save_traj(HookBase):
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
         """
+
+        traj is a Trajectory
+        traj.traj[0] is a dict of transition. 
+        traj.traj[i]['_attrs']  records dict of values for rendering for state; must be numpy or float
+
+
         render_traj calls envs._render_traj_rgb function to generate a dict of form
 
         {  
@@ -161,7 +167,8 @@ class save_traj(HookBase):
         """
         if trainer.epoch_id % self.n_epoch == 0:
             assert trainer.mode == 'sample'
-            traj = trainer.evaluate(env, steps)
+            from .traj import Trajectory
+            traj: Trajectory = trainer.evaluate(env, steps)
 
             logger.logkvs_mean(
                 {'eval_' + k: v 
@@ -177,7 +184,7 @@ class save_traj(HookBase):
             data = env.render_traj(traj) 
 
             from tools.utils import plt_save_fig_array
-            from solver.draw_utils import plot_colored_embedding
+            from solver.draw_utils import plot_colored_embedding, plot_point_values
             import matplotlib.pyplot as plt
 
             images = {}
@@ -213,6 +220,19 @@ class save_traj(HookBase):
                 clear(use_bg=False)
                 plot_colored_embedding(z, data['actions'])
                 get('action')
+
+                
+            # traj _attrs, record 
+            if '_attrs' in traj.traj[0]:
+                for k in traj.traj[0]['_attrs']:
+                    v = [i['_attrs'][k] for i in traj.traj]
+                    v = np.array(v)
+                    print(k, v.shape)
+
+                    clear()
+                    v = v.reshape(-1)
+                    plot_point_values(v.reshape(-1), data['state'], s=2)
+                    get(k)
 
             for k, v in images.items():
                 logger.savefig(k + '.png', v)

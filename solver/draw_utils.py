@@ -118,8 +118,21 @@ def env_draw_batch_pointcloud(pcd, env, mode='plt'):
     return images
 
     
+from tools.utils import tonumpy
+def plot_point_values(v, points, **kwargs):
+    points = tonumpy(points)
+    points = points.reshape(-1, 2)
+
+    kwargs['v_min']= v.min()
+    kwargs['v_max'] = v.max()
+    cm = plt.cm.get_cmap('RdYlBu')
+
+    colors = v.reshape(-1)
+    sc = plt.scatter(points[:, 0], points[:, 1], c=colors, cm=cm, **kwargs)
+    plt.colorbar(sc)
+
+    
 def plot_colored_embedding(z, points, **kwargs):
-    from tools.utils import tonumpy
     # TODO:
     colors = np.array(
         ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'C2', 'C3',
