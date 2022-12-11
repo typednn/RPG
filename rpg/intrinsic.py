@@ -22,3 +22,10 @@ class IntrinsicMotivation:
     def update_with_buffer(self, buffer):
         for i in self.args:
             i.update_with_buffer(buffer)
+
+    
+    def visualize_transition(self, transitions):
+        # add information for visualization
+        for i in self.args:
+            if hasattr(i, 'visualize_transition'):
+                i.visualize_transition(transitions)

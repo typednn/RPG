@@ -178,3 +178,9 @@ class RNDOptim(OptimModule):
         all_obs = rollout['state'].detach()
         loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=True)
         self.optimize(loss)
+
+    def visualize_transition(self, transition):
+        attrs = transition.get('_attrs', {})
+        if 'r' not in attrs:
+            from tools.utils import tonumpy
+            attrs['r'] = tonumpy(transition['r'])[..., 0] # just record one value ..

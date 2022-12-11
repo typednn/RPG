@@ -121,43 +121,36 @@ class PointEnv(StateEnv):
         img = cv2.rectangle(img, (start, start), (size+start, size+start), (255, 0, 255), 1, 1)
         return img
 
-
+        
     def _render_traj_rgb(self, traj, **kwargs):
+
         states = traj.get_tensor('obs', device='cpu')
-
-
-
+        states = states.detach().cpu().numpy() * 128 + 64 
         from tools.utils import plt_save_fig_array
-        states = states.detach().cpu().numpy()
+        states = states[:, :, :2]
+        return {
+            'state': states,
+            'background': {
+                'image': self._render_rgb()/255.,
+                'xlim': [0, 256],
+                'ylim': [0, 256],
+            },
+            'actions': traj.get_tensor('a', device='cpu').detach().cpu().numpy(),
+        }
+
 
         plt.clf()
         img = self._render_rgb()/255.
 
-        states = states * 128 + 64 
-
-        # if 'traj' in kwargs:
-        #     traj = kwargs['traj']
-
-        #     if self._cfg.save_traj:
-        #         from tools.utils import logger
-        #         logger.torch_save([traj], f'traj{self.traj_idx}.th')
-        #         self.traj_idx += 1
-        # else:
-        #     traj = kwargs
         z = traj.get_tensor('z', device='cpu')
 
         from ..draw_utils import plot_colored_embedding
         plt.clf()
 
-        #x = traj['z'].detach().cpu().numpy()
         if z.dtype == torch.int64:
             print(torch.bincount(z.long().flatten()))
         plt.imshow(np.uint8(img[...,::-1]*255))
         plot_colored_embedding(z, states[:, :, :2], s=2)
-        # else:
-        #     plt.imshow(img[...,::-1])
-        #     states = states.reshape(-1, 3)
-        #     plt.scatter(states[:, 0], states[:, 1], s=2)
 
         plt.xlim([0, 256])
         plt.ylim([0, 256])

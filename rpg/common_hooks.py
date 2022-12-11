@@ -146,6 +146,19 @@ class save_traj(HookBase):
         self.imgs = []
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
+        """
+        render_traj calls envs._render_traj_rgb function to generate a dict of form
+
+        {  
+            'state': np.array, T, B, 2,
+            'background': {
+                'image': background image (that can be plt.imshow),
+                'xlim': [0, 256] or None,
+                'ylim': [0, 256] or None,
+            },
+            'actions': np.array, T, B, 2,
+        }
+        """
         if trainer.epoch_id % self.n_epoch == 0:
             assert trainer.mode == 'sample'
             traj = trainer.evaluate(env, steps)
@@ -160,9 +173,53 @@ class save_traj(HookBase):
                 old_obs = trainer.obs_rms.unormalize(old_obs)
                 raise NotImplementedError
             traj.old_obs = old_obs
-            img = env.render_traj(traj) 
-            logger.savefig(self.traj_name + '.png', img)
+
+            data = env.render_traj(traj) 
+
+            from tools.utils import plt_save_fig_array
+            from solver.draw_utils import plot_colored_embedding
+            import matplotlib.pyplot as plt
+
+            images = {}
+            import numpy as np
+            background = data.get('background', {})
+
+            def clear(use_bg=True):
+                plt.clf()
+                if use_bg:
+                    if 'image' in background:
+                        plt.imshow(np.uint8(background['image']*255))
+                    if 'xlim' in background:
+                        plt.xlim(background['xlim'])
+                    if 'ylim' in background:
+                        plt.ylim(background['ylim'])
+
+            def get(name):
+                plt.title(name)
+                plt.tight_layout()
+                images[name] = plt_save_fig_array()[:, :, :3]
+
+            # plot z.
+            clear()
+            z = traj.get_tensor('z', device='cpu')
+            import torch
+            if z.dtype == torch.int64:
+                print('zbin', torch.bincount(z.long().flatten()))
+                print('z.shape', z.shape, 'data state shape', data['state'].shape)
+            plot_colored_embedding(z, data['state'], s=2)
+            get('latent')
+
+            if 'actions' in data:
+                clear(use_bg=False)
+                plot_colored_embedding(z, data['actions'])
+                get('action')
+
+            for k, v in images.items():
+                logger.savefig(k + '.png', v)
+
+            #logger.savefig(self.traj_name + '.png', img)
             if self.save_gif_epochs > 0:
+                img = np.concatenate([v for k, v in images.items()], axis=1)
                 self.imgs.append(img)
                 if len(self.imgs) % self.save_gif_epochs == 0:
                     logger.animate(self.imgs, self.traj_name + '.gif')

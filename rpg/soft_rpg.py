@@ -210,6 +210,11 @@ class Trainer(Configurable, RLAlgo):
                     images.append(self.env.render('rgb_array')[0])
 
                 transition.update(**data, a=a, z=prevz)
+
+                if mode != 'training':
+                    # for visualize the transitions ..
+                    self.intrinsic_reward.visualize_transition(transition)
+
                 transitions.append(transition)
                 timestep = transition['next_timestep']
                 for j in range(len(obs)):

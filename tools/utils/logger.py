@@ -431,6 +431,7 @@ def savefig(f, im=None, *, clear=True):
     if get_current().use_wandb:
         get_current().use_wandb.run.log({f: plt})
     else:
+        plt.tight_layout()
         plt.savefig(dir_path(f))
     if clear:
         plt.clf()
