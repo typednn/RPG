@@ -15,6 +15,10 @@ class IntrinsicMotivation:
             outs[name] = intrinsic
         return reward, outs
 
-    def update(self, rollout):
+    def update_with_rollout(self, rollout):
         for i in self.args:
             i.update_intrinsic(rollout)
+
+    def update_with_buffer(self, buffer):
+        for i in self.args:
+            i.update_with_buffer(buffer)

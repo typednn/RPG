@@ -82,22 +82,21 @@ class RNDOptim(OptimModule):
     KEYS = ['obs']
     name = 'rnd'
 
-    def __init__(self, obs_space, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
+    def __init__(self, obs_space, state_dim, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
         from .rnd import RNDNet
-        inp_dim = obs_space.shape[0] # TODO support other observation ..
-
+        # inp_dim = obs_space.shape[0] # TODO support other observation ..
+        inp_dim = state_dim
         self.inp_dim = inp_dim
         if use_embed > 0:
             self.embeder, self.inp_dim = get_embedder(use_embed)
         else:
             self.embeder = None
 
-        network = RNDNet(self.inp_dim)
-
+        network = RNDNet(self.inp_dim).cuda()
         self.normalizer = RunningMeanStd(last_dim=False) if normalizer else None
 
         super().__init__(network, cfg)
-        self.target = RNDNet(network.inp_dim, cfg=network._cfg)
+        self.target = RNDNet(network.inp_dim, cfg=network._cfg).cuda()
         for param in self.target.parameters():
             param.requires_grad = False
 
@@ -115,16 +114,16 @@ class RNDOptim(OptimModule):
         return out * self._cfg.rnd_scale
 
 
-    def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):
-        for i in range(self._cfg.learning_epoch):
-            n_batches = 0
-            keys = ['obs', 'z', 'timestep']
-            for batch in data.loop_over(batch_size, keys):
-                n_batches += 1
-                _, info = self.step(*[batch[i] for i in keys])
-                if logger_scope is not None:
-                    assert isinstance(logger_scope, str) and len(logger_scope) > 0
-                    logger.logkvs_mean({f'{logger_scope}/'+k:v for k, v in info.items()})
+    # def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):
+    #     for i in range(self._cfg.learning_epoch):
+    #         n_batches = 0
+    #         keys = ['obs', 'z', 'timestep']
+    #         for batch in data.loop_over(batch_size, keys):
+    #             n_batches += 1
+    #             _, info = self.step(*[batch[i] for i in keys])
+    #             if logger_scope is not None:
+    #                 assert isinstance(logger_scope, str) and len(logger_scope) > 0
+    #                 logger.logkvs_mean({f'{logger_scope}/'+k:v for k, v in info.items()})
 
 
     def compute_loss(self, obs, hidden, timestep, reduce=True):
@@ -141,8 +140,7 @@ class RNDOptim(OptimModule):
             target =self.target(inps, hidden, timestep)
 
         loss = ((predict - target)**2).sum(axis=-1, keepdim=True)
-        assert loss.dim() == 2
-
+        #assert loss.dim() == 2
         if reduce:
             loss = loss.mean()
 
@@ -158,3 +156,25 @@ class RNDOptim(OptimModule):
             images.append(out.detach().cpu().numpy())
 
         return np.array(images)
+
+
+    # def update_with_buffer(self, seg):
+    #     #obs_seq = seg.obs_seq
+    #     from .utils import flatten_obs
+    #     all_obs = flatten_obs(seg.obs_seq)
+    #     loss = self.compute_loss(all_obs, hidden=None, timestep=None)
+    #     self.optimize(loss)
+    #     # update the 
+
+    def update_with_buffer(self, *args, **kwargs):
+        pass
+
+    def intrinsic_reward(self, rollout):
+        loss = self.compute_loss(rollout['state'][1:], hidden=None, timestep=None, reduce=False)
+        return 'rnd', loss
+
+    def update_intrinsic(self, rollout):
+        from .utils import flatten_obs
+        all_obs = rollout['state'].detach()
+        loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=True)
+        self.optimize(loss)

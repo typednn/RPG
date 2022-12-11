@@ -116,6 +116,10 @@ class InfoLearner(LossOptimizer):
         logger.logkv_mean('info_ce_loss', float(-mutual_info))
         logger.logkv_mean('info_posterior_loss', float(-posterior))
 
+    def update_with_buffer(self, buffer):
+        pass
 
-    def get_posterior(self, states):
-        return self.net.get_posterior(states)
+
+    def sample_z(self, states):
+        #print(states.shape)
+        return self.net.get_posterior(states).sample()

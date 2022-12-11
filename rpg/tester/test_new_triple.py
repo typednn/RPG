@@ -48,7 +48,9 @@ trainer = Trainer.parse(
         value3_2=dict(model=dict(qmode='value'), horizon=3, z_dim=1, pi_a=dict(pi=dict(head=dict(std_scale=0.1, squash=False)))),
 
         #z=dict(model=dict(qmode='value'), horizon=3, z_dim=6, info=dict(coef=1.), pi_a=dict(pi=dict(head=dict(std_scale=0.1)))),
-        z = dict(_inherit='value3', z_dim=6, info=dict(coef=0.1))
+        z = dict(_inherit='value3', z_dim=6, info=dict(coef=0.1)),
+        z2=dict(_inherit='z', pi_a=dict(pi=dict(head=dict(std_scale=0.05)))),
+        relabelz=dict(_inherit='z2', relabel=0.8),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

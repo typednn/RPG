@@ -6,6 +6,19 @@ from tools.config import Configurable
 
 
 
+def flatten_obs(obs_seq):
+    if isinstance(obs_seq, torch.Tensor):
+        next_obs = obs_seq.reshape(-1, *obs_seq.shape[2:])
+    else:
+        assert isinstance(obs_seq[0], dict)
+        next_obs = {}
+        for k in obs_seq[0]:
+            # [T, B, ...]
+            next_obs[k] = torch.stack([v[k] for v in obs_seq])
+        for k, v in next_obs.items():
+                next_obs[k] = v.reshape(-1, *v.shape[2:])
+    return next_obs
+
 def iter_batch(index, batch_size):
     return np.array_split(np.array(index), max(len(index)//batch_size, 1))
 

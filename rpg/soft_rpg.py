@@ -15,6 +15,7 @@ from .info_net import InfoLearner
 from .traj import Trajectory
 from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 from .intrinsic import IntrinsicMotivation
+from .rnd import RNDOptim
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -37,6 +38,7 @@ class Trainer(Configurable, RLAlgo):
 
         # mutual information term ..
         info = InfoLearner.dc,
+        rnd = RNDOptim.dc,
 
         # update parameters..
         horizon=6,
@@ -57,6 +59,8 @@ class Trainer(Configurable, RLAlgo):
         save_video=0,
 
         tau=0.005,
+
+        relabel=0.,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
@@ -86,37 +90,59 @@ class Trainer(Configurable, RLAlgo):
         self.pi_z = DiscretePolicyLearner(
             'z', state_dim, enc_z, hidden_dim, self.z_space, cfg=pi_z
         )
+        self.intrinsics = [self.pi_a, self.pi_z]
         #self.info_net = lambda x: x['rewards'], 0, 0
-        self.intrinsic_reward = IntrinsicMotivation(*self.get_intrinsic())
-        self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, self.intrinsic_reward, cfg=trainer)
+        self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, cfg=trainer)
 
         self.z = None
         self.update_step = 0
 
+        self.make_rnd()
+
+
+    def make_rnd(self):
+        rnd = self._cfg.rnd
+        if rnd.rnd_scale > 0.:
+            self.rnd = RNDOptim(self.env.observation_space, self.dynamics_net.state_dim, cfg=rnd)
+            self.intrinsics.append(self.rnd)
+
+
     def get_intrinsic(self):
-        intrinsics = [self.pi_a, self.pi_z]
         if self.use_z:
-            intrinsics.append(self.info_learner)
-        return intrinsics
+            self.intrinsics.append(self.info_learner)
+        return self.intrinsics
+
+    def relabel_z(self, state, timestep, z):
+        if self._cfg.relabel > 0.:
+            #TODO: other relabel method, use the future state's info to relabel the current state's z
+            new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state, timestep=timestep))[0]
+
+            mask = torch.rand(size=(len(state),)) < self._cfg.relabel
+            z = z.clone()
+            z[mask] = new_z[mask]
+        return z
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
-        prev_z = seg.z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
+        z = self.relabel_z(seg.obs_seq[0], seg.timesteps[0], seg.z)
+        prev_z = z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
         self.model_learner.learn_dynamics(
             seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
+        self.intrinsic_reward.update_with_buffer(seg)
 
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
             seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
+            z = self.relabel_z(seg.obs_seq[0], seg.timesteps[0], seg.z)
             rollout = self.dynamics_net.inference(
-                seg.obs_seq[0], seg.z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
+                seg.obs_seq[0], z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
                 intrinsic_reward=self.intrinsic_reward
             )
             self.pi_a.update(rollout)
 
             # update intrinsic reward
-            self.intrinsic_reward.update(rollout)
+            self.intrinsic_reward.update_with_rollout(rollout)
 
             for k, v in rollout['extra_rewards'].items():
                 logger.logkv_mean(f'reward_{k}', float(v.mean()))
@@ -126,6 +152,7 @@ class Trainer(Configurable, RLAlgo):
         if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
             o, z, t = self.buffer.sample_start(self._cfg.batch_size)
             assert (t < 1).all()
+            z = self.relabel_z(o, t, z)
             rollout = self.dynamics_net.inference(o, z, t, self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
             self.pi_z.update(rollout)
 
@@ -218,6 +245,9 @@ class Trainer(Configurable, RLAlgo):
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
 
     def run_rpgm(self, max_epoch=None):
+        self.intrinsic_reward = IntrinsicMotivation(*self.get_intrinsic())
+        self.model_learner.set_intrinsic(self.intrinsic_reward)
+
         self.setup_logger()
         env = self.env
 
@@ -245,3 +275,5 @@ class Trainer(Configurable, RLAlgo):
             out = self.inference(steps * self._cfg.eval_episode, mode='evaluate')
             self.start(self.env, reset=True)
             return out
+
+            

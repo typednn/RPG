@@ -90,9 +90,12 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
 
             
             update = _update
-            if opts.var is not None:
+            if opts.var is not None or (_variants is not None and 'default' in _variants):
                 if _variants is None:
                     raise KeyError(f"Experiment management configs not in cfg")
+                if opts.var is None:
+                    opts.var = _variants['default']
+
                 if opts.var not in _variants:
                     raise KeyError(f"Exp {opts.var} not in {_variants.keys()}")
                 #base = CN(_variants[opts.var])

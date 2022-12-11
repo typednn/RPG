@@ -293,7 +293,7 @@ class DynamicsLearner(LossOptimizer):
     # optimizer of the dynamics model ..
     def __init__(
         self, models: HiddenDynamicNet,
-        pi_a, pi_z, intrinsic_reward,
+        pi_a, pi_z,
         
         cfg=None,
         target_horizon=None, have_done=False,
@@ -305,26 +305,19 @@ class DynamicsLearner(LossOptimizer):
         super().__init__(models, cfg)
         self.pi_a = pi_a
         self.pi_z = pi_z
-        self.intrinsic_reward = intrinsic_reward
+        self.intrinsic_reward = None
 
         self.nets = models
         with torch.no_grad():
             import copy
             self.target_net = copy.deepcopy(self.nets)
 
+    def set_intrinsic(self, var):
+        self.intrinsic_reward = var
+
     def get_flatten_next_obs(self, obs_seq):
-        if isinstance(obs_seq, torch.Tensor):
-            next_obs = obs_seq[1:].reshape(-1, *obs_seq.shape[2:])
-        else:
-            assert isinstance(obs_seq[0], dict)
-            next_obs = {}
-            for k in obs_seq[0]:
-                # [T, B, ...]
-                next_obs[k] = torch.stack([v[k] for v in obs_seq[1:]])
-            for k, v in next_obs.items():
-                    next_obs[k] = v.reshape(-1, *v.shape[2:])
-            raise NotImplementedError
-        return next_obs
+        from .utils import flatten_obs
+        return flatten_obs(obs_seq[1:])
 
     def learn_dynamics(self, obs_seq, timesteps, action, reward, done_gt, truncated_mask, prev_z):
         horizon = len(obs_seq) - 1
