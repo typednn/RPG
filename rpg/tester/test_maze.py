@@ -5,7 +5,7 @@ from rpg.soft_rpg import Trainer
 
 
 N = 100
-env = TorchEnv('SmallMaze', N, ignore_truncated_done=True, reward=True)
+env = TorchEnv('SmallMaze', N, ignore_truncated_done=True, reward=False)
 # 150000
 
 trainer = Trainer.parse(
@@ -30,7 +30,7 @@ trainer = Trainer.parse(
             linear=False,
             squash=True,
             std_mode='fix_no_grad',
-            std_scale = 0.1
+            std_scale = 0.2
         ))
     ),
     pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
@@ -45,7 +45,7 @@ trainer = Trainer.parse(
         value=dict(model=dict(qmode='value'), horizon=1),
         value3=dict(model=dict(qmode='value'), horizon=3, z_dim=1, pi_a=dict(pi=dict(head=dict(std_scale=0.2)))),
         #z=dict(model=dict(qmode='value'), horizon=3, z_dim=6, info=dict(coef=1.), pi_a=dict(pi=dict(head=dict(std_scale=0.1)))),
-        z = dict(_inherit='value3', z_dim=6, info=dict(coef=0.1)),
+        z = dict(_inherit='value3', z_dim=6, info=dict(coef=1.)),
         z2=dict(_inherit='z', pi_a=dict(pi=dict(head=dict(std_scale=0.05)))),
         relabelz=dict(_inherit='z2', relabel=0.8),
         rnd = dict(

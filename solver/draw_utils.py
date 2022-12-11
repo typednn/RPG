@@ -123,12 +123,12 @@ def plot_point_values(v, points, **kwargs):
     points = tonumpy(points)
     points = points.reshape(-1, 2)
 
-    kwargs['v_min']= v.min()
-    kwargs['v_max'] = v.max()
+    kwargs['vmin']= v.min()
+    kwargs['vmax'] = v.max()
     cm = plt.cm.get_cmap('RdYlBu')
 
     colors = v.reshape(-1)
-    sc = plt.scatter(points[:, 0], points[:, 1], c=colors, cm=cm, **kwargs)
+    sc = plt.scatter(points[:, 0], points[:, 1], c=colors, cmap=cm, **kwargs)
     plt.colorbar(sc)
 
     

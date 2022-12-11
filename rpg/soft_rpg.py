@@ -213,6 +213,7 @@ class Trainer(Configurable, RLAlgo):
 
                 if mode != 'training':
                     # for visualize the transitions ..
+                    transition['next_state'] = self.dynamics_net.enc_s(obs, timestep=timestep)
                     self.intrinsic_reward.visualize_transition(transition)
 
                 transitions.append(transition)

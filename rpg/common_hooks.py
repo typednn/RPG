@@ -224,6 +224,7 @@ class save_traj(HookBase):
                 
             # traj _attrs, record 
             if '_attrs' in traj.traj[0]:
+                others = []
                 for k in traj.traj[0]['_attrs']:
                     v = [i['_attrs'][k] for i in traj.traj]
                     v = np.array(v)
@@ -233,6 +234,8 @@ class save_traj(HookBase):
                     v = v.reshape(-1)
                     plot_point_values(v.reshape(-1), data['state'], s=2)
                     get(k)
+                    others.append(images.pop(k))
+                images['attrs'] = np.concatenate(others, axis=1)
 
             for k, v in images.items():
                 logger.savefig(k + '.png', v)

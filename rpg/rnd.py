@@ -184,4 +184,9 @@ class RNDOptim(OptimModule):
         if 'r' not in attrs:
             from tools.utils import tonumpy
             attrs['r'] = tonumpy(transition['r'])[..., 0] # just record one value ..
+
+        attrs['rnd'] = tonumpy(
+            self.compute_loss(transition['next_state'], hidden=None, timestep=None, reduce=False)
+        )
+
         transition['_attrs'] = attrs
