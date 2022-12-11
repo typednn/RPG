@@ -93,7 +93,7 @@ class RNDOptim(OptimModule):
             self.embeder = None
 
         network = RNDNet(self.inp_dim).cuda()
-        self.normalizer = RunningMeanStd(last_dim=False) if normalizer else None
+        self.normalizer = RunningMeanStd(last_dim=True) if normalizer else None
 
         super().__init__(network, cfg)
         self.target = RNDNet(network.inp_dim, cfg=network._cfg).cuda()
@@ -101,17 +101,17 @@ class RNDOptim(OptimModule):
             param.requires_grad = False
 
 
-    def __call__(self, traj: Trajectory, batch_size, update_normalizer=True):
-        out = traj.predict_value(('obs', 'z', 'timestep'),
-                                  lambda x, y, z: self.compute_loss(x, y, z, reduce=False), batch_size=batch_size) 
+    # def __call__(self, traj: Trajectory, batch_size, update_normalizer=True):
+    #     out = traj.predict_value(('obs', 'z', 'timestep'),
+    #                               lambda x, y, z: self.compute_loss(x, y, z, reduce=False), batch_size=batch_size) 
 
-        if self.normalizer is not None:
-            if update_normalizer:
-                self.normalizer.update(out)
-            out = self.normalizer.normalize(out)
+    #     if self.normalizer is not None:
+    #         if update_normalizer:
+    #             self.normalizer.update(out)
+    #         out = self.normalizer.normalize(out)
 
-        logger.logkvs_mean({'rnd/reward': out.mean().item()})
-        return out * self._cfg.rnd_scale
+    #     logger.logkvs_mean({'rnd/reward': out.mean().item()})
+    #     return out * self._cfg.rnd_scale
 
 
     # def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):
@@ -147,15 +147,15 @@ class RNDOptim(OptimModule):
         return loss
 
     
-    def plot2d(self):
-        images = []
+    # def plot2d(self):
+    #     images = []
 
-        for i in range(32):
-            coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
-            out = self.forward_network(coords, update_norm=False)
-            images.append(out.detach().cpu().numpy())
+    #     for i in range(32):
+    #         coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
+    #         out = self.forward_network(coords, update_norm=False)
+    #         images.append(out.detach().cpu().numpy())
 
-        return np.array(images)
+    #     return np.array(images)
 
 
     # def update_with_buffer(self, seg):
@@ -171,13 +171,22 @@ class RNDOptim(OptimModule):
 
     def intrinsic_reward(self, rollout):
         loss = self.compute_loss(rollout['state'][1:], hidden=None, timestep=None, reduce=False)
+
+        if self.normalizer is not None:
+            loss = self.normalizer.normalize(loss)
+
         return 'rnd', loss
 
     def update_intrinsic(self, rollout):
         from .utils import flatten_obs
         all_obs = rollout['state'].detach()
-        loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=True)
-        self.optimize(loss)
+        loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=False)
+
+        with torch.no_grad():
+            if self.normalizer is not None:
+                self.normalizer.update(loss)
+
+        self.optimize(loss.mean())
 
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
