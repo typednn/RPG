@@ -51,7 +51,9 @@ trainer = Trainer.parse(
         rnd = dict(
             _inherit='z2',
             rnd=dict(rnd_scale=1.),
-        )
+        ),
+        rnd2=dict(_inherit='rnd', pi_a=dict(pi=dict(head=dict(std_scale=0.3, std_mode='statewise')))),
+        # rnd3=dict(_inherit='rnd2', pi_a=dict(pi=dict(head=dict(std_scale=0.3, std_mode='statewise'))))
     ),
 ) # do not know if we need max_grad_norm
 

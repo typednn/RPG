@@ -271,53 +271,16 @@ class SmallMaze(LargeMaze):
         self.reset()
 
 
+class MediumMaze(LargeMaze):
+    # from pacman.maze import extract_mazewall
+    SIZE = 7
+    walls = torch.tensor(np.array(
+[[[-7, -1], [-5, -1]], [[-7, 5], [-5, 5]], [[-5, -5], [-3, -5]], [[-5, -3], [-3, -3]], [[-5, -1], [-3, -1]], [[-5, 1], [-3, 1]], [[-5, 1], [-5, 3]], [[-5, 3], [-3, 3]], [[-5, 5], [-3, 5]], [[-3, -5], [-1, -5]], [[-3, -3], [-1, -3]], [[-3, -1], [-1, -1]], [[-3, 1], [-1, 1]], [[-3, 3], [-1, 3]], [[-1, -7], [-1, -5]], [[-1, -3], [1, -3]], [[-1, 1], [1, 1]], [[-1, 3], [-1, 5]], [[1, -5], [3, -5]], [[1, -5], [1, -3]], [[1, -3], [1, -1]], [[1, -1], [1, 1]], [[1, 3], [1, 5]], [[1, 5], [1, 7]], [[3, -5], [3, -3]], [[3, -3], [5, -3]], [[3, -3], [3, -1]], [[3, -1], [3, 1]], [[3, 1], [5, 1]], [[3, 1], [3, 3]], [[3, 3], [3, 5]], [[5, -5], [7, -5]], [[5, -1], [7, -1]], [[5, 1], [5, 3]], [[5, 3], [7, 3]], [[5, 5], [5, 7]], [[-7, -7], [-7, 7]], [[-7, 7], [7, 7]], [[7, 7], [7, -7]], [[7, -7], [-7, -7]]]
+        ))
 
-
-from rpg.common_hooks import as_hook, HookBase
-                    
-
-@as_hook
-class plot_maze_env_rnd(HookBase):
-    def __init__(self, resolution=64) -> None:
-        super().__init__()
-        self.resolution = resolution
-
-    def init(self, trainer):
-        # patch
-        self.trainer = trainer
-        self.env = trainer.env.goal_env
-        self.old_render = trainer.env.goal_env._render_traj_rgb
-        trainer.env.goal_env._render_traj_rgb = self._render_traj_rgb
-
-    def  _render_traj_rgb(self, obs, z=None, **kwargs):
-        import matplotlib.pyplot as plt
-        from tools.utils import plt_save_fig_array
-        plt.clf()
-        plt.imshow(self.render_rnd())
-        plt.tight_layout(rect=[0., 0., 1., 1.])
-        plt.axis('off')
-        img2 = plt_save_fig_array()[:, :, :3]
-        img = self.old_render(obs, z)
-        return np.concatenate((img, img2), axis=1)
-
-
-    def render_rnd(self):
-        import numpy as np
-        from rpg.rnd import RNDOptim
-
-        env: LargeMaze = self.env
-        rnd: RNDOptim = self.trainer.rnd
-
-        x, y = np.meshgrid(np.arange(self.resolution), np.arange(self.resolution))
-        obs = np.stack([x, y], axis=2).reshape(-1, 2) / self.resolution
-        obs = obs  * env.SIZE * 2 - env.SIZE
-
-        out = rnd.compute_loss(obs, None, None, reduce=False)
-        out = out - out.min()
-        out = out / (out.max() + 1e-9)
-
-        images = out.reshape(self.resolution, self.resolution).detach().cpu().numpy()
-        return images
+    def __init__(self, cfg=None, low_steps=20) -> None:
+        super().__init__(cfg)
+        self.reset()
 
     
 if __name__ == '__main__':
