@@ -1,21 +1,19 @@
 import tqdm
-import copy
-import gym
 import torch
-from tools.config import Configurable
-from tools.utils import RunningMeanStd, mlp, orthogonal_init, Seq, TimedSeq, logger, Identity, ema, CatNet, totensor
-from tools.optim import LossOptimizer
 from .common_hooks import RLAlgo, build_hooks
-from typing import Union
 from .env_base import GymVecEnv, TorchEnv
-from torch.nn.functional import binary_cross_entropy as bce
-from .utils import masked_temporal_mse, create_hidden_space
 from .buffer import ReplayBuffer
 from .info_net import InfoLearner
 from .traj import Trajectory
 from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 from .intrinsic import IntrinsicMotivation
 from .rnd import RNDOptim
+from .utils import create_hidden_space
+from typing import Union
+from tools.config import Configurable
+from tools.utils import logger, totensor
+#from tools.optim import LossOptimizer
+#from torch.nn.functional import binary_cross_entropy as bce
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -24,6 +22,9 @@ class Trainer(Configurable, RLAlgo):
         self,
         env: Union[GymVecEnv, TorchEnv],
         cfg=None,
+
+        env_name=None,
+        env_cfg=None,
 
         z_dim=1, z_cont_dim=0,
 
@@ -64,6 +65,11 @@ class Trainer(Configurable, RLAlgo):
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
+
+        if env is None:
+            from tools.config import CN
+            from .env_base import make
+            env = make(env_name, **CN(env_cfg))
 
         obs_space = env.observation_space
         self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)

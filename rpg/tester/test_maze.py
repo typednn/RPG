@@ -5,12 +5,14 @@ from rpg.soft_rpg import Trainer
 
 
 N = 100
-env = TorchEnv('SmallMaze', N, ignore_truncated_done=True, reward=False)
+#env = TorchEnv('SmallMaze', N, ignore_truncated_done=True, reward=False)
 # 150000
 
 trainer = Trainer.parse(
-    env, 
+    None, 
     steps_per_epoch=200,
+    env_name='SmallMaze',
+    env_cfg=dict(n=N, ignore_truncated_done=True, reward=False),
 
     buffer=dict(max_episode_num=100000),
     z_dim=6,
