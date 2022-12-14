@@ -13,8 +13,9 @@ trainer = Trainer.parse(
     steps_per_epoch=150,
 
     buffer=dict(max_episode_num=100000),
-    z_dim=6,
-    z_cont_dim=0,
+    #z_dim=6,
+    #z_cont_dim=0,
+    hidden=dict(n=6),
 
     model=dict(qmode='value'),
     update_train_step=1,
@@ -24,16 +25,14 @@ trainer = Trainer.parse(
 
 
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
-    pi_a=dict(
-        ent=dict(coef=0.005),
-        pi=dict(head=dict(
-            linear=False,
-            squash=True,
-            std_mode='fix_no_grad',
-            std_scale = 0.1
-        ))
+    pi_a=dict(ent=dict(coef=0.005),),
+    head=dict(
+        linear=False,
+        squash=True,
+        std_mode='fix_no_grad',
+        std_scale = 0.1
     ),
-    pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
+    pi_z=dict(ent=dict(coef=1000., target_mode='none')),
 
     path='tmp/new',
     hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),
@@ -44,12 +43,12 @@ trainer = Trainer.parse(
         sac=dict(model=dict(qmode='Q'), horizon=1, trainer=dict(weights=dict(state=0.))),
         value=dict(model=dict(qmode='value'), horizon=1),
         sac3=dict(model=dict(qmode='Q'), horizon=3),
-        value3=dict(model=dict(qmode='value'), horizon=3, z_dim=1, pi_a=dict(pi=dict(head=dict(std_scale=0.2)))),
-        value3_2=dict(model=dict(qmode='value'), horizon=3, z_dim=1, pi_a=dict(pi=dict(head=dict(std_scale=0.1, squash=False)))),
+        value3=dict(model=dict(qmode='value'), horizon=3, hidden=dict(n=1), head=dict(std_scale=0.2)),
+        value3_2=dict(model=dict(qmode='value'), horizon=3, hidden=dict(n=1), head=dict(std_scale=0.1, squash=False)),
 
         #z=dict(model=dict(qmode='value'), horizon=3, z_dim=6, info=dict(coef=1.), pi_a=dict(pi=dict(head=dict(std_scale=0.1)))),
-        z = dict(_inherit='value3', z_dim=6, info=dict(coef=0.1)),
-        z2=dict(_inherit='z', pi_a=dict(pi=dict(head=dict(std_scale=0.05)))),
+        z = dict(_inherit='value3', hidden=dict(n=6), info=dict(coef=0.1)),
+        z2=dict(_inherit='z', head=dict(std_scale=0.05)),
         relabelz=dict(_inherit='z2', relabel=0.8),
     ),
 ) # do not know if we need max_grad_norm

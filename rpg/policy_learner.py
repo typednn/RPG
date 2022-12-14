@@ -87,6 +87,9 @@ def select_newz(policy, state, alpha, z, timestep, K):
     entropy = torch.zeros_like(log_new_prob) 
 
     if new.any():
+        print(state[new].shape)
+        print(policy)
+        exit(0)
         newz, newz_logp, ent = policy(state[new], alpha)
         z[new] = newz
         logp_z[new] = newz_logp

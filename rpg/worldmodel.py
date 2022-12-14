@@ -264,13 +264,11 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
         # Q
         #enc_z = ZTransform(z_space)
-        enc_z = z_space.tokenize
         action_dim = action_space.shape[0]
-        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, enc_z, hidden_dim)
+        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim)
 
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
-        self.enc_z = enc_z
         self.apply(orthogonal_init)
 
     def inference(self, *args, **kwargs):

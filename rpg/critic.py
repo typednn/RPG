@@ -41,14 +41,14 @@ def batch_select(values, z=None):
 
 class SoftQPolicy(AlphaPolicyBase):
     def __init__(
-        self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
+        self,state_dim, action_dim, z_space, hidden_dim, cfg = None,
     ) -> None:
         #nn.Module.__init__(self)
         AlphaPolicyBase.__init__(self)
         self.z_space = z_space
-        self.enc_z = enc_z
-        self.q = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
-        self.q2 = self.build_backbone(state_dim + action_dim + enc_z.output_dim, hidden_dim, 1)
+        self.enc_z = z_space.tokenize
+        self.q = self.build_backbone(state_dim + action_dim + z_space.dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim + action_dim + z_space.dim, hidden_dim, 1)
         self.action_dim = action_dim
 
     from tools.utils import print_input_args
@@ -76,16 +76,16 @@ class SoftQPolicy(AlphaPolicyBase):
 
 class ValuePolicy(AlphaPolicyBase):
     def __init__(
-        self,state_dim, action_dim, z_space, enc_z, hidden_dim, cfg = None,
+        self,state_dim, action_dim, z_space, hidden_dim, cfg = None,
         zero_done_value=True,
     ) -> None:
         #nn.Module.__init__(self)
         AlphaPolicyBase.__init__(self)
         self.z_space = z_space
-        self.enc_z = enc_z
+        self.enc_z = z_space.tokenize
         # assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
-        self.q2 = self.build_backbone(state_dim + enc_z.output_dim, hidden_dim, 1)
+        self.q = self.build_backbone(state_dim + z_space.dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim + z_space.dim, hidden_dim, 1)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         # return the Q value .. if it's value, return self._cfg.gamma

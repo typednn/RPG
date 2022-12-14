@@ -39,7 +39,7 @@ class CategoricalAction(ActionDistr):
 
 
 class Discrete(DistHead):
-    def __init__(self, action_space: Discrete = None, cfg=None, epsilon=0.):
+    def __init__(self, action_space: Discrete, cfg=None, epsilon=0.):
         Network.__init__(self)
         self.action_dim = action_space.n
 

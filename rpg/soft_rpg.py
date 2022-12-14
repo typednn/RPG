@@ -16,7 +16,7 @@ from tools.utils import logger, totensor
 from .policy_learner import PolicyLearner
 #from tools.optim import LossOptimizer
 #from torch.nn.functional import binary_cross_entropy as bce
-from .hidden import HiddenSpace
+from .hidden import HiddenSpace, Categorical
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -30,7 +30,7 @@ class Trainer(Configurable, RLAlgo):
         env_cfg=None,
 
         #z_dim=1, z_cont_dim=0,
-        hidden=HiddenSpace.to_build(),
+        hidden=HiddenSpace.to_build(TYPE=Categorical),
 
         # model
         buffer=ReplayBuffer.dc,
@@ -98,20 +98,19 @@ class Trainer(Configurable, RLAlgo):
             obs_space, env.action_space, z_space, cfg=model).cuda()
 
         state_dim = self.dynamics_net.state_dim
-        enc_z = self.dynamics_net.enc_z
         hidden_dim = 256
 
-        #if self.use_z:
-        self.info_learner = InfoLearner(state_dim, env.action_space, hidden_dim, z_space, cfg=info)
+        if self.z_space.learn:
+            self.info_learner = InfoLearner(state_dim, env.action_space, z_space, cfg=info, hidden_dim=hidden_dim)
 
         from .policy_net import DiffPolicy, QPolicy
-        pi_a_net = DiffPolicy(state_dim, hidden_dim, Normal(env.action_space, cfg=head))
-        self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, enc_z, cfg=pi_a)
+        pi_a_net = DiffPolicy(state_dim, hidden_dim, Normal(env.action_space, cfg=head)).cuda()
+        self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, z_space.tokenize, cfg=pi_a)
 
         # z learning ..
         z_head = self.z_space.make_policy_head(z_head)
-        pi_z_net = QPolicy(state_dim, hidden_dim, z_head)
-        self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, cfg=pi_z)
+        pi_z_net = QPolicy(state_dim, hidden_dim, z_head).cuda()
+        self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z)
 
         self.intrinsics = [self.pi_a, self.pi_z]
         #self.info_net = lambda x: x['rewards'], 0, 0
@@ -131,7 +130,7 @@ class Trainer(Configurable, RLAlgo):
 
 
     def get_intrinsic(self):
-        if self.use_z:
+        if self.z_space.learn:
             self.intrinsics.append(self.info_learner)
         return self.intrinsics
 
@@ -211,12 +210,13 @@ class Trainer(Configurable, RLAlgo):
 
     def inference(self, n_step, mode='training'):
         with torch.no_grad():
+            z_space = self.z_space.space
             obs, timestep = self.start(self.env)
             if self.z is None:
-                self.z = [self.z_space.sample()] * len(obs)
+                self.z = [z_space.sample()] * len(obs)
             for idx in range(len(obs)):
                 if timestep[idx] == 0:
-                    self.z[idx] = self.z_space.sample() * 0
+                    self.z[idx] = z_space.sample() * 0
         r = tqdm.trange if self._cfg.update_train_step > 0 else range 
 
         transitions = []
