@@ -28,7 +28,7 @@ class PolicyBase(AlphaPolicyBase):
 
     def forward(self, inp, alpha):
         feature = self.backbone(inp)
-        dist =  self.head(feature, alpha)
+        dist =  self.head(feature)
 
 
         if isinstance(dist, NormalAction):

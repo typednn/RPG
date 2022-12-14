@@ -104,12 +104,12 @@ class Trainer(Configurable, RLAlgo):
             self.info_learner = InfoLearner(state_dim, env.action_space, z_space, cfg=info, hidden_dim=hidden_dim)
 
         from .policy_net import DiffPolicy, QPolicy
-        pi_a_net = DiffPolicy(state_dim, hidden_dim, Normal(env.action_space, cfg=head)).cuda()
+        pi_a_net = DiffPolicy(state_dim + z_space.dim, hidden_dim, Normal(env.action_space, cfg=head)).cuda()
         self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, z_space.tokenize, cfg=pi_a)
 
         # z learning ..
         z_head = self.z_space.make_policy_head(z_head)
-        pi_z_net = QPolicy(state_dim, hidden_dim, z_head).cuda()
+        pi_z_net = QPolicy(state_dim + z_space.dim, hidden_dim, z_head).cuda()
         self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z)
 
         self.intrinsics = [self.pi_a, self.pi_z]
@@ -243,7 +243,7 @@ class Trainer(Configurable, RLAlgo):
                 timestep = transition['next_timestep']
                 for j in range(len(obs)):
                     if timestep[j] == 0:
-                        self.z[j] = self.z_space.sample() * 0
+                        self.z[j] = z_space.sample() * 0
 
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
@@ -255,7 +255,7 @@ class Trainer(Configurable, RLAlgo):
         return Trajectory(transitions, len(obs), n_step)
 
     def setup_logger(self):
-        format_strs = ["stdout", "log", "csv", 'tensorboard']
+        format_strs = ["stdout", "log", "csv"]
         kwargs = {}
         if self._cfg.wandb is not None:
             wandb_cfg = dict(self._cfg.wandb)

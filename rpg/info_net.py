@@ -17,7 +17,7 @@ class InfoNet(Network):
                 mutual_info_weight=0., backbone=None, 
                 action_weight=1., noise=0.0, obs_weight=1.,
                 head=None, use_next_state=False, #, epsilon=0.2,
-                std_mode='fix_no_grad',
+                # std_mode='fix_no_grad',
                 ):
         super().__init__()
         action_dim = action_space.shape[0]
