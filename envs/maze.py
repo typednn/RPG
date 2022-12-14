@@ -17,7 +17,7 @@ def get_intersect(A, B, C, D):
 
     det = (B[0] - A[0]) * (C[1] - D[1]) - (C[0] - D[0]) * (B[1] - A[1])
 
-    no_intersect = (det.abs() < 1e-10)
+    no_intersect = (det.abs() < 1e-16)
 
     det = det.masked_fill(no_intersect, 1) # mask it as 1
 
@@ -131,16 +131,16 @@ class LargeMaze(Configurable):
 
         self.action_space = spaces.Box(-1, 1, (2,))
         self.observation_space = spaces.Box(-12, 12, (2,))
-        self.walls = self.walls.to(device).float()
+        self.walls = self.walls.to(device).double()
         self.mode = mode
         self.render_wall()
 
 
     def step(self, action):
         if self.mode != 'batch':
-            action = torch.tensor(action, device=self.device).float()[None, :]
+            action = torch.tensor(action, device=self.device).double()[None, :]
         else:
-            action = torch.tensor(action, device=self.device).float()
+            action = torch.tensor(action, device=self.device).double()
         assert self.pos.shape == action.shape
 
         new_pos = self.pos + action.clip(-1., 1.) * self.ACTION_SCALE
@@ -168,7 +168,7 @@ class LargeMaze(Configurable):
 
         reward = torch.zeros(self.batch_size, device=self.device) + self.get_reward()
         if self.mode == 'batch':
-            return self.pos.clone(), reward, False, {}
+            return self.pos.clone().float(), reward.float(), False, {}
         else:
             o, r = self.pos.clone().detach().cpu().numpy()[0], reward.detach().cpu().numpy().reshape(-1)[0]
             return o, r, False, {}
@@ -184,13 +184,20 @@ class LargeMaze(Configurable):
         if batch_size is not None:
             self.batch_size = batch_size
 
-        self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float32)
+        self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)
 
         if self.mode == 'batch':
-            return self.pos.clone()
+            return self.pos.clone().float()
         else:
             return self.pos.clone().detach().cpu().numpy()[0]
 
+
+    def pos2pixel(self, x):
+        if isinstance(x, torch.Tensor):
+            x = x.detach().cpu().numpy()
+
+        x = (x + self.SIZE) / (self.SIZE * 2) * 0.8 + 0.1
+        return (x* self.RESOLUTION).astype(np.int32)
 
     def render_wall(self):
         import cv2
@@ -199,8 +206,12 @@ class LargeMaze(Configurable):
         for wall in self.walls:
             left = wall[0].detach().cpu().numpy()
             right = wall[1].detach().cpu().numpy()
-            left = ((left + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
-            right = ((right + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
+            #left = ((left + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
+            # left = self.pos2pixel((left + self.SIZE) / (self.SIZE * 2))
+            # right = self.pos2pixel((right + self.SIZE) / (self.SIZE * 2))
+            # right = ((right + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
+            left = self.pos2pixel(left)
+            right = self.pos2pixel(right)
             cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
         return self.screen
 
@@ -208,7 +219,8 @@ class LargeMaze(Configurable):
         assert mode == 'rgb_array'
 
         img = self.screen.copy()
-        pos = ((self.pos.detach().cpu().numpy() + self.SIZE) / (self.SIZE * 2) * 512).astype(np.int32)
+        # pos = ((self.pos.detach().cpu().numpy() + self.SIZE) / (self.SIZE * 2) * 512).astype(np.int32)
+        pos = self.pos2pixel(self.pos)
         for i in range(pos.shape[0]):
             cv2.circle(img, tuple(pos[i]), 3, (0, 255, 0), 1)
         return img
@@ -226,8 +238,9 @@ class LargeMaze(Configurable):
         plt.clf()
         img = self.screen.copy()/255.
         #obs = ((obs  + self.SIZE)/ (self.SIZE * 2)).detach().cpu().numpy()
-        obs = obs / self.SIZE / 2 + 0.5
-        obs = obs.detach().cpu().numpy() * self.RESOLUTION
+        #obs = obs / self.SIZE / 2 + 0.5
+        #obs = obs.detach().cpu().numpy() * self.RESOLUTION
+        obs = self.pos2pixel(obs)
         return {
             'state': obs,
             'background': {
@@ -278,7 +291,7 @@ class MediumMaze(LargeMaze):
 [[[-7, -1], [-5, -1]], [[-7, 5], [-5, 5]], [[-5, -5], [-3, -5]], [[-5, -3], [-3, -3]], [[-5, -1], [-3, -1]], [[-5, 1], [-3, 1]], [[-5, 1], [-5, 3]], [[-5, 3], [-3, 3]], [[-5, 5], [-3, 5]], [[-3, -5], [-1, -5]], [[-3, -3], [-1, -3]], [[-3, -1], [-1, -1]], [[-3, 1], [-1, 1]], [[-3, 3], [-1, 3]], [[-1, -7], [-1, -5]], [[-1, -3], [1, -3]], [[-1, 1], [1, 1]], [[-1, 3], [-1, 5]], [[1, -5], [3, -5]], [[1, -5], [1, -3]], [[1, -3], [1, -1]], [[1, -1], [1, 1]], [[1, 3], [1, 5]], [[1, 5], [1, 7]], [[3, -5], [3, -3]], [[3, -3], [5, -3]], [[3, -3], [3, -1]], [[3, -1], [3, 1]], [[3, 1], [5, 1]], [[3, 1], [3, 3]], [[3, 3], [3, 5]], [[5, -5], [7, -5]], [[5, -1], [7, -1]], [[5, 1], [5, 3]], [[5, 3], [7, 3]], [[5, 5], [5, 7]], [[-7, -7], [-7, 7]], [[-7, 7], [7, 7]], [[7, 7], [7, -7]], [[7, -7], [-7, -7]]]
         ))
 
-    def __init__(self, cfg=None, low_steps=20) -> None:
+    def __init__(self, cfg=None, low_steps=40) -> None:
         super().__init__(cfg)
         self.reset()
 

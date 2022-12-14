@@ -263,7 +263,8 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         done_fn = mlp(latent_dim, hidden_dim, 1) if have_done else None
 
         # Q
-        enc_z = ZTransform(z_space)
+        #enc_z = ZTransform(z_space)
+        enc_z = z_space.tokenize
         action_dim = action_space.shape[0]
         q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, enc_z, hidden_dim)
 

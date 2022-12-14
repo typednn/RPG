@@ -5,15 +5,18 @@ from .env_base import GymVecEnv, TorchEnv
 from .buffer import ReplayBuffer
 from .info_net import InfoLearner
 from .traj import Trajectory
-from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
+#from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
 from .intrinsic import IntrinsicMotivation
 from .rnd import RNDOptim
 from .utils import create_hidden_space
+from nn.distributions import Normal
 from typing import Union
 from tools.config import Configurable
 from tools.utils import logger, totensor
+from .policy_learner import PolicyLearner
 #from tools.optim import LossOptimizer
 #from torch.nn.functional import binary_cross_entropy as bce
+from .hidden import HiddenSpace
 
 
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
@@ -26,7 +29,8 @@ class Trainer(Configurable, RLAlgo):
         env_name=None,
         env_cfg=None,
 
-        z_dim=1, z_cont_dim=0,
+        #z_dim=1, z_cont_dim=0,
+        hidden=HiddenSpace.to_build(),
 
         # model
         buffer=ReplayBuffer.dc,
@@ -34,8 +38,16 @@ class Trainer(Configurable, RLAlgo):
         trainer=DynamicsLearner.dc,
 
         # policy
-        pi_a=DiffPolicyLearner.dc,
-        pi_z=DiscretePolicyLearner.dc,
+        pi_a=PolicyLearner.dc,
+        pi_z=PolicyLearner.dc,
+
+        head = Normal.gdc(
+                    linear=False,
+                    squash=True,
+                    std_mode='statewise',
+                    std_scale=1.,
+                ),
+        z_head=None,
 
         # mutual information term ..
         info = InfoLearner.dc,
@@ -72,8 +84,10 @@ class Trainer(Configurable, RLAlgo):
             env = make(env_name, **CN(env_cfg))
 
         obs_space = env.observation_space
-        self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)
-        self.use_z = z_dim > 1 or z_cont_dim > 0
+        #self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)
+        #self.use_z = z_dim > 1 or z_cont_dim > 0
+        z_space: HiddenSpace = HiddenSpace.build(hidden)
+        self.z_space = z_space
 
         self.horizon = horizon
         self.env = env
@@ -87,15 +101,18 @@ class Trainer(Configurable, RLAlgo):
         enc_z = self.dynamics_net.enc_z
         hidden_dim = 256
 
-        if self.use_z:
-            self.info_learner = InfoLearner(state_dim, env.action_space, hidden_dim, z_space, cfg=info)
+        #if self.use_z:
+        self.info_learner = InfoLearner(state_dim, env.action_space, hidden_dim, z_space, cfg=info)
 
-        self.pi_a = DiffPolicyLearner(
-            'a', state_dim, enc_z, hidden_dim, env.action_space, cfg=pi_a
-        )
-        self.pi_z = DiscretePolicyLearner(
-            'z', state_dim, enc_z, hidden_dim, self.z_space, cfg=pi_z
-        )
+        from .policy_net import DiffPolicy, QPolicy
+        pi_a_net = DiffPolicy(state_dim, hidden_dim, Normal(env.action_space, cfg=head))
+        self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, enc_z, cfg=pi_a)
+
+        # z learning ..
+        z_head = self.z_space.make_policy_head(z_head)
+        pi_z_net = QPolicy(state_dim, hidden_dim, z_head)
+        self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, cfg=pi_z)
+
         self.intrinsics = [self.pi_a, self.pi_z]
         #self.info_net = lambda x: x['rewards'], 0, 0
         self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, cfg=trainer)
@@ -109,7 +126,7 @@ class Trainer(Configurable, RLAlgo):
     def make_rnd(self):
         rnd = self._cfg.rnd
         if rnd.rnd_scale > 0.:
-            self.rnd = RNDOptim(self.env.observation_space, self.dynamics_net.state_dim, cfg=rnd)
+            self.rnd = RNDOptim(self.env.observation_space, self.dynamics_net.state_dim, self.dynamics_net.enc_s, cfg=rnd)
             self.intrinsics.append(self.rnd)
 
 

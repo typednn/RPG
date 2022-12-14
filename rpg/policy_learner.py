@@ -8,14 +8,7 @@ from tools.utils.scheduler import Scheduler
 from tools.config import Configurable, as_builder
 from collections import namedtuple
 from nn.distributions import Normal
-from .critic import AlphaPolicyBase
 
-
-def batch_select(values, z=None):
-    if z is None:
-        return values
-    else:
-        return torch.gather(values, -1, z.unsqueeze(-1))
 
 class EntropyLearner(Configurable):
     def __init__(
@@ -67,85 +60,20 @@ class EntropyLearner(Configurable):
         return float(self.log_alpha.exp() * self._cfg.coef)
         
 
-Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
-
-@as_builder
-class PolicyBase(AlphaPolicyBase):
-    def __init__(self, cfg=None):
-        super().__init__()
-
-class DiffPolicy(PolicyBase):
-    def __init__(self, state_dim, hidden_dim, action_space,
-                 cfg=None,
-                 head=Normal.gdc(
-                    linear=False,
-                    squash=True,
-                    std_mode='statewise',
-                    std_scale=1.,
-                )
-    ):
-        super().__init__()
-        head = Normal(action_space, cfg=head)
-        self.head = head
-        self.backbone = self.build_backbone(
-            state_dim,
-            hidden_dim,
-            head.get_input_dim()
-        )
-
-    def forward(self, inp, alpha):
-        #inp = self.add_alpha(state_embed, self.enc_hidden(hidden))
-        dist = self.head(self.backbone(inp))
-
-        from nn.distributions import NormalAction
-        if isinstance(dist, NormalAction):
-            scale = dist.dist.scale
-            logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
-
-        a, logp = dist.rsample()
-        return Aout(a, logp, None)
-
-
-    def loss(self, rollout, alpha):
-        assert rollout['value'].shape[-1] == 2
-        return -rollout['value'][..., 0].mean()
-
-class DiscreteSoftPolicy(PolicyBase):
-    def __init__(self, state_dim, hidden_dim, action_space, cfg=None, epsilon=0., head=None,
-                 use_prevz=False) -> None:
-        super().__init__()
-        assert not use_prevz
-        self.qnet = self.build_backbone(state_dim, hidden_dim, action_space.n)
-
-    def q_value(self, state):
-        return self.qnet(self.add_alpha(state))
-
-    def forward(self, state, alpha):
-        q = self.q_value(state)
-        logits = q / alpha
-        from nn.distributions import CategoricalAction
-        out = CategoricalAction(logits, epsilon=self._cfg.epsilon)
-        a, logp = out.sample()
-        return Aout(a, logp, out.entropy())
-
-    def loss(self, rollout, alpha):
-        # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
-        state = rollout['state'].detach()
-        q_value = rollout['q_value'].detach()
-        z = rollout['z'].detach()
-
-        q_value = q_value.min(axis=-1, keepdims=True).values
-        with torch.no_grad():
-            q_target = q_value
-            extra_rewards = rollout['extra_rewards']
-            for k, v in extra_rewards.items():
-                if k!='ent_z':
-                    q_target = q_target + v.detach()
-
-        q_val = self.q_value(state[:-1])
-        q_predict = batch_select(q_val, z)
-        assert q_predict.shape == q_target.shape
-        return ((q_predict - q_target)**2).mean() # the $z$ selected should be consistent with the policy ..  
+"""
+Structure of the policy
+PolicyLearner(directly take the head as input):
+    - PolicyNet
+        components: 
+            - backbone (just a normal network)
+            - head: created and depends on the hidden space
+        loss:
+            * take the rollout as input, compute the way of updating the policy
+            * depends on the policy type, we have the following losses
+                - for categorical, we just need to l2 loss with the q-value functions
+                - gradient, just need to compute the 
+    - Ent: tune the entropy
+"""
 
 
 Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
@@ -227,22 +155,22 @@ class PolicyLearner(LossOptimizer):
         pass
 
         
-class DiffPolicyLearner(PolicyLearner):
-    def __init__(
-        self, name, state_dim, enc_z, hidden_dim, action_space,
-        # TODO: not sure if this will be ok ..
-        cfg=None,
-        pi=DiffPolicy.dc,
-    ):
-        policy = DiffPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
-        super().__init__(name, action_space, policy, enc_z, cfg=cfg)
+# class DiffPolicyLearner(PolicyLearner):
+#     def __init__(
+#         self, name, state_dim, enc_z, hidden_dim, action_space,
+#         # TODO: not sure if this will be ok ..
+#         cfg=None,
+#         pi=DiffPolicy.dc,
+#     ):
+#         policy = DiffPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
+#         super().__init__(name, action_space, policy, enc_z, cfg=cfg)
 
         
-class DiscretePolicyLearner(PolicyLearner):
-    def __init__(
-        self, name, state_dim, enc_z, hidden_dim, action_space,
-        cfg=None, pi=DiscreteSoftPolicy.dc
-    ):
-        # ignore previous z ..
-        policy = DiscreteSoftPolicy(state_dim, hidden_dim, action_space, cfg=pi).cuda()
-        super().__init__(name, action_space, policy, enc_z, cfg=cfg, ignore_hidden=True)
+# class DiscretePolicyLearner(PolicyLearner):
+#     def __init__(
+#         self, name, state_dim, enc_z, hidden_dim, action_space,
+#         cfg=None, pi=DiscreteSoftPolicy.dc
+#     ):
+#         # ignore previous z ..
+#         policy = DiscreteSoftPolicy(state_dim, hidden_dim, action_space, cfg=pi).cuda()
+#         super().__init__(name, action_space, policy, enc_z, cfg=cfg, ignore_hidden=True)

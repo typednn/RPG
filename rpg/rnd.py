@@ -82,7 +82,7 @@ class RNDOptim(OptimModule):
     KEYS = ['obs']
     name = 'rnd'
 
-    def __init__(self, obs_space, state_dim, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
+    def __init__(self, obs_space, state_dim, enc_s, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
         from .rnd import RNDNet
         # inp_dim = obs_space.shape[0] # TODO support other observation ..
         inp_dim = state_dim
@@ -99,6 +99,7 @@ class RNDOptim(OptimModule):
         self.target = RNDNet(network.inp_dim, cfg=network._cfg).cuda()
         for param in self.target.parameters():
             param.requires_grad = False
+        self.enc_s = enc_s
 
 
     # def __call__(self, traj: Trajectory, batch_size, update_normalizer=True):
@@ -166,8 +167,21 @@ class RNDOptim(OptimModule):
     #     self.optimize(loss)
     #     # update the 
 
-    def update_with_buffer(self, *args, **kwargs):
+    def update_with_buffer(self, seg):
         pass
+    # def update_with_buffer(self, seg):
+    #     from .utils import flatten_obs
+    #     with torch.no_grad():
+    #         all_obs = self.enc_s(flatten_obs(seg.obs_seq), timestep=seg.timesteps.reshape(-1)) # fake timestep
+    #     loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=False)
+
+    #     with torch.no_grad():
+    #         if self.normalizer is not None:
+    #             self.normalizer.update(loss)
+    #             logger.logkvs_mean({'rnd_std': float(self.normalizer.std)})
+
+    #     logger.logkv_mean('rnd_loss', float(loss.mean()))
+    #     self.optimize(loss.mean())
 
     def intrinsic_reward(self, rollout):
         loss = self.compute_loss(rollout['state'][1:], hidden=None, timestep=None, reduce=False)
