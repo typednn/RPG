@@ -120,29 +120,30 @@ class ExplorationBonus(OptimModule):
                         self.normalizer.update(bonus)
 
     def process_obs(self, obs):
-        return self.enc_s(obs, timestep='none')
+        if self.obs_mode == 'state':
+            return self.enc_s(obs, timestep='none')
+        else:
+            return obs
 
     def sample_data(self):
         #pass
         assert not self.training_on_rollout
         index = np.random.choice(len(self.buffer), self.batch_size)
         obs = totensor([self.buffer[i] for i in index], device='cuda:0')
-        if self.obs_mode == 'state':
-            obs = self.process_obs(obs)
+        obs = self.process_obs(obs)
         return obs
 
-    def update(self, obs) -> torch.Tensor: 
+    def update(self, inp) -> torch.Tensor: 
         # the input is the same with the compute_bonus
         raise NotImplementedError
 
-    def compute_bonus(self, obs) -> torch.Tensor:
+    def compute_bonus(self, inp) -> torch.Tensor:
         # when obs_mode is state, obs is the state
         # otherwise, it is the obs
         raise NotImplementedError
 
     def compute_bonus_by_obs(self, obs):
-        if self.obs_mode == 'state':
-            obs = self.process_obs(obs)
+        obs = self.process_obs(obs)
         return self.compute_bonus(obs)
         
     def visualize_transition(self, transition):
@@ -177,7 +178,6 @@ class ExplorationBonus(OptimModule):
         else:
             # rollout is the obs
             bonus = self.compute_bonus_by_obs(rollout)
-            
             if self.normalizer is not None:
                 bonus = self.normalizer.normalize(bonus)
             return bonus * self.scale

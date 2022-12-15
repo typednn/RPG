@@ -2,6 +2,7 @@ import torch
 from tools.config import Configurable, as_builder, merge_a_into_b, CN
 from nn.distributions.discrete import Discrete
 from nn.distributions.normal import Normal
+from gym.spaces import Box
 
 
 @as_builder
@@ -70,7 +71,6 @@ class Gaussian(HiddenSpace):
         self, cfg=None, dim=6,
     ) -> None:
         super().__init__()
-        from gym.spaces import Box
         self._dim = dim 
         self._space = Box(-1, 1, (dim,))
 

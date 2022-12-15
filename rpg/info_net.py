@@ -56,21 +56,6 @@ class InfoNet(Network):
             states, a_seq).log_prob(z_seq)
         return info[..., None]
 
-    def config_head(self, hidden_space):
-        from tools.config import merge_inputs
-        discrete = dict(TYPE='Discrete', epsilon=self._cfg.epsilon)  # 0.2 epsilon
-        continuous = dict(TYPE='Normal', linear=True, std_mode=self._cfg.std_mode, std_scale=0.3989)
-
-        if isinstance(hidden_space, Discrete):
-            head = discrete
-        elif isinstance(hidden_space, Box):
-            head = continuous
-        else:
-            raise NotImplementedError
-        if self._cfg.head is not None:
-            head = merge_inputs(head, **self._cfg.head)
-        return head
-
     def enc_s(self, obs, timestep):
         return self.enc_s(obs, timestep=timestep)
 

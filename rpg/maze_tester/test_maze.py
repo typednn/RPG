@@ -65,7 +65,11 @@ trainer = Trainer.parse(
         rndreward=dict(_inherit='medium2', rnd=dict(
             as_reward=True,
             training_on_rollout=False,
-        ), path='tmp/rndreward'),
+            obs_mode='obs',
+            scale=0.1,
+        ),
+                       env_cfg=dict(obs_dim=5),
+                       path='tmp/rndreward'),
     ),
 ) # do not know if we need max_grad_norm
 

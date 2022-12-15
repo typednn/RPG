@@ -32,6 +32,58 @@ def get_intersect(A, B, C, D):
 
 
 
+class Embedder:
+    # https://github.com/yenchenlin/nerf-pytorch/blob/master/run_nerf_helpers.py
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+        embed_fns = []
+        d = self.kwargs['input_dims']
+        out_dim = 0
+        if self.kwargs['include_input']:
+            embed_fns.append(lambda x : x)
+            out_dim += d
+            
+        max_freq = self.kwargs['max_freq_log2']
+        N_freqs = self.kwargs['num_freqs']
+        
+        if self.kwargs['log_sampling']:
+            freq_bands = 2.**torch.linspace(0., max_freq, steps=N_freqs)
+        else:
+            freq_bands = torch.linspace(2.**0., 2.**max_freq, steps=N_freqs)
+            
+        for freq in freq_bands:
+            for p_fn in self.kwargs['periodic_fns']:
+                embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
+                out_dim += d
+                    
+        self.embed_fns = embed_fns
+        self.out_dim = out_dim
+        
+    def embed(self, inputs):
+        return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
+
+
+def get_embedder(multires, i=0):
+    if i == -1:
+        from torch import nn
+        return nn.Identity(), 2
+    
+    embed_kwargs = {
+                'include_input' : True,
+                'input_dims' : 2,
+                'max_freq_log2' : multires-1,
+                'num_freqs' : multires,
+                'log_sampling' : True,
+                'periodic_fns' : [torch.sin, torch.cos],
+    }
+    
+    embedder_obj = Embedder(**embed_kwargs)
+    embed = lambda x, eo=embedder_obj : eo.embed(x)
+    return embed, embedder_obj.out_dim
+
+
+
 
 class LargeMaze(Configurable):
     """Continuous maze environment."""
@@ -118,7 +170,7 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch') -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0) -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
@@ -130,11 +182,22 @@ class LargeMaze(Configurable):
 
 
         self.action_space = spaces.Box(-1, 1, (2,))
-        self.observation_space = spaces.Box(-12, 12, (2,))
+
+        if obs_dim == 0:
+            self.observation_space = spaces.Box(-12, 12, (2,))
+        else:
+            self.embedder, dim = get_embedder(obs_dim)
+            self.observation_space = spaces.Box(-12, 12, (dim + 2,))
+        self.obs_dim = obs_dim
         self.walls = self.walls.to(device).double()
         self.mode = mode
         self.render_wall()
 
+    def get_obs(self):
+        obs = self.pos.clone().float()
+        if self.obs_dim == 0:
+            return obs
+        return torch.cat((obs * 0.01, self.embedder(obs)), -1)
 
     def step(self, action):
         if self.mode != 'batch':
@@ -168,9 +231,9 @@ class LargeMaze(Configurable):
 
         reward = torch.zeros(self.batch_size, device=self.device) + self.get_reward()
         if self.mode == 'batch':
-            return self.pos.clone().float(), reward.float(), False, {}
+            return self.get_obs(), reward.float(), False, {}
         else:
-            o, r = self.pos.clone().detach().cpu().numpy()[0], reward.detach().cpu().numpy().reshape(-1)[0]
+            o, r = self.get_obs().detach().cpu().numpy()[0], reward.detach().cpu().numpy().reshape(-1)[0]
             return o, r, False, {}
 
 
@@ -187,9 +250,9 @@ class LargeMaze(Configurable):
         self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)
 
         if self.mode == 'batch':
-            return self.pos.clone().float()
+            return self.get_obs()
         else:
-            return self.pos.clone().detach().cpu().numpy()[0]
+            return self.get_obs().detach().cpu().numpy()[0]
 
 
     def pos2pixel(self, x):
@@ -234,6 +297,10 @@ class LargeMaze(Configurable):
             obs = traj['next_obs']
         else:
             obs = traj.get_tensor('next_obs')
+
+        obs = obs[..., :2]
+        if self.obs_dim > 0:
+            obs = obs / 0.01
 
         plt.clf()
         img = self.screen.copy()/255.

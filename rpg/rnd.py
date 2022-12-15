@@ -169,8 +169,15 @@ class RNDExplorer(ExplorationBonus):
         as_reward=False, training_on_rollout=True
     ):
 
-        inp_dim = state_dim
+        if cfg.obs_mode == 'state':
+            inp_dim = state_dim
+        elif cfg.obs_mode == 'obs':
+            inp_dim = obs_space.shape[0]
+        else:
+            raise NotImplementedError
         self.inp_dim = inp_dim
+
+
         if use_embed > 0:
             self.embeder, self.inp_dim = get_embedder(use_embed)
         else:

@@ -55,26 +55,14 @@ class Trainer(Configurable, RLAlgo):
         rnd = RNDExplorer.dc,
 
         # update parameters..
-        horizon=6,
-        batch_size=512,
-        update_target_freq=2,
-        update_train_step=1,
-        warmup_steps=1000,
-        steps_per_epoch=None,
+        horizon=6, batch_size=512, update_target_freq=2, update_train_step=1, warmup_steps=1000, steps_per_epoch=None,
 
-        actor_delay=2,
-        z_delay=0,
-        eval_episode=10,
+        actor_delay=2, z_delay=0,
+        eval_episode=10, save_video=0,
 
         # trainer utils ..
-        hooks = None,
-        path = None,
-        wandb=None,
-        save_video=0,
-
-        tau=0.005,
-
-        relabel=0.,
+        hooks=None, path=None, wandb=None,
+        tau=0.005, relabel=0.,
     ):
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
