@@ -79,9 +79,6 @@ def get_embedder(multires, i=0):
 
 
 class RNDOptim(OptimModule):
-    KEYS = ['obs']
-    name = 'rnd'
-
     def __init__(self, obs_space, state_dim, enc_s, cfg=None, use_embed=0, learning_epoch=1, mode='step', normalizer=True, rnd_scale=0.,):
         from .rnd import RNDNet
         # inp_dim = obs_space.shape[0] # TODO support other observation ..
@@ -93,7 +90,6 @@ class RNDOptim(OptimModule):
             self.embeder = None
 
         network = RNDNet(self.inp_dim).cuda()
-        self.normalizer = RunningMeanStd(last_dim=True) if normalizer else None
 
         super().__init__(network, cfg)
         self.target = RNDNet(network.inp_dim, cfg=network._cfg).cuda()
@@ -101,31 +97,8 @@ class RNDOptim(OptimModule):
             param.requires_grad = False
         self.enc_s = enc_s
 
-
-    # def __call__(self, traj: Trajectory, batch_size, update_normalizer=True):
-    #     out = traj.predict_value(('obs', 'z', 'timestep'),
-    #                               lambda x, y, z: self.compute_loss(x, y, z, reduce=False), batch_size=batch_size) 
-
-    #     if self.normalizer is not None:
-    #         if update_normalizer:
-    #             self.normalizer.update(out)
-    #         out = self.normalizer.normalize(out)
-
-    #     logger.logkvs_mean({'rnd/reward': out.mean().item()})
-    #     return out * self._cfg.rnd_scale
-
-
-    # def learn(self, data: DataBuffer, batch_size, logger_scope='rnd', **kwargs):
-    #     for i in range(self._cfg.learning_epoch):
-    #         n_batches = 0
-    #         keys = ['obs', 'z', 'timestep']
-    #         for batch in data.loop_over(batch_size, keys):
-    #             n_batches += 1
-    #             _, info = self.step(*[batch[i] for i in keys])
-    #             if logger_scope is not None:
-    #                 assert isinstance(logger_scope, str) and len(logger_scope) > 0
-    #                 logger.logkvs_mean({f'{logger_scope}/'+k:v for k, v in info.items()})
-
+        self.normalizer = RunningMeanStd(last_dim=True) if normalizer else None
+        
 
     def compute_loss(self, obs, hidden, timestep, reduce=True):
         inps = obs
@@ -147,47 +120,13 @@ class RNDOptim(OptimModule):
 
         return loss
 
-    
-    # def plot2d(self):
-    #     images = []
-
-    #     for i in range(32):
-    #         coords = (np.stack([np.arange(32), np.zeros(32)+i], axis=1) + 0.5)/32.
-    #         out = self.forward_network(coords, update_norm=False)
-    #         images.append(out.detach().cpu().numpy())
-
-    #     return np.array(images)
-
-
-    # def update_with_buffer(self, seg):
-    #     #obs_seq = seg.obs_seq
-    #     from .utils import flatten_obs
-    #     all_obs = flatten_obs(seg.obs_seq)
-    #     loss = self.compute_loss(all_obs, hidden=None, timestep=None)
-    #     self.optimize(loss)
-    #     # update the 
-
-    def update_with_buffer(self, seg):
-        pass
-    # def update_with_buffer(self, seg):
-    #     from .utils import flatten_obs
-    #     with torch.no_grad():
-    #         all_obs = self.enc_s(flatten_obs(seg.obs_seq), timestep=seg.timesteps.reshape(-1)) # fake timestep
-    #     loss = self.compute_loss(all_obs, hidden=None, timestep=None, reduce=False)
-
-    #     with torch.no_grad():
-    #         if self.normalizer is not None:
-    #             self.normalizer.update(loss)
-    #             logger.logkvs_mean({'rnd_std': float(self.normalizer.std)})
-
-    #     logger.logkv_mean('rnd_loss', float(loss.mean()))
-    #     self.optimize(loss.mean())
 
     def intrinsic_reward(self, rollout):
         loss = self.compute_loss(rollout['state'][1:], hidden=None, timestep=None, reduce=False)
 
         if self.normalizer is not None:
             loss = self.normalizer.normalize(loss)
+            
 
         return 'rnd', loss
 
@@ -202,14 +141,15 @@ class RNDOptim(OptimModule):
 
         self.optimize(loss.mean())
 
+
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
         if 'r' not in attrs:
             from tools.utils import tonumpy
             attrs['r'] = tonumpy(transition['r'])[..., 0] # just record one value ..
 
-        attrs['rnd'] = tonumpy(
-            self.compute_loss(transition['next_state'], hidden=None, timestep=None, reduce=False)
-        )
-
+        attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_state']))
         transition['_attrs'] = attrs
+
+    def compute_bonus(self, state):
+        return self.compute_loss(state, hidden=None, timestep=None, reduce=False)

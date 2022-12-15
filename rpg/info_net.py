@@ -90,7 +90,7 @@ class InfoLearner(LossOptimizer):
             state_dim, action_space, hidden_dim, hidden_space, cfg=net
         ).cuda()
         self.coef = coef
-        self.info_decay = Scheduler.build(weight)
+        self.info_decay: Scheduler = Scheduler.build(weight)
         super().__init__(net)
         self.net = net
 
@@ -106,7 +106,7 @@ class InfoLearner(LossOptimizer):
         info_reward = self.net(traj, detach=False)
         return 'info', info_reward * self.get_coef()
     
-    def update_intrinsic(self, rollout):
+    def update(self, rollout):
         z_detach = rollout['z'].detach()
 
         mutual_info = self.net(rollout, detach=True).mean()
@@ -118,9 +118,8 @@ class InfoLearner(LossOptimizer):
         logger.logkv_mean('info_ce_loss', float(-mutual_info))
         logger.logkv_mean('info_posterior_loss', float(-posterior))
 
-    def update_with_buffer(self, buffer):
-        pass
-
+        self.info_decay.step()
+        logger.logkv_mean('info_decay', self.info_decay.get())
 
     def sample_z(self, states):
         #print(states.shape)

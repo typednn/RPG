@@ -53,8 +53,13 @@ trainer = Trainer.parse(
         relabelz=dict(_inherit='z2', relabel=0.8),
 
         
-        normal=dict(model=dict(qmode='value'), horizon=3, hidden=dict(TYPE='Gaussian', dim=5), 
-                    info=dict(coef=0.1), head=dict(std_scale=0.05), path='tmp/normal')
+        normal=dict(
+            model=dict(qmode='value'), horizon=3,
+            hidden=dict(TYPE='Gaussian', dim=5), 
+            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.0001, end=10000)),
+            head=dict(std_scale=0.1),
+            path='tmp/normal'
+        )
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

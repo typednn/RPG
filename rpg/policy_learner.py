@@ -148,11 +148,11 @@ class PolicyLearner(LossOptimizer):
         name = 'ent_{}'.format(self.name)
         return name, rollout[name] * alpha
 
-    def update_intrinsic(self, *args, **kwargs):
-        pass
+    # def update_intrinsic(self, *args, **kwargs):
+    #     pass
 
-    def update_with_buffer(self, buffer):
-        pass
+    # def update_with_buffer(self, buffer):
+    #     pass
 
         
 # class DiffPolicyLearner(PolicyLearner):
