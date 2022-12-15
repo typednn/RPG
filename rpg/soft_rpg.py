@@ -6,7 +6,7 @@ from .buffer import ReplayBuffer
 from .info_net import InfoLearner
 from .traj import Trajectory
 from .intrinsic import IntrinsicMotivation
-from .rnd import RNDOptim
+from .rnd import RNDOptim, RNDExplorer
 from .utils import create_hidden_space
 from nn.distributions import Normal
 from typing import Union
@@ -52,7 +52,7 @@ class Trainer(Configurable, RLAlgo):
 
         # mutual information term ..
         info = InfoLearner.dc,
-        rnd = RNDOptim.dc,
+        rnd = RNDExplorer.dc,
 
         # update parameters..
         horizon=6,
@@ -126,9 +126,11 @@ class Trainer(Configurable, RLAlgo):
 
     def make_rnd(self):
         rnd = self._cfg.rnd
-        if rnd.rnd_scale > 0.:
-            self.exploration = RNDOptim(self.env.observation_space, self.dynamics_net.state_dim, self.dynamics_net.enc_s, cfg=rnd)
-            self.intrinsics.append(self.exploration)
+        if rnd.scale > 0.:
+            self.exploration = RNDExplorer(self.env.observation_space, self.dynamics_net.state_dim, self.buffer, self.dynamics_net.enc_s, cfg=rnd)
+
+            if not self.exploration.as_reward:
+                self.intrinsics.append(self.exploration)
         else:
             self.exploration = None
 
@@ -161,7 +163,8 @@ class Trainer(Configurable, RLAlgo):
             self.pi_a.update(rollout)
             self.info_learner.update(rollout)
 
-            self.exploration.update_intrinsic(rollout)
+            if self.exploration is not None:
+                self.exploration.update_by_rollout(rollout)
 
 
             for k, v in rollout['extra_rewards'].items():

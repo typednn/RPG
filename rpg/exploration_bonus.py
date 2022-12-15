@@ -5,6 +5,7 @@ from .buffer import ReplayBuffer
 from collections import deque
 import numpy as np
 from tools.utils import RunningMeanStd
+from tools.optim import OptimModule
 
 """
 The intrinsic reward:
@@ -67,12 +68,19 @@ class ScalarNormalizer:
         return (data - self.mean) / self.std
 
 
-class ExplorationBonus(Configurable):
+class ExplorationBonus(OptimModule):
     name = 'bonus'
-    def __init__(self, buffer: ReplayBuffer, enc_s,
+    def __init__(self, module, buffer: ReplayBuffer, enc_s,
                  cfg=None, buffer_size=None, update_step=1, update_freq=1, batch_size=512,
-                 obs_mode='state', normalizer=None, as_reward=False) -> None:
-        super().__init__()
+                 obs_mode='state',
+                 normalizer=None,
+
+                 as_reward=False,
+                 training_on_rollout=False,
+                 scale=0.
+    ) -> None:
+
+        super().__init__(module)
         if buffer_size is None:
             buffer_size = buffer.capacity
 
@@ -88,30 +96,35 @@ class ExplorationBonus(Configurable):
         elif isinstance(normalizer, int):
             self.normalizer = ScalarNormalizer(normalizer)
         else:
-            raise NotImplementedError("normalizer: {}".format(normalizer))
+            raise NotImplementedError
 
             
         self.as_reward = as_reward
+        self.training_on_rollout = training_on_rollout
         self.obs_mode = obs_mode
         self.update_step = update_step
         self.update_freq = update_freq
+        
+        self.scale = scale
 
     def add_data(self, data):
-        self.buffer.append(data)
-        self.step += 1
-        if self.step % self.update_freq == 0:
-            for _ in range(self.update_step):
-                bonus = totensor(self.update(self.sample_data()))
-                if self.normalizer is not None:
-                    self.normalizer.update(bonus)
+        if not self.training_on_rollout:
+            self.buffer.append(data)
+            self.step += 1
+            if self.step % self.update_freq == 0:
+                for _ in range(self.update_step):
+                    bonus = totensor(self.update(self.sample_data()))
+                    if self.normalizer is not None:
+                        self.normalizer.update(bonus)
 
     def sample_data(self):
         #pass
-        index = np.random.choice(len(self.buffer), self.batch_size)
-        obs = totensor([self.buffer[i] for i in index])
-        if self.obs_mode == 'state':
-            obs = self.enc_s(obs)
-        return obs
+        if not self.training_on_rollout:
+            index = np.random.choice(len(self.buffer), self.batch_size)
+            obs = totensor([self.buffer[i] for i in index])
+            if self.obs_mode == 'state':
+                obs = self.enc_s(obs)
+            return obs
 
     def update(self, obs) -> torch.Tensor: 
         raise NotImplementedError
@@ -119,16 +132,6 @@ class ExplorationBonus(Configurable):
     def compute_bonus(self, obs) -> torch.Tensor:
         raise NotImplementedError
         
-    def intrinsic_reward(self, rollout):
-        if not self.as_reward:
-            assert self.obs_mode == 'state'
-            bonus = self.compute_bonus(rollout['state'][1:])
-            if self.normalizer is not None:
-                bonus = self.normalizer.normalize(bonus)
-            return self.name, bonus
-        else:
-            return None, None
-            
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
         if 'r' not in attrs:
@@ -140,3 +143,24 @@ class ExplorationBonus(Configurable):
         else:
             attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_obs']))
         transition['_attrs'] = attrs
+
+
+    # for training on state
+    def update_by_rollout(self, rollout):
+        #raise NotImplementedError
+        if self.training_on_rollout:
+            assert self.obs_mode == 'state'
+            bonus = self.update(rollout['state'][1:].detach())
+            if self.normalizer is not None:
+                self.normalizer.update(bonus)
+
+    def intrinsic_reward(self, rollout):
+        if not self.as_reward:
+            assert self.obs_mode == 'state'
+            bonus = self.compute_bonus(rollout['state'][1:])
+            if self.normalizer is not None:
+                bonus = self.normalizer.normalize(bonus)
+            return self.name, bonus * self.scale
+        else:
+            return None, None
+            

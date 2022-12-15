@@ -54,11 +54,11 @@ trainer = Trainer.parse(
 
         rnd = dict(
             _inherit='z2',
-            rnd=dict(rnd_scale=1.),
+            rnd=dict(scale=1.),
         ),
         rnd2=dict(_inherit='rnd', head=dict(std_scale=0.3, std_mode='statewise')),
         # medium=dict(_inherit='rnd2', env_name='MediumMaze'),
-        medium2=dict(_inherit='rnd2', env_name='MediumMaze', head=dict(std_scale=0.2, std_mode='fix_no_grad', linear=False, squash=False), pi_a=dict(ent=dict(coef=0.01)), rnd=dict(rnd_scale=10.), info=dict(coef=0.1), path='tmp/medium'), # seems that we can continue to decrease the info coef
+        medium2=dict(_inherit='rnd2', env_name='MediumMaze', head=dict(std_scale=0.2, std_mode='fix_no_grad', linear=False, squash=False), pi_a=dict(ent=dict(coef=0.01)), rnd=dict(scale=1.), info=dict(coef=0.1), path='tmp/medium'), # seems that we can continue to decrease the info coef
         medium0=dict(_inherit='medium2', z_dim=1, path='tmp/medium0'),
         lessinfo=dict(_inherit='medium2', info=dict(coef=0.02), path='tmp/lessinfo'),
     ),
