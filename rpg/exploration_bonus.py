@@ -109,28 +109,41 @@ class ExplorationBonus(OptimModule):
 
     def add_data(self, data):
         if not self.training_on_rollout:
-            self.buffer.append(data)
+            with torch.no_grad():
+                for i in data:
+                    self.buffer.append(i)
             self.step += 1
-            if self.step % self.update_freq == 0:
+            if self.step % self.update_freq == 0 and len(self.buffer) > self.batch_size:
                 for _ in range(self.update_step):
-                    bonus = totensor(self.update(self.sample_data()))
+                    bonus = self.update(self.sample_data())
                     if self.normalizer is not None:
                         self.normalizer.update(bonus)
 
+    def process_obs(self, obs):
+        return self.enc_s(obs, timestep='none')
+
     def sample_data(self):
         #pass
-        if not self.training_on_rollout:
-            index = np.random.choice(len(self.buffer), self.batch_size)
-            obs = totensor([self.buffer[i] for i in index])
-            if self.obs_mode == 'state':
-                obs = self.enc_s(obs)
-            return obs
+        assert not self.training_on_rollout
+        index = np.random.choice(len(self.buffer), self.batch_size)
+        obs = totensor([self.buffer[i] for i in index], device='cuda:0')
+        if self.obs_mode == 'state':
+            obs = self.process_obs(obs)
+        return obs
 
     def update(self, obs) -> torch.Tensor: 
+        # the input is the same with the compute_bonus
         raise NotImplementedError
 
     def compute_bonus(self, obs) -> torch.Tensor:
+        # when obs_mode is state, obs is the state
+        # otherwise, it is the obs
         raise NotImplementedError
+
+    def compute_bonus_by_obs(self, obs):
+        if self.obs_mode == 'state':
+            obs = self.process_obs(obs)
+        return self.compute_bonus(obs)
         
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
@@ -162,5 +175,10 @@ class ExplorationBonus(OptimModule):
                 bonus = self.normalizer.normalize(bonus)
             return self.name, bonus * self.scale
         else:
-            return None, None
+            # rollout is the obs
+            bonus = self.compute_bonus_by_obs(rollout)
+            
+            if self.normalizer is not None:
+                bonus = self.normalizer.normalize(bonus)
+            return bonus * self.scale
             

@@ -6,7 +6,7 @@ from .buffer import ReplayBuffer
 from .info_net import InfoLearner
 from .traj import Trajectory
 from .intrinsic import IntrinsicMotivation
-from .rnd import RNDOptim, RNDExplorer
+from .rnd import RNDExplorer
 from .utils import create_hidden_space
 from nn.distributions import Normal
 from typing import Union
@@ -146,11 +146,14 @@ class Trainer(Configurable, RLAlgo):
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
+        
+        if self.exploration is not None and self.exploration.as_reward:
+            seg.reward = seg.reward + self.exploration.intrinsic_reward(seg.obs_seq[1:])
+
         z = self.relabel_z(seg.obs_seq[0], seg.timesteps[0], seg.z)
         prev_z = z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
         self.model_learner.learn_dynamics(
             seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
-
     
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
@@ -169,7 +172,6 @@ class Trainer(Configurable, RLAlgo):
 
             for k, v in rollout['extra_rewards'].items():
                 logger.logkv_mean(f'reward_{k}', float(v.mean()))
-
 
     def update_pi_z(self):
         if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
@@ -198,7 +200,6 @@ class Trainer(Configurable, RLAlgo):
         # train
         return
 
-
     def policy(self, obs, prevz, timestep):
         obs = totensor(obs, self.device)
         prevz = totensor(prevz, self.device, dtype=None)
@@ -207,7 +208,6 @@ class Trainer(Configurable, RLAlgo):
         z = self.pi_z(s, prevz, prev_action=prevz, timestep=timestep).a
         a = self.pi_a(s, z).a
         return a, z.detach().cpu().numpy()
-
 
     def inference(self, n_step, mode='training'):
         with torch.no_grad():
@@ -247,6 +247,9 @@ class Trainer(Configurable, RLAlgo):
                 for j in range(len(obs)):
                     if timestep[j] == 0:
                         self.z[j] = z_space.sample() * 0
+
+            if mode == 'training' and self.exploration is not None:
+                self.exploration.add_data(obs)
 
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:
