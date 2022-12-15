@@ -56,7 +56,7 @@ trainer = Trainer.parse(
         normal=dict(
             model=dict(qmode='value'), horizon=3,
             hidden=dict(TYPE='Gaussian', dim=5), 
-            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.0001, end=10000)),
+            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.001, end=4000)),
             head=dict(std_scale=0.1),
             path='tmp/normal'
         )

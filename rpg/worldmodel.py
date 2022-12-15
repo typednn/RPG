@@ -67,7 +67,7 @@ class GeneralizedQ(torch.nn.Module):
         return q_values
 
     def inference_with_actions(self, obs, timestep, step, z_seq, a_seq):
-        s = self.enc_s(obs, timestep=timestep)
+        s = self.enc_s(obs)
         states = [s]
         # for dynamics part ..
         h = self.init_h(s)[None,:]
@@ -102,14 +102,14 @@ class GeneralizedQ(torch.nn.Module):
         if sample_a:
             a_seq, logp_a = [], []
 
-        s = self.enc_s(obs, timestep=timestep)
+        s = self.enc_s(obs)
         states = [s]
 
         # for dynamics part ..
         h = self.init_h(s)[None,:]
         a_embeds = []
 
-        out = dict(timestep=timestep)
+        out = dict(init_timestep=timestep)
         for idx in range(step):
             if len(z_seq) <= idx:
                 z, _logp_z, z_new, logp_z_new, _entz = pi_z(s, z, prev_action=z, timestep=timestep)
@@ -213,7 +213,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
 
         if no_state_encoder:
-            enc_s = TimedSeq(Identity(), *args) # encode state with time step ..
+            enc_s = Seq(Identity(), *args) # encode state with time step ..
             latent_dim = obs_space.shape[0]
         else:
             latent_dim = state_dim
@@ -223,7 +223,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
                 args.append(BN(latent_dim))
 
             if not isinstance(obs_space, dict):
-                enc_s = TimedSeq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+                enc_s = Seq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
             else:
                 from nn.modules.point import PointNet
                 assert not state_layer_norm and not state_batch_norm

@@ -121,7 +121,7 @@ class ExplorationBonus(OptimModule):
 
     def process_obs(self, obs):
         if self.obs_mode == 'state':
-            return self.enc_s(obs, timestep='none')
+            return self.enc_s(obs)
         else:
             return obs
 

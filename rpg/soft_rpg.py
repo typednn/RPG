@@ -111,6 +111,8 @@ class Trainer(Configurable, RLAlgo):
         self.intrinsic_reward = IntrinsicMotivation(*self.intrinsics)
         self.model_learner.set_intrinsic(self.intrinsic_reward)
 
+        z_space.callback(self)
+
 
     def make_rnd(self):
         rnd = self._cfg.rnd
@@ -125,7 +127,7 @@ class Trainer(Configurable, RLAlgo):
     def relabel_z(self, state, timestep, z):
         if self._cfg.relabel > 0.:
             #TODO: other relabel method, use the future state's info to relabel the current state's z
-            new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state, timestep=timestep))[0]
+            new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state))[0]
 
             mask = torch.rand(size=(len(state),)) < self._cfg.relabel
             z = z.clone()
@@ -192,9 +194,9 @@ class Trainer(Configurable, RLAlgo):
         obs = totensor(obs, self.device)
         prevz = totensor(prevz, self.device, dtype=None)
         timestep = totensor(timestep, self.device, dtype=None)
-        s = self.dynamics_net.enc_s(obs, timestep=timestep)
+        s = self.dynamics_net.enc_s(obs)
         z = self.pi_z(s, prevz, prev_action=prevz, timestep=timestep).a
-        a = self.pi_a(s, z).a
+        a = self.pi_a(s, z, timestep=timestep).a
         return a, z.detach().cpu().numpy()
 
     def inference(self, n_step, mode='training'):
@@ -225,7 +227,7 @@ class Trainer(Configurable, RLAlgo):
 
                 if mode != 'training':
                     # for visualize the transitions ..
-                    transition['next_state'] = self.dynamics_net.enc_s(obs, timestep=timestep)
+                    transition['next_state'] = self.dynamics_net.enc_s(obs)
 
                     if self.exploration is not None:
                         self.exploration.visualize_transition(transition)

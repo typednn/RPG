@@ -22,17 +22,10 @@ class InfoNet(Network):
         super().__init__()
         action_dim = action_space.shape[0]
         from .hidden import HiddenSpace
-        hidden_space: HiddenSpace
-        self.zhead = hidden_space.make_info_head(cfg=head)
-        backbone = Seq(mlp(state_dim + action_dim, hidden_dim, self.zhead.get_input_dim()))
-        self.info_net = Seq(backbone, self.zhead)
+        self.hidden: HiddenSpace = hidden_space
+        self.info_net = Seq(mlp(state_dim + action_dim, hidden_dim, self.hidden.get_input_dim()))
 
-        # # the posterior of p(z|s), for off-policy training..
-        # zhead2 = DistHead.build(hidden_space, cfg=self.config_head(hidden_space))
-        # backbone = Seq(mlp(state_dim, hidden_dim, zhead2.get_input_dim()))
-        # self.posterior_z = Seq(backbone, zhead) 
-
-    def compute_info_dist(self, states, a_seq):
+    def compute_feature(self, states, a_seq):
         states = states * self._cfg.obs_weight
         a_seq = (a_seq + torch.randn_like(a_seq) * self._cfg.noise)
         a_seq = a_seq * self._cfg.action_weight
@@ -52,8 +45,18 @@ class InfoNet(Network):
             states = states.detach()
             a_seq = a_seq.detach()
             z_seq = z_seq.detach()
-        info =  self.compute_info_dist(
-            states, a_seq).log_prob(z_seq)
+
+        inp = self.compute_feature(states, a_seq)
+        t = traj['init_timestep']
+        ts = []
+        for _ in range(len(inp)):
+            ts.append(t)
+            t = t + 1
+        t = torch.stack(ts)
+        if detach:
+            info = self.hidden.likelihood(inp, z_seq, timestep=t)
+        else:
+            info = self.hidden.reward(inp, z_seq, timestep=t)
         return info[..., None]
 
     def enc_s(self, obs, timestep):
