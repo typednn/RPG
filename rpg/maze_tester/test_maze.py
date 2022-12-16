@@ -68,8 +68,10 @@ trainer = Trainer.parse(
             obs_mode='obs',
             scale=0.1,
         ),
-                       env_cfg=dict(obs_dim=5),
-                       path='tmp/rndreward'),
+        env_cfg=dict(obs_dim=5),
+        path='tmp/rndreward'),
+
+        small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
     ),
 ) # do not know if we need max_grad_norm
 

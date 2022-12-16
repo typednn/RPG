@@ -68,12 +68,18 @@ class TrajSeg:
     truncated_mask: torch.Tensor
     done: torch.Tensor
     z: Optional[torch.Tensor]
+    future: None
 
+
+def rand(a, b):
+    return torch.minimum(torch.floor(torch.rand_like(b) * (b-a)).long() + a, b-1)
 
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
-    def __init__(self, obs_space, action_space, episode_length, horizon,
-                       cfg=None, device='cuda:0', max_episode_num=1000, modality='state'):
+    def __init__(self,
+        obs_space, action_space, episode_length, horizon,
+        cfg=None, device='cuda:0', max_episode_num=1000,
+    ):
         super().__init__()
 
         self.cfg = cfg
@@ -82,8 +88,7 @@ class ReplayBuffer(Configurable):
         self.capacity = max_episode_num * episode_length
         self.horizon = horizon
 
-        assert modality == 'state'
-        dtype = torch.float32 if cfg.modality == 'state' else torch.uint8
+        dtype = torch.float32 # if cfg.modality == 'state' else torch.uint8
 
         if not isinstance(obs_space, dict):
             obs_shape = obs_space.shape
@@ -108,6 +113,7 @@ class ReplayBuffer(Configurable):
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device) - 1
+        self._step2trajend = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
         self._z = None
 
         self._eps = 1e-6
@@ -157,6 +163,9 @@ class ReplayBuffer(Configurable):
             truncated[l-1, i] = True # last one is always truncated ..
             self._truncated[self.idx:self.idx+l] = truncated[:l, i, None]
             self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
+            self._step2trajend[self.idx: self.idx+l] = torch.arange(l, 0, -1, device=self.device)
+
+            print(torch.arange(self.idx, self.idx+l, device=self.device) + self._step2trajend[self.idx: self.idx+l])
 
             if self._z is not None:
                 self._z[self.idx:self.idx+l] = z[:l, i]
@@ -183,10 +192,18 @@ class ReplayBuffer(Configurable):
         done = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
 
+
+
+        def get_obs_by_idx(self, _obs, idxs):
+            if isinstance(_obs, dict):
+                return {k: v[idxs.cpu()].to(self.device) for k, v in _obs.items()}
+            return _obs[idxs]
+
+        obs = get_obs_by_idx(self._obs, idxs)
         if isinstance(self._obs, dict):
-            obs_seq.append({k: v[idxs.cpu()].to(self.device) for k, v in self._obs.items()})
+            obs_seq.append(obs)
         else:
-            obs_seq[0] = self._obs[idxs]
+            obs_seq[0] = obs
         timesteps[0] = self._timesteps[idxs]
 
         if self._z is not None:
@@ -200,10 +217,11 @@ class ReplayBuffer(Configurable):
             done[t] = self._dones[_idxs]
             truncated[t] = self._truncated[_idxs]
 
+            next_obs = get_obs_by_idx(self._next_obs, _idxs)
             if isinstance(self._obs, dict):
-                obs_seq.append({k: v[_idxs.cpu()].to(self.device) for k, v in self._next_obs.items()})
+                obs_seq.append(next_obs)
             else:
-                obs_seq[t+1] = self._next_obs[_idxs]
+                obs_seq[t+1] = next_obs #self._next_obs[_idxs]
             timesteps[t+1] = self._timesteps[_idxs] + 1
 
 
@@ -215,6 +233,18 @@ class ReplayBuffer(Configurable):
         if self._z is not None:
             output.z = z
             #output += (z,) #NOTE: this is the z before the state ..
+
+            a = idxs
+            b = idxs + self._step2trajend[idxs]
+
+            idx_future = rand(a, b)
+
+            output.future = {
+                'obs': get_obs_by_idx(self._obs, idx_future),
+                'action': self._action[idx_future],
+                'next_obs': get_obs_by_idx(self._next_obs, idx_future),
+            }
+            
         return output
 
     

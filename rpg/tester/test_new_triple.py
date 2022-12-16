@@ -59,7 +59,23 @@ trainer = Trainer.parse(
             info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.001, end=4000)),
             head=dict(std_scale=0.1),
             path='tmp/normal'
-        )
+        ),
+
+        goal=dict(
+            time_embedding=10,
+            _inherit='normal',
+            hidden=dict(TYPE='Goal'),
+            info=dict(coef=0.1, weight=dict(TYPE='linear', min_value=0.01, end=10000)),
+            path='tmp/goal',
+        ),
+
+        discrete_goal=dict(
+            time_embedding=10,
+            _inherit='z2',
+            hidden=dict(TYPE='DiscreteGoal', n=6),
+            info=dict(coef=5., net=dict(use_next_state=True)),
+            path='tmp/goal_discrete',
+        ),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

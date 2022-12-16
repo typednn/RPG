@@ -14,13 +14,9 @@ from tools.config import Configurable
 from tools.utils import logger, totensor
 from .policy_learner import PolicyLearner
 from .hidden import HiddenSpace, Categorical
-
-#from .policy_learner import DiffPolicyLearner, DiscretePolicyLearner
-#from tools.optim import LossOptimizer
-#from torch.nn.functional import binary_cross_entropy as bce
-
-
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
+from . import repr 
+
 class Trainer(Configurable, RLAlgo):
     def __init__(
         self,

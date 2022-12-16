@@ -201,9 +201,8 @@ class HiddenDynamicNet(Network, GeneralizedQ):
     ):
         # Encoder
         # TODO: layer norm?
-        from .utils import ZTransform
         import gym
-        from tools.utils import TimedSeq, Identity, mlp, Seq
+        from tools.utils import Identity, mlp, Seq
 
         args = []
         class BN(torch.nn.Module):
