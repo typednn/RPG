@@ -60,22 +60,6 @@ class EntropyLearner(Configurable):
         return float(self.log_alpha.exp() * self._cfg.coef)
         
 
-"""
-Structure of the policy
-PolicyLearner(directly take the head as input):
-    - PolicyNet
-        components: 
-            - backbone (just a normal network)
-            - head: created and depends on the hidden space
-        loss:
-            * take the rollout as input, compute the way of updating the policy
-            * depends on the policy type, we have the following losses
-                - for categorical, we just need to l2 loss with the q-value functions
-                - gradient, just need to compute the 
-    - Ent: tune the entropy
-"""
-
-
 Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
 
 def select_newz(policy, state, alpha, z, timestep, K):
@@ -95,7 +79,8 @@ def select_newz(policy, state, alpha, z, timestep, K):
 
 
 class PolicyLearner(LossOptimizer):
-    def __init__(self, name, action_space, policy, enc_z, cfg=None, ent=EntropyLearner.dc, freq=1000000, max_grad_norm=1., lr=3e-4, ignore_hidden=False):
+    def __init__(self, name, action_space, policy, enc_z, cfg=None,
+                 ent=EntropyLearner.dc, freq=1000000, max_grad_norm=1., lr=3e-4, ignore_hidden=False):
         from tools.utils import orthogonal_init
         policy.apply(orthogonal_init)
 
@@ -128,9 +113,10 @@ class PolicyLearner(LossOptimizer):
         ema(self._policy, self._target_policy, decay)
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
+        inps = [s]
         if not self._cfg.ignore_hidden:
-            hidden = self.enc_z(hidden)
-            s = self.policy.add_alpha(s, hidden) # concatenate the two
+            inps += [self.enc_z(hidden)]
+        s = self.policy.add_alpha(*inps, timestep=timestep) # concatenate the two
 
         with torch.no_grad():
             alpha = self.ent.alpha
@@ -147,30 +133,3 @@ class PolicyLearner(LossOptimizer):
             alpha = self.ent.alpha
         name = 'ent_{}'.format(self.name)
         return name, rollout[name] * alpha
-
-    # def update_intrinsic(self, *args, **kwargs):
-    #     pass
-
-    # def update_with_buffer(self, buffer):
-    #     pass
-
-        
-# class DiffPolicyLearner(PolicyLearner):
-#     def __init__(
-#         self, name, state_dim, enc_z, hidden_dim, action_space,
-#         # TODO: not sure if this will be ok ..
-#         cfg=None,
-#         pi=DiffPolicy.dc,
-#     ):
-#         policy = DiffPolicy(state_dim + enc_z.output_dim, hidden_dim, action_space, cfg=pi).cuda()
-#         super().__init__(name, action_space, policy, enc_z, cfg=cfg)
-
-        
-# class DiscretePolicyLearner(PolicyLearner):
-#     def __init__(
-#         self, name, state_dim, enc_z, hidden_dim, action_space,
-#         cfg=None, pi=DiscreteSoftPolicy.dc
-#     ):
-#         # ignore previous z ..
-#         policy = DiscreteSoftPolicy(state_dim, hidden_dim, action_space, cfg=pi).cuda()
-#         super().__init__(name, action_space, policy, enc_z, cfg=cfg, ignore_hidden=True)

@@ -60,7 +60,8 @@ class GeneralizedQ(torch.nn.Module):
         a_seq = traj['a']
         reward = traj['reward']
         dones = traj['done']
-        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma)
+        timestep = traj['timestep']
+        q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma, timestep=timestep)
 
         traj['q_value'] = q_values
         traj['pred_values'] = values
@@ -110,7 +111,10 @@ class GeneralizedQ(torch.nn.Module):
         a_embeds = []
 
         out = dict(init_timestep=timestep)
+        ts = []
         for idx in range(step):
+            ts.append(timestep)
+
             if len(z_seq) <= idx:
                 z, _logp_z, z_new, logp_z_new, _entz = pi_z(s, z, prev_action=z, timestep=timestep)
                 logp_z.append(_logp_z[..., None])
@@ -119,7 +123,7 @@ class GeneralizedQ(torch.nn.Module):
             z = z_seq[idx]
 
             if len(a_seq) <= idx:
-                a, _logp_a, _enta = pi_a(s, z)
+                a, _logp_a, _enta = pi_a(s, z, timestep=timestep)
                 logp_a.append(_logp_a[..., None])
                 a_seq.append(a)
             
@@ -129,7 +133,8 @@ class GeneralizedQ(torch.nn.Module):
 
             timestep = timestep + 1
 
-        out.update(state=torch.stack(states), a_embed=torch.stack(a_embeds))
+        ts = torch.stack(ts)
+        out.update(state=torch.stack(states), a_embed=torch.stack(a_embeds), timestep=ts)
         self.pred_rewards(out)
 
         if sample_a:
@@ -176,7 +181,7 @@ class GeneralizedQ(torch.nn.Module):
 
 class HiddenDynamicNet(Network, GeneralizedQ):
     def __init__(self, 
-        obs_space, action_space, z_space,
+        obs_space, action_space, z_space, time_embeddding,
         cfg=None, 
         qmode='Q',
         gamma=0.99,
@@ -265,7 +270,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         # Q
         #enc_z = ZTransform(z_space)
         action_dim = action_space.shape[0]
-        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim)
+        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim, time_embedding=time_embeddding)
 
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)

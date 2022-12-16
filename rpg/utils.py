@@ -249,3 +249,28 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
         gae = gae[::-1]
 
     return torch.stack(gae).float() #* (1-lmbda) 
+
+
+
+import math
+def positional_encoding(dim, position):
+    """
+    :param d_model: dimension of the model
+    :param length: length of positions
+    :return: length*d_model position matrix
+    """
+    if dim == 0:
+        return None
+
+    if dim == 1:
+        return position / 1000.
+
+    if dim % 2 != 0:
+        raise ValueError("Cannot use sin/cos positional encoding with "
+                         "odd dim (got dim={:d})".format(dim))
+    pe = torch.zeros(*position.shape, dim, dtype=torch.float, device=position.device)
+    div_term = torch.exp((torch.arange(0, dim, 2, dtype=torch.float, device=position.device) * -(math.log(10000.0) / dim)))
+    position = position.float()[..., None]
+    pe[..., 0::2] = torch.sin(position * div_term)
+    pe[..., 1::2] = torch.cos(position * div_term)
+    return pe

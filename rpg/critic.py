@@ -11,16 +11,20 @@ from gym import spaces
 
 
 class AlphaPolicyBase(Network):
-    def __init__(self, cfg=None, observe_alpha=False) -> None:
+    def __init__(self, cfg=None, observe_alpha=False, time_embedding=0) -> None:
         super().__init__()
         self.observe_alpha = observe_alpha
         self.alpha_dim = 2 if observe_alpha else 0
         self.alpha = None
 
-    def set_alpha(self, alpha):
-        self.alpha = alpha
+        self.time_embedding = time_embedding
 
-    def add_alpha(self, *args):
+    def add_alpha(self, *args, timestep=None):
+        if self.time_embedding > 0:
+            assert timestep is not None
+            from .utils import positional_encoding
+            args = list(args) + [positional_encoding(self.time_embedding, timestep)]
+
         x = torch.cat(args, dim=-1)
         if self.observe_alpha:
             v = torch.zeros(*x.shape[:-1], len(self.alphas), device=x.device, dtype=x.dtype) + self.alphas
@@ -28,7 +32,7 @@ class AlphaPolicyBase(Network):
         return x
 
     def build_backbone(self, inp_dim, hidden_dim, output_shape):
-        return mlp(inp_dim + self.alpha_dim, hidden_dim, output_shape)
+        return mlp(inp_dim + self.alpha_dim + self.time_embedding, hidden_dim, output_shape)
 
 
 def batch_select(values, z=None):
@@ -56,10 +60,10 @@ class SoftQPolicy(AlphaPolicyBase):
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         z = self.enc_z(z)
         if self.action_dim > 0:
-            inp = self.add_alpha(s, a, z)
+            inp = self.add_alpha(s, a, z, timestep=timestep)
         else:
             assert torch.allclose(a, z)
-            inp = self.add_alpha(s, z)
+            inp = self.add_alpha(s, z, timestep=timestep)
 
         q1 = self.q(inp)
         q2 = self.q2(inp)
@@ -92,7 +96,7 @@ class ValuePolicy(AlphaPolicyBase):
         z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())
         # print(new_s.shape, new_s.device, z.shape, z.device)
-        inp = self.add_alpha(new_s, z)
+        inp = self.add_alpha(new_s, z, timestep=timestep+1)
 
         v1, v2 = self.q(inp), self.q2(inp)
         values = torch.cat((v1, v2), dim=-1)

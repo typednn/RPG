@@ -47,12 +47,7 @@ class InfoNet(Network):
             z_seq = z_seq.detach()
 
         inp = self.compute_feature(states, a_seq)
-        t = traj['init_timestep']
-        ts = []
-        for _ in range(len(inp)):
-            ts.append(t)
-            t = t + 1
-        t = torch.stack(ts)
+        t = traj['timestep']
         if detach:
             info = self.hidden.likelihood(inp, z_seq, timestep=t)
         else:

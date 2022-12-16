@@ -24,59 +24,8 @@ class RNDNet(Network):
             inp_dim = dim
         self.main = nn.Sequential(*layers)
         
-    def forward(self, x, hidden, timestep):
+    def forward(self, x):
         return self.main(x)
-
-
-# Positional encoding (section 5.1)
-class Embedder:
-    # https://github.com/yenchenlin/nerf-pytorch/blob/master/run_nerf_helpers.py
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-
-        embed_fns = []
-        d = self.kwargs['input_dims']
-        out_dim = 0
-        if self.kwargs['include_input']:
-            embed_fns.append(lambda x : x)
-            out_dim += d
-            
-        max_freq = self.kwargs['max_freq_log2']
-        N_freqs = self.kwargs['num_freqs']
-        
-        if self.kwargs['log_sampling']:
-            freq_bands = 2.**torch.linspace(0., max_freq, steps=N_freqs)
-        else:
-            freq_bands = torch.linspace(2.**0., 2.**max_freq, steps=N_freqs)
-            
-        for freq in freq_bands:
-            for p_fn in self.kwargs['periodic_fns']:
-                embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
-                out_dim += d
-                    
-        self.embed_fns = embed_fns
-        self.out_dim = out_dim
-        
-    def embed(self, inputs):
-        return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
-
-
-def get_embedder(multires, i=0):
-    if i == -1:
-        return nn.Identity(), 3
-    
-    embed_kwargs = {
-                'include_input' : True,
-                'input_dims' : 2,
-                'max_freq_log2' : multires-1,
-                'num_freqs' : multires,
-                'log_sampling' : True,
-                'periodic_fns' : [torch.sin, torch.cos],
-    }
-    
-    embedder_obj = Embedder(**embed_kwargs)
-    embed = lambda x, eo=embedder_obj : eo.embed(x)
-    return embed, embedder_obj.out_dim
 
 
 # class RNDOptim(OptimModule):
@@ -191,7 +140,7 @@ class RNDExplorer(ExplorationBonus):
             param.requires_grad = False
         self.enc_s = enc_s
 
-    def compute_loss(self, obs, hidden, timestep):
+    def compute_loss(self, obs):
         inps = obs
 
         if self.embeder is not None:
@@ -200,15 +149,15 @@ class RNDExplorer(ExplorationBonus):
         from tools.utils import totensor
         inps = totensor(inps, device='cuda:0')
 
-        predict = self.network(inps, hidden, timestep)
+        predict = self.network(inps)
         with torch.no_grad():
-            target = self.target(inps, hidden, timestep)
+            target = self.target(inps)
 
         loss = ((predict - target)**2).sum(axis=-1, keepdim=True)
         return loss
 
     def compute_bonus(self, obs) -> torch.Tensor:
-        loss =  self.compute_loss(obs, hidden=None, timestep=None)
+        loss =  self.compute_loss(obs)
         return loss
 
 
