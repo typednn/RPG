@@ -72,7 +72,7 @@ class TrajSeg:
 
 
 def rand(a, b):
-    return torch.minimum(torch.floor(torch.rand_like(b) * (b-a)).long() + a, b-1)
+    return torch.minimum(torch.floor(torch.rand(b.shape, device=b.device) * (b-a).float()).long() + a, b-1)
 
 class ReplayBuffer(Configurable):
     # replay buffer with done ..
@@ -112,8 +112,8 @@ class ReplayBuffer(Configurable):
         self._reward = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._dones = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
         self._truncated = torch.empty((self.capacity, 1), dtype=torch.float32, device=self.device)
-        self._timesteps = torch.empty((self.capacity,), dtype=torch.float32, device=self.device) - 1
-        self._step2trajend = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
+        self._timesteps = torch.empty((self.capacity,), dtype=torch.long, device=self.device) - 1
+        self._step2trajend = torch.empty((self.capacity,), dtype=torch.long, device=self.device)
         self._z = None
 
         self._eps = 1e-6
@@ -165,8 +165,6 @@ class ReplayBuffer(Configurable):
             self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
             self._step2trajend[self.idx: self.idx+l] = torch.arange(l, 0, -1, device=self.device)
 
-            print(torch.arange(self.idx, self.idx+l, device=self.device) + self._step2trajend[self.idx: self.idx+l])
-
             if self._z is not None:
                 self._z[self.idx:self.idx+l] = z[:l, i]
 
@@ -185,7 +183,7 @@ class ReplayBuffer(Configurable):
         else:
             obs_seq = torch.empty((horizon + 1, batch_size, *self.obs_shape), dtype=torch.float32, device=self.device)
 
-        timesteps = torch.empty((horizon + 1, batch_size), dtype=torch.float32, device=self.device)
+        timesteps = torch.empty((horizon + 1, batch_size), dtype=torch.long, device=self.device)
 
         action = torch.empty((horizon, batch_size, *self._action.shape[1:]), dtype=self._action.dtype, device=self.device)
         reward = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
@@ -194,7 +192,7 @@ class ReplayBuffer(Configurable):
 
 
 
-        def get_obs_by_idx(self, _obs, idxs):
+        def get_obs_by_idx(_obs, idxs):
             if isinstance(_obs, dict):
                 return {k: v[idxs.cpu()].to(self.device) for k, v in _obs.items()}
             return _obs[idxs]
@@ -228,7 +226,8 @@ class ReplayBuffer(Configurable):
         truncated_mask = torch.ones_like(truncated) # we weill not predict state after done ..
         truncated_mask[1:] = 1 - (truncated.cumsum(0)[:-1] > 0).float()
 
-        output = TrajSeg(obs_seq, timesteps, action, reward, done, truncated_mask[..., 0], None)
+
+        output = TrajSeg(obs_seq, timesteps, action, reward, done, truncated_mask[..., 0], None, None)
 
         if self._z is not None:
             output.z = z
