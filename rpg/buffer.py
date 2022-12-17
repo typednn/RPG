@@ -163,7 +163,18 @@ class ReplayBuffer(Configurable):
             truncated[l-1, i] = True # last one is always truncated ..
             self._truncated[self.idx:self.idx+l] = truncated[:l, i, None]
             self._timesteps[self.idx:self.idx+l] = timesteps[:l, i]
-            self._step2trajend[self.idx: self.idx+l] = torch.arange(l, 0, -1, device=self.device)
+
+            d = 0
+            for j in range(self.idx + l - 1, self.idx-1, -1):
+                if self._truncated[j]:
+                    d = 0
+                d += 1
+                self._step2trajend[j] = d
+            # print(z[:l, i])
+            # print(dones[:l, i].any())
+            # print(truncated[:l, i], d)
+            # #self._step2trajend[self.idx: self.idx+l] = torch.arange(l, 0, -1, device=self.device)
+            # exit(0)
 
             if self._z is not None:
                 self._z[self.idx:self.idx+l] = z[:l, i]
@@ -235,6 +246,20 @@ class ReplayBuffer(Configurable):
             b = idxs + self._step2trajend[idxs]
 
             idx_future = rand(a, b)
+
+            # c = torch.where(self._z[idx_future] != z)[0]
+            # if len(c) > 0:
+            #     print(c)
+            #     print(z[c[0]])
+            #     print(self._z[idx_future][c[0]])
+            #     print(idxs[c[0]])
+            #     print(idx_future[c[0]])
+            #     print(a[c[0]])
+            #     print(b[c[0]])
+            #     print(self._step2trajend[idxs[c[0]]])
+            #     print(self._truncated[a[c[0]]:b[c[0]]])
+
+            assert torch.allclose(self._z[idx_future], z)
 
             output.future = (
                 get_obs_by_idx(self._obs, idx_future),

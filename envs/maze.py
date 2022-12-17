@@ -321,22 +321,24 @@ class LargeMaze(Configurable):
                 'xlim': [0, self.RESOLUTION],
                 'ylim': [0, self.RESOLUTION],
             },
-            'occupancy': occupancy.float() / occupancy.max(),
+            'occupancy': occupancy / occupancy.max(),
             'occ_history': occupancy,
-            'occ_metric': (occupancy > occ_val).float().mean(),
+            'occ_metric': (occupancy > occ_val).mean(),
         }
 
     def build_anchor(self):
-        x = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
-        y = x.clone()
+        y = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
+        x = torch.arange(self.SIZE, -self.SIZE, -1., device=self.device) - 0.5 #x.clone()
         x, y = torch.meshgrid(x, y, indexing='ij')
-        return torch.stack([y, x], dim=-1)
+        return torch.stack([y, x], dim=-1).cuda()
 
     def counter(self, obs):
         anchor = self.build_anchor()
+        obs = obs.reshape(-1, obs.shape[-1])
+        #print(obs.shape, anchor.shape)
         reached = torch.abs(obs[None, None, :, :] - anchor[:, :, None, :])
         reached = torch.logical_and(reached[..., 0] < 0.5, reached[..., 1] < 0.5)
-        return reached.sum(axis=-1)
+        return reached.sum(axis=-1).float().detach().cpu().numpy()
 
 
 class SmallMaze(LargeMaze):

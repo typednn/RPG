@@ -27,7 +27,7 @@ trainer = Trainer.parse(
 
 
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
-    pi_a=dict(ent=dict(coef=0.005),),
+    pi_a=dict(ent=dict(coef=0.0, target_mode='fixed'),),
     head=dict(
             linear=False,
             squash=True,

@@ -241,9 +241,13 @@ class TorchEnv(VecEnv):
 
 
         episode = []
+        truncated = [False for i in info]
         if len(end_envs) > 0:
             assert len(end_envs) == self.nenv
             for j in end_envs:
+                truncated[j] = True
+
+
                 step, total_reward = int(self.steps[j]), float(self.returns[j])
                 self.steps[j] = 0
                 self.returns[j] = 0
@@ -264,7 +268,7 @@ class TorchEnv(VecEnv):
             'done': done,
             'info': info,
             'total_reward': self.returns.clone(),
-            'truncated': [False for i in info],
+            'truncated': truncated,
             'episode': episode
         }
         

@@ -26,7 +26,7 @@ trainer = Trainer.parse(
 
 
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
-    pi_a=dict(ent=dict(coef=0.005),),
+    pi_a=dict(ent=dict(coef=0.0, target_mode='fixed'),),
     head=dict(
         linear=False,
         squash=True,
@@ -81,7 +81,7 @@ trainer = Trainer.parse(
             _inherit='z2',
             relabel=0.8,
             path='tmp/relabel',
-            info=dict(coef=0.03),
+            info=dict(coef=0.1),
         )
     ),
 ) # do not know if we need max_grad_norm

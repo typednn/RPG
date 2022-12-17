@@ -184,7 +184,7 @@ class save_traj(HookBase):
                 raise NotImplementedError
             traj.old_obs = old_obs
 
-            data = env.render_traj(traj, occ_val=self.occupancy, occ_history=self.occupancy_history)) 
+            data = env.render_traj(traj, occ=self.occupancy, occ_history=self.occupancy_history)
 
             from tools.utils import plt_save_fig_array
             from solver.draw_utils import plot_colored_embedding, plot_point_values
@@ -235,7 +235,7 @@ class save_traj(HookBase):
                 get('occupancy')
                 self.occupancy_history = data['occ_history']
                 val = data['occ_metric']
-                logger.logkv('test_occ_metric', val)
+                logger.logkv_mean('test_occ_metric', val)
 
 
                 
