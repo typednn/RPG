@@ -288,11 +288,7 @@ class LargeMaze(Configurable):
             cv2.circle(img, tuple(pos[i]), 3, (0, 255, 0), 1)
         return img
 
-    def _render_traj_rgb(self, traj, z=None, **kwargs):
-        # assert z is None
-        from tools.utils import plt_save_fig_array
-        import matplotlib.pyplot as plt
-
+    def get_obs_from_traj(self, traj):
         if isinstance(traj, dict):
             obs = traj['next_obs']
         else:
@@ -301,12 +297,22 @@ class LargeMaze(Configurable):
         obs = obs[..., :2]
         if self.obs_dim > 0:
             obs = obs / 0.01
+        return obs
 
-        plt.clf()
+    def _render_traj_rgb(self, traj, z=None, occ_val=False, occ_history=None, **kwargs):
+        # assert z is None
+        from tools.utils import plt_save_fig_array
+        import matplotlib.pyplot as plt
+        obs = self.get_obs_from_traj(traj)
+
+        if occ_val >= 0:
+            occupancy = self.counter(obs) 
+            if occ_history is not None:
+                occupancy += occ_history
+        else:
+            occupancy = None
+
         img = self.screen.copy()/255.
-        #obs = ((obs  + self.SIZE)/ (self.SIZE * 2)).detach().cpu().numpy()
-        #obs = obs / self.SIZE / 2 + 0.5
-        #obs = obs.detach().cpu().numpy() * self.RESOLUTION
         obs = self.pos2pixel(obs)
         return {
             'state': obs,
@@ -315,7 +321,22 @@ class LargeMaze(Configurable):
                 'xlim': [0, self.RESOLUTION],
                 'ylim': [0, self.RESOLUTION],
             },
+            'occupancy': occupancy.float() / occupancy.max(),
+            'occ_history': occupancy,
+            'occ_metric': (occupancy > occ_val).float().mean(),
         }
+
+    def build_anchor(self):
+        x = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
+        y = x.clone()
+        x, y = torch.meshgrid(x, y, indexing='ij')
+        return torch.stack([y, x], dim=-1)
+
+    def counter(self, obs):
+        anchor = self.build_anchor()
+        reached = torch.abs(obs[None, None, :, :] - anchor[:, :, None, :])
+        reached = torch.logical_and(reached[..., 0] < 0.5, reached[..., 1] < 0.5)
+        return reached.sum(axis=-1)
 
 
 class SmallMaze(LargeMaze):

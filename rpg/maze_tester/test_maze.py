@@ -37,7 +37,7 @@ trainer = Trainer.parse(
     pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
 
     path='tmp/maze',
-    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10)),
+    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10, occupancy=1)),
     info=dict(coef=0.0),
     # info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
 

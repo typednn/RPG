@@ -50,13 +50,13 @@ trainer = Trainer.parse(
         #z=dict(model=dict(qmode='value'), horizon=3, z_dim=6, info=dict(coef=1.), pi_a=dict(pi=dict(head=dict(std_scale=0.1)))),
         z = dict(_inherit='value3', hidden=dict(n=6), info=dict(coef=0.1)),
         z2=dict(_inherit='z', head=dict(std_scale=0.05)),
-        relabelz=dict(_inherit='z2', relabel=0.8),
+        #relabelz=dict(_inherit='z2', relabel=0.8),
 
         
         normal=dict(
             model=dict(qmode='value'), horizon=3,
             hidden=dict(TYPE='Gaussian', dim=5), 
-            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.001, end=4000)),
+            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.001, end=8000)),
             head=dict(std_scale=0.1),
             path='tmp/normal'
         ),
@@ -73,9 +73,16 @@ trainer = Trainer.parse(
             time_embedding=10,
             _inherit='z2',
             hidden=dict(TYPE='DiscreteGoal', n=6),
-            info=dict(coef=5., net=dict(use_next_state=True)),
+            info=dict(coef=5.),
             path='tmp/goal_discrete',
         ),
+
+        relabel=dict(
+            _inherit='z2',
+            relabel=0.8,
+            path='tmp/relabel',
+            info=dict(coef=0.03),
+        )
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

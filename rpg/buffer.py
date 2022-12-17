@@ -190,8 +190,6 @@ class ReplayBuffer(Configurable):
         done = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
         truncated = torch.empty((horizon, batch_size, 1), dtype=torch.float32, device=self.device)
 
-
-
         def get_obs_by_idx(_obs, idxs):
             if isinstance(_obs, dict):
                 return {k: v[idxs.cpu()].to(self.device) for k, v in _obs.items()}
@@ -238,11 +236,11 @@ class ReplayBuffer(Configurable):
 
             idx_future = rand(a, b)
 
-            output.future = {
-                'obs': get_obs_by_idx(self._obs, idx_future),
-                'action': self._action[idx_future],
-                'next_obs': get_obs_by_idx(self._next_obs, idx_future),
-            }
+            output.future = (
+                get_obs_by_idx(self._obs, idx_future),
+                get_obs_by_idx(self._next_obs, idx_future),
+                self._action[idx_future],
+            )
             
         return output
 

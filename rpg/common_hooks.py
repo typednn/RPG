@@ -136,14 +136,17 @@ class log_info(HookBase):
     
 @as_hook
 class save_traj(HookBase):
-    def __init__(self, n_epoch=10, traj_name='traj', save_gif_epochs=0, **kwargs) -> None:
+    def __init__(self, n_epoch=10, traj_name='traj', save_gif_epochs=0, occupancy=-1, **kwargs) -> None:
         super().__init__()
         self.n_epoch = n_epoch
         self.traj_name = traj_name
         self.kwargs = kwargs
         self.save_gif_epochs = save_gif_epochs
+        self.occupancy = occupancy
 
         self.imgs = []
+        self.occupancy_history = None
+
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
         """
@@ -181,7 +184,7 @@ class save_traj(HookBase):
                 raise NotImplementedError
             traj.old_obs = old_obs
 
-            data = env.render_traj(traj) 
+            data = env.render_traj(traj, occ_val=self.occupancy, occ_history=self.occupancy_history)) 
 
             from tools.utils import plt_save_fig_array
             from solver.draw_utils import plot_colored_embedding, plot_point_values
@@ -205,6 +208,9 @@ class save_traj(HookBase):
                 plt.title(name)
                 plt.tight_layout()
                 images[name] = plt_save_fig_array()[:, :, :3]
+                
+
+
 
             # plot z.
             clear()
@@ -220,6 +226,17 @@ class save_traj(HookBase):
                 clear(use_bg=False)
                 plot_colored_embedding(z, data['actions'])
                 get('action')
+
+
+            occupancy = data.get('occupancy', None)
+            if occupancy is not None:
+                clear(use_bg=False)
+                plt.imshow(occupancy)
+                get('occupancy')
+                self.occupancy_history = data['occ_history']
+                val = data['occ_metric']
+                logger.logkv('test_occ_metric', val)
+
 
                 
             # traj _attrs, record 

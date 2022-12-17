@@ -122,12 +122,18 @@ class Trainer(Configurable, RLAlgo):
         else:
             self.exploration = None
 
-    def relabel_z(self, state, timestep, z):
+    def relabel_z(self, seg):
+        z = seg.z
+        # .obs_seq[0], seg.timesteps[0], seg.z
         if self._cfg.relabel > 0.:
             #TODO: other relabel method, use the future state's info to relabel the current state's z
-            new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state))[0]
+            #new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state))[0]
+            assert seg.future is not None
+            o, no, a = seg.future
+            traj = self.dynamics_net.enc_s(torch.stack((o, no)))
+            new_z = self.info_learner.sample_z(traj, a)[0]
 
-            mask = torch.rand(size=(len(state),)) < self._cfg.relabel
+            mask = torch.rand(size=(len(z),)) < self._cfg.relabel
             z = z.clone()
             z[mask] = new_z[mask]
         return z
@@ -138,7 +144,7 @@ class Trainer(Configurable, RLAlgo):
         if self.exploration is not None and self.exploration.as_reward:
             seg.reward = seg.reward + self.exploration.intrinsic_reward(seg.obs_seq[1:])
 
-        z = self.relabel_z(seg.obs_seq[0], seg.timesteps[0], seg.z)
+        z = self.relabel_z(seg)
         prev_z = z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
         self.model_learner.learn_dynamics(
             seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
@@ -146,13 +152,14 @@ class Trainer(Configurable, RLAlgo):
     def update_pi_a(self):
         if self.update_step % self._cfg.actor_delay == 0:
             seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
-            z = self.relabel_z(seg.obs_seq[0], seg.timesteps[0], seg.z)
+            z = self.relabel_z(seg)
             rollout = self.dynamics_net.inference(
                 seg.obs_seq[0], z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
                 intrinsic_reward=self.intrinsic_reward
             )
             self.pi_a.update(rollout)
-            self.info_learner.update(rollout)
+            if self.z_space.learn:
+                self.info_learner.update(rollout)
 
             if self.exploration is not None:
                 self.exploration.update_by_rollout(rollout)
@@ -223,9 +230,9 @@ class Trainer(Configurable, RLAlgo):
 
                 transition.update(**data, a=a, z=prevz)
 
-                if mode != 'training':
+                if mode != 'training' and self.exploration is not None:
                     # for visualize the transitions ..
-                    transition['next_state'] = self.dynamics_net.enc_s(obs)
+                    transition['next_state'] = self.dynamics_net.enc_s(totensor(obs, device='cuda:0'))
 
                     if self.exploration is not None:
                         self.exploration.visualize_transition(transition)

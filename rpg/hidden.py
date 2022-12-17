@@ -7,8 +7,12 @@ from gym.spaces import Box
 
 @as_builder
 class HiddenSpace(Configurable):
-    def __init__(self, cfg=None) -> None:
+    def __init__(self, cfg=None,
+                 action_weight=1., noise=0.0, obs_weight=1.,
+                 use_next_state=False
+                 ) -> None:
         super().__init__(cfg)
+        self.head = None
 
     @property
     def dim(self):
@@ -26,6 +30,9 @@ class HiddenSpace(Configurable):
 
     def likelihood(self, inp, z, timestep):
         raise NotImplementedError
+
+    def sample(self, inp):
+        return self.head(inp).sample()
 
     def reward(self, inp, z, timestep):
         return self.likelihood(inp, z, timestep)
