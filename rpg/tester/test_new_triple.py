@@ -56,10 +56,15 @@ trainer = Trainer.parse(
         normal=dict(
             model=dict(qmode='value'), horizon=3,
             hidden=dict(TYPE='Gaussian', dim=5), 
-            info=dict(coef=0.01, weight=dict(TYPE='linear', min_value=0.001, end=8000)),
-            head=dict(std_scale=0.1),
+            info=dict(coef=0.1, weight=dict(TYPE='linear', min_value=0.02, end=8000)),
+            head=dict(std_scale=0.01),
             path='tmp/normal'
         ),
+
+        normal_bounded = dict(
+            _inherit='normal',
+            relabel=0.8,
+        )
 
         goal=dict(
             time_embedding=10,

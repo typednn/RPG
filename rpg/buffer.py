@@ -259,7 +259,7 @@ class ReplayBuffer(Configurable):
             #     print(self._step2trajend[idxs[c[0]]])
             #     print(self._truncated[a[c[0]]:b[c[0]]])
 
-            assert torch.allclose(self._z[idx_future], z)
+            # assert torch.allclose(self._z[idx_future], z)
 
             output.future = (
                 get_obs_by_idx(self._obs, idx_future),

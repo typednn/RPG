@@ -23,6 +23,8 @@ class Trainer(Configurable, RLAlgo):
         env: Union[GymVecEnv, TorchEnv],
         cfg=None,
 
+        max_epoch=None,
+
         env_name=None,
         env_cfg=None,
 
@@ -132,6 +134,9 @@ class Trainer(Configurable, RLAlgo):
             o, no, a = seg.future
             traj = self.dynamics_net.enc_s(torch.stack((o, no)))
             new_z = self.info_learner.sample_z(traj, a)[0]
+            # if self.update_step % 100 == 0:
+            #     print(z)
+            #     print(new_z)
 
             mask = torch.rand(size=(len(z),)) < self._cfg.relabel
             z = z.clone()
@@ -274,9 +279,10 @@ class Trainer(Configurable, RLAlgo):
 
         logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
 
-    def run_rpgm(self, max_epoch=None):
+    def run_rpgm(self):
         self.setup_logger()
         env = self.env
+        max_epoch = self._cfg.max_epoch
 
         steps = self._cfg.steps_per_epoch or self.env.max_time_steps
         epoch_id = 0
