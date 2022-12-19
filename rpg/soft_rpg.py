@@ -59,7 +59,7 @@ class Trainer(Configurable, RLAlgo):
         eval_episode=10, save_video=0,
 
         # trainer utils ..
-        hooks=None, path=None, wandb=None,
+        hooks=None, path=None, wandb=None, log_date=False,
         tau=0.005, relabel=0.,
 
         time_embedding=0,
@@ -277,7 +277,7 @@ class Trainer(Configurable, RLAlgo):
                     name = None
                 kwargs['name'] = wandb_cfg.get('name', None) + (('_' + name) if name is not None else '')
 
-        logger.configure(dir=self._cfg.path, format_strs=format_strs, **kwargs)
+        logger.configure(dir=self._cfg.path, format_strs=format_strs, date=self._cfg.log_date, **kwargs)
 
     def run_rpgm(self):
         self.setup_logger()

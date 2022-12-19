@@ -11,12 +11,17 @@ experiment template; needs to specify
   metric 
   ways of saving and visualization
 """
+import os
+import glob
 import copy
+import pandas as pd
+import numpy as np
 from tools.config import Configurable, CN, merge_a_into_b, extract_variant
+import matplotlib.pyplot as plt
 
 
-base_config = CN(
-    max_epochs=1000, # 200 * 5 * 1000
+base_config = dict(
+    max_epoch=1000, # 200 * 5 * 1000
     steps_per_epoch=200,
     env_name='SmallMaze',
     env_cfg=dict(n=5, ignore_truncated_done=True, reward=False),
@@ -84,28 +89,38 @@ base_config = CN(
 
 
 class Experiment(Configurable):
-    def __init__(self, cfg=None, env=None, variant=None, path='tmp', wandb=False) -> None:
-        self.base_config = base_config
+    def __init__(self, cfg=None, path='maze_exp', wandb=False) -> None:
+        super().__init__()
+        self.basis = base_config.pop('_variants')
+
+        from rpg.soft_rpg import Trainer
+        cfg = Trainer.dc
+        merge_a_into_b(CN(base_config), cfg)
+        self.base_config = cfg
         self.env_configs = self.get_env_configs()
         self.wandb = wandb
+        self.path = path
+        self.exps = {}
+
+    def add_exps(self, expname, cfgs, names=None, base=None):
+        if names is not None:
+            cfgs['_names'] = names
+        self.exps[expname] = {
+            'cfgs': cfgs,
+            'base': base
+        }
 
     def get_variants(self):
-        base = self.base_config._variants
-        return base
+        return self.basis
 
     def get_env_configs(self):
         # name_name, env_config
         return {
             'SmallMaze': dict(n=5),
+            'MediumMaze': dict(n=5),
         }
 
-
-    def setup_logger(self, env_name, base, factor, variants):
-        # naming
-        # path
-        assert len(variants) == 1
-
-    def build_configs(self, env_name, expname, cfgs, base=None):
+    def build_configs(self, env_name, expname, verbose=False):
         """
         base
         To specify the variants, also use dictionary, but for certain keys it can be a list. We only support list of the same size.
@@ -116,8 +131,14 @@ class Experiment(Configurable):
               }
               then zip them together
         """
+        exp_config = copy.deepcopy(self.exps[expname])
+        base = exp_config.pop('base', None)
+        cfgs = exp_config.pop('cfgs')
+
         names = cfgs.pop('_names', [])
-        rename = len(names) > 0
+        names = [[i] for i in names]
+        rename = len(names) == 0
+            
         factor_name = []
         default = {}
 
@@ -130,7 +151,7 @@ class Experiment(Configurable):
             d[keys[-1]] = val
 
         def process_variants(configs, keys):
-            for k, v in configs:
+            for k, v in configs.items():
                 new_keys = keys + k.split('.')
                 if isinstance(v, list):
                     factor_name.append(k)
@@ -141,14 +162,14 @@ class Experiment(Configurable):
                         assert len(variants) == len(names), "The length of the list should be the same."
                     else:
                         if len(names) == 0:
-                            names = [[] for i in range(len(v))]
+                            names.extend([[] for i in range(len(v))])
                         for i in range(len(v)):
                             names[i].append(str(v[i]))
                     assert len(variants) == len(v), "The length of the list should be the same."
                     for i in range(len(v)):
                         set_keyval(variants[i], new_keys, v[i])
                 elif isinstance(v, dict):
-                    process_variants(v)
+                    process_variants(v, new_keys)
                 else:
                     if len(variants) == 0:
                         set_keyval(default, new_keys, v)
@@ -160,12 +181,18 @@ class Experiment(Configurable):
         factor_name = '_'.join(factor_name)
         names = [factor_name + '_'.join(n) for n in names]
 
+        if verbose:
+            print("name", names)
+            for i in range(len(variants)):
+                print(variants[i])
+
 
         cfg = self.base_config.clone()
         cfg.defrost()
 
         if base is not None:
-            var = extract_variant(cfg, self.get_variants())
+            var = extract_variant(base, self.get_variants())
+            cfg.set_new_allowed(True)
             merge_a_into_b(var, cfg)
             
 
@@ -177,15 +204,16 @@ class Experiment(Configurable):
             var_cfg = cfg.clone()
             merge_a_into_b(k, var_cfg)
             merge_a_into_b(
-                CN(env_name=env_name, env_cfg=env_cfg), var_cfg
+                CN(dict(env_name=env_name, env_cfg=env_cfg)), var_cfg
             )
             cfg_name = f'{env_name}_{expname}_{name}'
 
+            var_cfg.set_new_allowed(True)
             if self.wandb:
                 var_cfg.wandb = {'project': self.path, 'name': cfg_name, 'group': expname}
             else:
-                var_cfg.path = self.path 
-
+                var_cfg.path = os.path.join(self.path, expname, cfg_name)
+                var_cfg.log_date = True
             outputs.append(var_cfg)
 
         return outputs
@@ -194,5 +222,36 @@ class Experiment(Configurable):
 
     def run_config(self, cfg):
         from rpg.soft_rpg import Trainer
-        trainer = Trainer(cfg=cfg)
+        trainer = Trainer(None, cfg=cfg)
         trainer.run_rpgm()
+
+    def plot(self, configs, keyword):
+        outputs = {}
+        plt.clf()
+        for i in configs:
+            files = glob.glob(os.path.join(i.path, "*"))
+            if len(files) > 0:
+                filename = sorted(files, key=os.path.getmtime)[-1]
+
+                frame = pd.read_csv(os.path.join(filename, 'progress.csv'))
+                progress = frame[keyword].dropna()
+
+                key = i.path.split('/')[-1].split('_')[2]
+                outputs[key] = progress.to_numpy()
+                plt.plot(np.arange(len(progress)), progress, label=key)
+
+        plt.legend()
+        plt.savefig('x.png')
+
+        
+        
+        
+exp = Experiment.parse()
+exp.add_exps(
+    'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small'
+)
+
+configs = exp.build_configs('MediumMaze', 'zdim', verbose=True) # inherit from small
+#exp.run_config(configs[0])
+#exp.run_config(configs[2])
+exp.plot(configs, 'test_occ_metric')

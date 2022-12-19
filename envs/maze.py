@@ -242,12 +242,15 @@ class LargeMaze(Configurable):
             return self.pos.sum(axis=-1)
         else:
             return 0
+
+    def init_pos(self):
+        return torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)
         
     def reset(self, batch_size=None):
         if batch_size is not None:
             self.batch_size = batch_size
 
-        self.pos = torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)
+        self.pos = self.init_pos()
 
         if self.mode == 'batch':
             return self.get_obs()
@@ -385,9 +388,52 @@ class MediumMaze(LargeMaze):
         super().__init__(cfg)
         self.reset()
 
+
+def create_walls(topleft, width, height, split, width_ratio, height_ratio, depth):
+    if depth == 0:
+        return []
+
+    block_width = width * (1 - width_ratio) / split
+    wall_width = width * width_ratio / (split - 1)
+    height_width = height * height_ratio
+
+    walls = []
+    for i in range(split):
+        x = topleft[0] + i * (wall_width + block_width)
+        y = topleft[1] + height * (1 - height_ratio)
+
+        walls += create_walls([x, y], block_width, height_width, split, width_ratio, height_ratio, depth - 1)
+
+        if i < split - 1:
+            walls.append([[x + block_width, y], [x + block_width, y + height_width]])
+            walls.append([[x + block_width + wall_width, y], [x + block_width + wall_width, y + height_width]])
+            walls.append([[x + block_width, y], [x + block_width + wall_width, y]])
+    return walls
+
+
+
+
+class TreeMaze(LargeMaze):
+    SIZE = 7
+    def __init__(self, cfg=None, low_steps=40, split=5, width_ratio=0.3, height_ratio=0.8, depth=2) -> None:
+
+        walls = create_walls([-7, -7], 14, 14, split, width_ratio, height_ratio, depth)
+        s = self.SIZE
+        walls += [
+            [[-s, -s], [-s, s]], [[-s, s], [s, s]], [[s, s], [s, -s]], [[s, -s], [-s, -s]]
+        ]
+        self.walls = torch.tensor(
+            np.array(walls)
+        )
+        super().__init__(cfg)
+        self.reset()
+
+    def init_pos(self):
+        return super().init_pos() + torch.tensor([0., -self.SIZE + 0.5]).cuda()
+
     
 if __name__ == '__main__':
-    env = SmallMaze()
+    env = TreeMaze()
     import matplotlib.pyplot as plt
     plt.imshow(env.render('rgb_array'))
     plt.savefig('xx.png')
