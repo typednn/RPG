@@ -214,6 +214,8 @@ class Experiment(Configurable):
                 var_cfg.wandb = {'project': self.path, 'name': cfg_name, 'group': expname}
             else:
                 var_cfg.path = os.path.join(self.path, expname, cfg_name)
+                if 'MODEL_PATH' in os.environ:
+                    var_cfg.path = os.path.join(os.environ['MODEL_PATH'], var_cfg.path)
                 var_cfg.log_date = True
             outputs.append(var_cfg)
 
@@ -284,7 +286,8 @@ if __name__ == '__main__':
                     os.system(cmd)
         else:
             for i in range(len(configs)):
-                cmd = 'remote.py --go --exp_name {} '+base + ' --id '+str(i)
+                cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --exp_name {}-{} '.format(args.exp, i)
+                print(cmd)
                 os.system(cmd)
     else:
         if args.id is not None:
