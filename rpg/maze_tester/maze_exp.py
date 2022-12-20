@@ -272,7 +272,9 @@ class Experiment(Configurable):
                             os.system(cmd)
                 else:
                     for i in range(len(configs)):
-                        cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(expname, i)
+
+                        silent = '' if args.silent else ' --silent '
+                        cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{} '.format(expname, i)
                         print(cmd)
                         os.system(cmd)
                     
@@ -300,6 +302,7 @@ def build_exp(**kwargs):
     parser.add_argument('--id', default=None, type=int, help='id')
     parser.add_argument('--runall', default=None, type=str)
     parser.add_argument('--download', action='store_true', help='download data')
+    parser.add_argument('--silent', action='store_true', help='silent')
 
     exp = Experiment.parse(parser=parser)
     exp.parser = parser
