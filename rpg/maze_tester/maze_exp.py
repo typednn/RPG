@@ -257,12 +257,12 @@ class Experiment(Configurable):
 
         configs = []
         for i in exps:
-            configs += exp.build_configs(args.env_name, i, verbose=True) # inherit from small
+            configs.append(exp.build_configs(args.env_name, i, verbose=True)) # inherit from small
         if args.runall is not None:
             # run on cluster
             import sys
-            for exp in exps:
-                base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', exp, '--wandb', exp._cfg.wandb])
+            for expname, configs in zip(exps, configs):
+                base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)])
                 if args.runall == 'local':
                     for i in range(len(configs)):
                         cmd = 'python3 '+base + ' --id '+str(i)
@@ -272,11 +272,12 @@ class Experiment(Configurable):
                             os.system(cmd)
                 else:
                     for i in range(len(configs)):
-                        cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(args.exp, i)
+                        cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(expname, i)
                         print(cmd)
                         os.system(cmd)
                     
         else:
+            configs = sum(configs)
             if args.id is not None:
                 if args.download:
                     os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
