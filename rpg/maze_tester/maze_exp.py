@@ -118,6 +118,7 @@ class Experiment(Configurable):
         return {
             'SmallMaze': dict(n=5),
             'MediumMaze': dict(n=5),
+            'TreeMaze': dict(n=5),
         }
 
     def build_configs(self, env_name, expname, verbose=False):
@@ -246,12 +247,39 @@ class Experiment(Configurable):
         
         
         
-exp = Experiment.parse()
+import argparse
+parser = argparse.ArgumentParser()
+exp = Experiment.parse(parser=parser)
+
 exp.add_exps(
-    'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small'
+    'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small',
+)
+exp.add_exps(
+    'rndbuffer', dict(rnd=dict(buffer_size=[1000, 10000, 100000, 1000000])), base='small',
 )
 
-configs = exp.build_configs('MediumMaze', 'zdim', verbose=True) # inherit from small
-#exp.run_config(configs[0])
-#exp.run_config(configs[2])
-exp.plot(configs, 'test_occ_metric')
+exp.add_exps(
+    'infoloss', dict(info=dict(coef=[0.02, 0.05, 0.08, 0.1])), base='small',
+)
+
+if __name__ == '__main__':
+    parser.add_argument('--env_name', default='MediumMaze', type=str, help='env name')
+    parser.add_argument('--exp', default='zdim', type=str, help='experiment to run')
+    parser.add_argument('--id', default=None, type=int, help='id')
+    parser.add_argument('--runall', default=None, type=str)
+    args = parser.parse_args()
+
+
+    configs = exp.build_configs(args.env_name, 'zdim', verbose=True) # inherit from small
+    if args.runall is not None:
+        if args.runall == 'local':
+            raise NotImplementedError
+        else:
+            # run on cluster
+            cmds = []
+            raise NotImplementedError
+    else:
+        if args.id is not None:
+            exp.run_config(configs[args.id])
+        else:
+            exp.plot(configs, 'test_occ_metric')

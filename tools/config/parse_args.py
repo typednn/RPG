@@ -11,30 +11,30 @@ def _parse_args(default_cfg='', parser=None):
     if parser is None:
         parser = argparse.ArgumentParser(description='Training')
 
-        parser.add_argument(
-            '--cfg',
-            dest='config_file',
-            default=default_cfg,
-            help='path to config file',
-            type=str,
-        )
+    parser.add_argument(
+        '--cfg',
+        dest='config_file',
+        default=default_cfg,
+        help='path to config file',
+        type=str,
+    )
 
-        parser.add_argument(
-            '--var',
-            default=None,
-            help='experiment variant to run',
-            type=str,
-        )
+    parser.add_argument(
+        '--var',
+        default=None,
+        help='experiment variant to run',
+        type=str,
+    )
 
-        parser.add_argument(
-            '--output_cfg',
-            action="store_true"
-        )
-        parser.add_argument(
-            '--save_cfg',
-            default=None,
-            help='path to save config file',
-        )
+    parser.add_argument(
+        '--output_cfg',
+        action="store_true"
+    )
+    parser.add_argument(
+        '--save_cfg',
+        default=None,
+        help='path to save config file',
+    )
 
     for i in EXTRA_PARSER:
         i(parser)
