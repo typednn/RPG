@@ -389,8 +389,15 @@ class MediumMaze(LargeMaze):
         self.reset()
 
 
+END_POINTS = []
+END_SCALE = []
 def create_walls(topleft, width, height, split, width_ratio, height_ratio, depth):
+    global END_POINTS, END_SCALE
+
     if depth == 0:
+        point = [topleft[0] + width/2, topleft[1] + height]
+        END_SCALE = [width/2, width]
+        END_POINTS.append(point) # end points
         return []
 
     block_width = width * (1 - width_ratio) / split
@@ -416,8 +423,13 @@ def create_walls(topleft, width, height, split, width_ratio, height_ratio, depth
 class TreeMaze(LargeMaze):
     SIZE = 7
     def __init__(self, cfg=None, low_steps=40, split=5, width_ratio=0.3, height_ratio=0.8, depth=2) -> None:
+        END_POINTS.clear()
 
         walls = create_walls([-7, -7], 14, 14, split, width_ratio, height_ratio, depth)
+
+        self.anchors = torch.tensor(np.array(END_POINTS)).cuda()
+        self.scale = torch.tensor(np.array(END_SCALE)).cuda()
+
         s = self.SIZE
         walls += [
             [[-s, -s], [-s, s]], [[-s, s], [s, s]], [[s, s], [s, -s]], [[s, -s], [-s, -s]]
@@ -430,6 +442,22 @@ class TreeMaze(LargeMaze):
 
     def init_pos(self):
         return super().init_pos() + torch.tensor([0., -self.SIZE + 0.5]).cuda()
+
+
+    def build_anchor(self):
+        #y = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
+        #x = torch.arange(self.SIZE, -self.SIZE, -1., device=self.device) - 0.5 #x.clone()
+        #x, y = torch.meshgrid(x, y, indexing='ij')
+        #return torch.stack([y, x], dim=-1).cuda()
+        return self.anchors
+
+    def counter(self, obs):
+        anchor = self.build_anchor()
+        obs = obs.reshape(-1, obs.shape[-1])
+        #print(obs.shape, anchor.shape)
+        reached = torch.abs(obs[None, None, :, :] - anchor[:, :, None, :])
+        reached = torch.logical_and(reached[..., 0] < self.scale[0], reached[..., 1] <self.scale[1])
+        return reached.sum(axis=-1).float().detach().cpu().numpy()
 
     
 if __name__ == '__main__':

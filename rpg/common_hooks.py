@@ -145,7 +145,7 @@ class save_traj(HookBase):
         self.occupancy = occupancy
 
         self.imgs = []
-        self.occupancy_history = None
+        self.history = None
 
 
     def on_epoch(self, trainer: RLAlgo, env, steps, **locals_):
@@ -166,6 +166,10 @@ class save_traj(HookBase):
                 'ylim': [0, 256] or None,
             },
             'actions': np.array, T, B, 2,
+
+            'history': (things to store)
+            'images': (things to render)
+            'scale': things to plot 
         }
         """
         if trainer.epoch_id % self.n_epoch == 0:
@@ -184,7 +188,7 @@ class save_traj(HookBase):
                 raise NotImplementedError
             traj.old_obs = old_obs
 
-            data = env.render_traj(traj, occ=self.occupancy, occ_history=self.occupancy_history)
+            data = env.render_traj(traj, occ=self.occupancy, history=self.history)
 
             from tools.utils import plt_save_fig_array
             from solver.draw_utils import plot_colored_embedding, plot_point_values
@@ -228,14 +232,15 @@ class save_traj(HookBase):
                 get('action')
 
 
-            occupancy = data.get('occupancy', None)
-            if occupancy is not None:
-                clear(use_bg=False)
-                plt.imshow(occupancy)
-                get('occupancy')
-                self.occupancy_history = data['occ_history']
-                val = data['occ_metric']
-                logger.logkv_mean('test_occ_metric', val)
+            if 'image' in data:
+                for k, v in data['image'].items():
+                    clear(use_bg=False)
+                    plt.imshow(v)
+                    get(k)
+            if 'metric' in data:
+                for k, v in data['metric'].items():
+                    logger.logkv_mean(f'test_{k}_metric', v)
+            self.history = data['history']
 
 
                 
