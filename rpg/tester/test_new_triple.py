@@ -61,10 +61,12 @@ trainer = Trainer.parse(
             path='tmp/normal'
         ),
 
-        # normal_bounded = dict(
-        #     _inherit='normal',
-        #     relabel=0.8,
-        # ),
+        normal_relabel = dict(
+             _inherit='normal',
+             relabel=0.8,
+            info=dict(coef=0.003, weight=dict(TYPE='linear', min_value=1., end=8000)),
+            path='tmp/normal_relabel'
+        ),
 
         goal=dict(
             time_embedding=10,

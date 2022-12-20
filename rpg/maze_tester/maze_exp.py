@@ -68,9 +68,9 @@ base_config = dict(
         ),
         rnd2=dict(_inherit='rnd', head=dict(std_scale=0.3, std_mode='statewise')),
         # medium=dict(_inherit='rnd2', env_name='MediumMaze'),
-        medium2=dict(_inherit='rnd2', env_name='MediumMaze', head=dict(std_scale=0.2, std_mode='fix_no_grad', linear=False, squash=False), pi_a=dict(ent=dict(coef=0.01)), rnd=dict(scale=1.), info=dict(coef=0.1), path='tmp/medium'), # seems that we can continue to decrease the info coef
+        medium2=dict(_inherit='rnd2', env_name='MediumMaze', head=dict(std_scale=0.2, std_mode='fix_no_grad', linear=False, squash=False), pi_a=dict(ent=dict(coef=0.01)), rnd=dict(scale=1.), info=dict(coef=0.03), path='tmp/medium'), # seems that we can continue to decrease the info coef
         medium0=dict(_inherit='medium2', z_dim=1, path='tmp/medium0'),
-        lessinfo=dict(_inherit='medium2', info=dict(coef=0.02), path='tmp/lessinfo'),
+        lessinfo=dict(_inherit='medium2', info=dict(coef=0.03), path='tmp/lessinfo'),
 
         rndreward=dict(_inherit='medium2', rnd=dict(
             as_reward=True,
@@ -87,7 +87,7 @@ base_config = dict(
 
 
 class Experiment(Configurable):
-    def __init__(self, cfg=None, path='maze_exp', wandb=False) -> None:
+    def __init__(self, cfg=None, path='maze_exp', wandb=False, opt=None) -> None:
         super().__init__()
         self.basis = base_config.pop('_variants')
 
@@ -99,6 +99,7 @@ class Experiment(Configurable):
         self.wandb = wandb
         self.path = path
         self.exps = {}
+        self.opt = opt
 
     def add_exps(self, expname, cfgs, names=None, base=None):
         if names is not None:
@@ -215,6 +216,10 @@ class Experiment(Configurable):
                 if 'MODEL_PATH' in os.environ:
                     var_cfg.path = os.path.join(os.environ['MODEL_PATH'], var_cfg.path)
                 var_cfg.log_date = True
+
+            if self.opt is not None:
+                merge_a_into_b(self.opt, var_cfg)
+
             outputs.append(var_cfg)
 
         return outputs
@@ -245,63 +250,78 @@ class Experiment(Configurable):
         plt.savefig('x.png')
 
         
-        
-        
-import argparse
-parser = argparse.ArgumentParser()
+    def main(exp):
+        args, _unkown = exp.parser.parse_known_args()
 
-parser.add_argument('--env_name', default='MediumMaze', type=str, help='env name')
-parser.add_argument('--exp', default='zdim', type=str, help='experiment to run')
-parser.add_argument('--id', default=None, type=int, help='id')
-parser.add_argument('--runall', default=None, type=str)
-parser.add_argument('--download', action='store_true', help='download data')
+        exps = args.exp.split(',')
 
-exp = Experiment.parse(parser=parser)
+        configs = []
+        for i in exps:
+            configs += exp.build_configs(args.env_name, i, verbose=True) # inherit from small
+        if args.runall is not None:
+            # run on cluster
+            import sys
+            for exp in exps:
+                base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', exp, '--wandb', exp._cfg.wandb])
+                if args.runall == 'local':
+                    for i in range(len(configs)):
+                        cmd = 'python3 '+base + ' --id '+str(i)
+                        print('running ', cmd, 'yes/no?')
+                        x = input()
+                        if x == 'yes':
+                            os.system(cmd)
+                else:
+                    for i in range(len(configs)):
+                        cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(args.exp, i)
+                        print(cmd)
+                        os.system(cmd)
+                    
+        else:
+            if args.id is not None:
+                if args.download:
+                    os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
+                    exit(0)
+                exp.run_config(configs[args.id])
+            else:
+                if args.download:
+                    for i in range(len(configs)):
+                        os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
+                    exit(0)
+                exp.plot(configs, 'test_occ_metric')
 
-exp.add_exps(
-    'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small',
-)
-exp.add_exps(
-    'rndbuffer', dict(rnd=dict(buffer_size=[1000, 10000, 100000, 1000000])), base='small',
-)
-exp.add_exps(
-    'infoloss', dict(info=dict(coef=[0.02, 0.05, 0.08, 0.1])), base='small',
-)
+def build_exp(**kwargs):
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--env_name', default=kwargs.get('env_name', 'MediumMaze'), type=str, help='env name')
+    parser.add_argument('--exp', default=kwargs.get('exp', 'zdim'), type=str, help='experiment to run')
+
+    parser.add_argument('--id', default=None, type=int, help='id')
+    parser.add_argument('--runall', default=None, type=str)
+    parser.add_argument('--download', action='store_true', help='download data')
+
+    exp = Experiment.parse(parser=parser)
+    exp.parser = parser
+    return exp
 
 if __name__ == '__main__':
-    args, _unkown = parser.parse_known_args()
+    exp = build_exp()
+    exp.add_exps(
+        'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small',
+    )
 
+    # python3 maze_exp.py --exp buffers  --wandb True --runall nautilus
+    exp.add_exps(
+        'relabel', dict(relabel=[0.8, 0.1]), ['8', '1'], base='small',
+    )
+    exp.add_exps(
+        'rndbuf', dict(rnd=dict(buffer_size=[10000, 100000, int(1e6)])), ['bs4', 'bs5', 'bs6'], base='small',
+    )
+    exp.add_exps(
+        'stda', dict(head=dict(std_scale=[0.1, 0.2, 0.3])), base='small',
+    )
 
-    exps = args.exp.split(',')
-    configs = []
-    for i in exps:
-        configs += exp.build_configs(args.env_name, i, verbose=True) # inherit from small
-    if args.runall is not None:
-        # run on cluster
-        import sys
-        base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', args.exp, '--wandb', exp._cfg.wandb])
-        if args.runall == 'local':
-            for i in range(len(configs)):
-                cmd = 'python3 '+base + ' --id '+str(i)
-                print('running ', cmd, 'yes/no?')
-                x = input()
-                if x == 'yes':
-                    os.system(cmd)
-        else:
-            for i in range(len(configs)):
-                cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(args.exp, i)
-                print(cmd)
-                os.system(cmd)
-                
-    else:
-        if args.id is not None:
-            if args.download:
-                os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
-                exit(0)
-            exp.run_config(configs[args.id])
-        else:
-            if args.download:
-                for i in range(len(configs)):
-                    os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
-                exit(0)
-            exp.plot(configs, 'test_occ_metric')
+    exp.add_exps(
+        'infoloss', dict(info=dict(coef=[0.02, 0.05, 0.08, 0.1])), base='small',
+    )
+    exp.main()

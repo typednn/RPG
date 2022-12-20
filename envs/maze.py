@@ -302,7 +302,11 @@ class LargeMaze(Configurable):
             obs = obs / 0.01
         return obs
 
-    def _render_traj_rgb(self, traj, z=None, occ_val=False, occ_history=None, **kwargs):
+
+    def counter2(self, obs):
+        return None
+
+    def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
         # assert z is None
         from tools.utils import plt_save_fig_array
         import matplotlib.pyplot as plt
@@ -310,24 +314,43 @@ class LargeMaze(Configurable):
 
         if occ_val >= 0:
             occupancy = self.counter(obs) 
-            if occ_history is not None:
-                occupancy += occ_history
+            if history is not None:
+                occupancy += history['occ']
         else:
             occupancy = None
 
+        counter2 = self.counter2(obs)
+
         img = self.screen.copy()/255.
         obs = self.pos2pixel(obs)
-        return {
+        output = {
             'state': obs,
             'background': {
                 'image':  img,
                 'xlim': [0, self.RESOLUTION],
                 'ylim': [0, self.RESOLUTION],
             },
-            'occupancy': occupancy / occupancy.max(),
-            'occ_history': occupancy,
-            'occ_metric': (occupancy > occ_val).mean(),
+
+            'image': {
+                'occupancy': occupancy / occupancy.max(),
+            },
+            'history': {
+                'occ': occupancy,
+            },
+            'metric': {
+                'occ': (occupancy > occ_val).mean(),
+            }
         }
+
+        if counter2 is not None:
+            if history is not None:
+                occupancy2 = history['occ2'] + counter2
+            else:
+                occupancy2 = counter2
+            output['metric']['occ2'] = (occupancy2 > 0).mean()
+            output['history']['occ2'] = occupancy2
+
+        return output
 
     def build_anchor(self):
         y = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
@@ -427,8 +450,9 @@ class TreeMaze(LargeMaze):
 
         walls = create_walls([-7, -7], 14, 14, split, width_ratio, height_ratio, depth)
 
-        self.anchors = torch.tensor(np.array(END_POINTS)).cuda()
+        self.anchors2 = torch.tensor(np.array(END_POINTS)).cuda()
         self.scale = torch.tensor(np.array(END_SCALE)).cuda()
+        print(END_SCALE)
 
         s = self.SIZE
         walls += [
@@ -443,21 +467,14 @@ class TreeMaze(LargeMaze):
     def init_pos(self):
         return super().init_pos() + torch.tensor([0., -self.SIZE + 0.5]).cuda()
 
-
-    def build_anchor(self):
-        #y = torch.arange(-self.SIZE, self.SIZE, device=self.device) + 0.5
-        #x = torch.arange(self.SIZE, -self.SIZE, -1., device=self.device) - 0.5 #x.clone()
-        #x, y = torch.meshgrid(x, y, indexing='ij')
-        #return torch.stack([y, x], dim=-1).cuda()
-        return self.anchors
-
-    def counter(self, obs):
-        anchor = self.build_anchor()
+    def counter2(self, obs):
+        anchor = self.anchors2
         obs = obs.reshape(-1, obs.shape[-1])
         #print(obs.shape, anchor.shape)
-        reached = torch.abs(obs[None, None, :, :] - anchor[:, :, None, :])
+        reached = torch.abs(obs[None, :, :] - anchor[:, None, :])
         reached = torch.logical_and(reached[..., 0] < self.scale[0], reached[..., 1] <self.scale[1])
         return reached.sum(axis=-1).float().detach().cpu().numpy()
+
 
     
 if __name__ == '__main__':

@@ -231,16 +231,18 @@ class save_traj(HookBase):
                 plot_colored_embedding(z, data['actions'])
                 get('action')
 
-
             if 'image' in data:
                 for k, v in data['image'].items():
                     clear(use_bg=False)
                     plt.imshow(v)
                     get(k)
+
             if 'metric' in data:
                 for k, v in data['metric'].items():
                     logger.logkv_mean(f'test_{k}_metric', v)
-            self.history = data['history']
+
+            if 'history' in data:
+                self.history = data['history']
 
 
                 

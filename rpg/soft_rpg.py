@@ -139,8 +139,17 @@ class Trainer(Configurable, RLAlgo):
             #     print(new_z)
 
             mask = torch.rand(size=(len(z),)) < self._cfg.relabel
+            if new_z.dtype == torch.float32:
+                #new_z = new_z.to(torch.int64)
+                prior = torch.distributions.Normal(0, 1)
+                mask[prior.log_prob(new_z).mean(axis=-1) < -2.] = False
+                
+
             z = z.clone()
             z[mask] = new_z[mask]
+
+            if new_z.dtype == torch.float32:
+                logger.logkv_mean('relabel', new_z.std())
         return z
 
     def update_dynamcis(self):
