@@ -270,14 +270,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    configs = exp.build_configs(args.env_name, 'zdim', verbose=True) # inherit from small
+    configs = exp.build_configs(args.env_name, args.exp, verbose=True) # inherit from small
     if args.runall is not None:
+        # run on cluster
+        import sys
+        base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', args.exp])
         if args.runall == 'local':
-            raise NotImplementedError
+            for i in range(len(configs)):
+                cmd = 'python3 '+base + ' --id '+str(i)
+                print('running ', cmd, 'yes/no?')
+                x = input()
+                if x == 'yes':
+                    os.system(cmd)
         else:
-            # run on cluster
-            cmds = []
-            raise NotImplementedError
+            for i in range(len(configs)):
+                cmd = 'remote.py --go '+base + ' --id '+str(i)
+                os.system(cmd)
     else:
         if args.id is not None:
             exp.run_config(configs[args.id])

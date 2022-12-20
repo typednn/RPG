@@ -279,6 +279,10 @@ class Trainer(Configurable, RLAlgo):
 
         logger.configure(dir=self._cfg.path, format_strs=format_strs, date=self._cfg.log_date, **kwargs)
 
+        import os
+        with open(os.path.join(logger.get_dir(), 'config.yaml'), 'w') as f:
+            f.write(str(self._cfg))
+
     def run_rpgm(self):
         self.setup_logger()
         env = self.env
