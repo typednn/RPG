@@ -87,7 +87,7 @@ def go_remote(programs, args):
         os.system("git push")
 
         if not args.silent:
-            print("Are you sure you want to run it? Please enter: yes to execute")
+            print("(use --silent to skip this prompt) Are you sure you want to run it? Please enter: yes to execute")
             com = input()
         else:
             com = 'yes'
