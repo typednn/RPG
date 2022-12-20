@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 
 base_config = dict(
-    max_epoch=1000, # 200 * 5 * 1000
+    max_epoch=2000, # 200 * 5 * 2000
     steps_per_epoch=200,
     env_name='SmallMaze',
     env_cfg=dict(n=5, ignore_truncated_done=True, reward=False),
@@ -35,7 +35,6 @@ base_config = dict(
     horizon=3,
     actor_delay=4, #10,
     z_delay=4,
-
 
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
     pi_a=dict(ent=dict(coef=0.0, target_mode='fixed'),),
@@ -85,7 +84,6 @@ base_config = dict(
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
     ),
 )
-
 
 
 class Experiment(Configurable):
@@ -211,7 +209,7 @@ class Experiment(Configurable):
 
             var_cfg.set_new_allowed(True)
             if self.wandb:
-                var_cfg.wandb = {'project': self.path, 'name': cfg_name, 'group': expname}
+                var_cfg.wandb = CN({'project': self.path, 'name': cfg_name, 'group': expname})
             else:
                 var_cfg.path = os.path.join(self.path, expname, cfg_name)
                 if 'MODEL_PATH' in os.environ:
@@ -251,6 +249,13 @@ class Experiment(Configurable):
         
 import argparse
 parser = argparse.ArgumentParser()
+
+parser.add_argument('--env_name', default='MediumMaze', type=str, help='env name')
+parser.add_argument('--exp', default='zdim', type=str, help='experiment to run')
+parser.add_argument('--id', default=None, type=int, help='id')
+parser.add_argument('--runall', default=None, type=str)
+parser.add_argument('--download', action='store_true', help='download data')
+
 exp = Experiment.parse(parser=parser)
 
 exp.add_exps(
@@ -259,24 +264,22 @@ exp.add_exps(
 exp.add_exps(
     'rndbuffer', dict(rnd=dict(buffer_size=[1000, 10000, 100000, 1000000])), base='small',
 )
-
 exp.add_exps(
     'infoloss', dict(info=dict(coef=[0.02, 0.05, 0.08, 0.1])), base='small',
 )
 
 if __name__ == '__main__':
-    parser.add_argument('--env_name', default='MediumMaze', type=str, help='env name')
-    parser.add_argument('--exp', default='zdim', type=str, help='experiment to run')
-    parser.add_argument('--id', default=None, type=int, help='id')
-    parser.add_argument('--runall', default=None, type=str)
-    args = parser.parse_args()
+    args, _unkown = parser.parse_known_args()
 
 
-    configs = exp.build_configs(args.env_name, args.exp, verbose=True) # inherit from small
+    exps = args.exp.split(',')
+    configs = []
+    for i in exps:
+        configs += exp.build_configs(args.env_name, i, verbose=True) # inherit from small
     if args.runall is not None:
         # run on cluster
         import sys
-        base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', args.exp])
+        base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', args.exp, '--wandb', exp._cfg.wandb])
         if args.runall == 'local':
             for i in range(len(configs)):
                 cmd = 'python3 '+base + ' --id '+str(i)
@@ -289,8 +292,16 @@ if __name__ == '__main__':
                 cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(args.exp, i)
                 print(cmd)
                 os.system(cmd)
+                
     else:
         if args.id is not None:
+            if args.download:
+                os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
+                exit(0)
             exp.run_config(configs[args.id])
         else:
+            if args.download:
+                for i in range(len(configs)):
+                    os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
+                exit(0)
             exp.plot(configs, 'test_occ_metric')

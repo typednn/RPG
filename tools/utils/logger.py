@@ -557,6 +557,7 @@ class Logger(object):
 
     def __init__(self, dir, output_formats, comm=None):
         self.name2val = defaultdict(float)  # values this iteration
+        self.name2sqr = defaultdict(float)  # values this iteration
         self.name2cnt = defaultdict(int)
         self.dir = dir
         self.output_formats = output_formats
@@ -578,6 +579,17 @@ class Logger(object):
         oldval, cnt = self.name2val[key], self.name2cnt[key]
         self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
         self.name2cnt[key] = cnt + 1
+
+    def logkv_mean_std(self, key, val):
+        assert hasattr(val, "__float__")
+        if hasattr(val, "requires_grad"):  # see "pytorch explainer" above
+            val = val.detach()
+        oldval, cnt = self.name2val[key], self.name2cnt[key]
+
+        self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
+        self.name2sqr[key] = self.name2sqr[key] * cnt / (cnt + 1) + (val * val) / (cnt + 1)
+        self.name2cnt[key] = cnt + 1
+        raise NotImplementedError("logkv_mean_std not implemented")
 
     def dump_media(self, kvs):
         for fmt in self.output_formats:

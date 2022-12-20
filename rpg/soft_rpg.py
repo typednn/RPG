@@ -305,6 +305,7 @@ class Trainer(Configurable, RLAlgo):
             print(traj.summarize_epsidoe_info())
 
             logger.dumpkvs()
+            epoch_id += 1
 
     def evaluate(self, env, steps):
         with torch.no_grad():
