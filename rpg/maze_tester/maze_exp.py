@@ -272,10 +272,8 @@ class Experiment(Configurable):
                             os.system(cmd)
                 else:
                     for i in range(len(configs)):
-
-                        silent = '' if args.silent else ' --silent '
+                        silent = ' --silent ' if args.silent else ''
                         cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{} '.format(expname, i)
-                        print(cmd)
                         os.system(cmd)
                     
         else:
