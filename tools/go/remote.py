@@ -32,13 +32,13 @@ def go_remote(programs, args):
 
     arguments = container['args'][-1]
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_name', required=True)
+    parser.add_argument('--job_name', required=True)
     names = []
     import copy
     outs = {}
     for i in programs:
         i_args, remain = parser.parse_known_args(i.split(' '))
-        name = f"{args.username}-job-{i_args.exp_name}"
+        name = f"{args.username}-job-{i_args.job_name}"
         config['metadata']['name'] = name
         names.append(name)
         i = ' '.join(remain)

@@ -286,7 +286,7 @@ if __name__ == '__main__':
                     os.system(cmd)
         else:
             for i in range(len(configs)):
-                cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --exp_name {}-{} '.format(args.exp, i)
+                cmd = 'remote.py --go ' +base + ' --id '+str(i) + ' --job_name {}-{} '.format(args.exp, i)
                 print(cmd)
                 os.system(cmd)
     else:
