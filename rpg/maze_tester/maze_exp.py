@@ -277,7 +277,7 @@ class Experiment(Configurable):
                         os.system(cmd)
                     
         else:
-            configs = sum(configs)
+            configs = sum(configs, [])
             if args.id is not None:
                 if args.download:
                     os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))

@@ -86,8 +86,11 @@ def go_remote(programs, args):
         os.system("git commit -am 'update'")
         os.system("git push")
 
-        print("Are you sure you want to run it? Please enter: yes to execute")
-        com = input()
+        if not args.silent:
+            print("Are you sure you want to run it? Please enter: yes to execute")
+            com = input()
+        else:
+            com = 'yes'
         if com == 'yes':
             for i in paths:
                 print(paths[i])

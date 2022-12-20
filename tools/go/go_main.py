@@ -53,6 +53,7 @@ def nautilus_args(parser: argparse.ArgumentParser):
     parser.add_argument("--git pull", default=None, type=str, help="Determine if we need to pull the github..")
 
     parser.add_argument("--multiple", default=1, type=int) # multiple to improve gpu utility
+    parser.add_argument('--silent', action="store_true", help='log the results in a silent mood..')
 
 
 def main(go=None, nautilus=False):
