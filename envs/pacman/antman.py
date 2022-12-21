@@ -76,13 +76,15 @@ class AntManEnv(PacManEnv):
         return self.low_obs
 
 
-    def reset(self):
+    def reset(self, player=None):
         if self.reset_maze or self.maze is None:
             self.maze = MazeGame(self.height, width=self.width)
         self.maze.reset(reset_target=self.reset_goal)
 
         self._background = None
         self._high_background = get_maze_env_obs(self.maze, self.observation_space.shape[0])
+        if player is not None:
+            self.maze.player = player
         self.loc = np.array(self.maze.player) + 0.5
         self.goal = np.array(self.maze.target) + 0.5
         self.subgoal = tuple(map(int, self.loc))
@@ -123,10 +125,11 @@ class AntManEnv(PacManEnv):
         if self._background is None and mode == 'rgb_array':
             self._background = render_background(self.maze, self.block_size)
         import cv2
-        img1 = render_maze(self.maze, self.block_size, self._background, self.loc, self.goal, self.subgoal, mode)
+        #img1 = render_maze(self.maze, self.block_size, self._background, self.loc, self.goal, self.subgoal, mode)
         img2 = self.ant_env.render(mode='rgb_array')
-        img1 = cv2.resize(img1[::-1], (img2.shape[1], img2.shape[0]))
-        img = np.concatenate((img2, img1), axis=1)
+        #img1 = cv2.resize(img1[::-1], (img2.shape[1], img2.shape[0]))
+        #img = np.concatenate((img2, img1), axis=1)
+        img = img2
         if mode == 'human':
             cv2.imshow('x', img)
             cv2.waitKey(1)

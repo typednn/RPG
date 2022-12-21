@@ -1,7 +1,8 @@
-from envs.pacman import AntManEnv
+#from envs.pacman import AntManEnv
+from envs.ant_maze import AntMaze
 
 
-env = AntManEnv()
+env = AntMaze()
 images = []
 
 env.reset()
