@@ -181,6 +181,7 @@ class TorchEnv(VecEnv):
             from envs.maze import TreeMaze
             self.goal_env = TreeMaze(**kwargs)
 
+
         elif env_name == 'MediumMaze':
             from envs.maze import MediumMaze
             self.goal_env = MediumMaze(**kwargs)
