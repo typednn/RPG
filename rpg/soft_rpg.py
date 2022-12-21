@@ -63,7 +63,13 @@ class Trainer(Configurable, RLAlgo):
         tau=0.005, relabel=0.,
 
         time_embedding=0,
+
+        seed=None,
     ):
+        if seed is not None:
+            from tools.utils import set_seed
+            set_seed(seed)
+    
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
 

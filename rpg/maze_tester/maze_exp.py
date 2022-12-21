@@ -262,19 +262,31 @@ class Experiment(Configurable):
             # run on cluster
             import sys
             for expname, configs in zip(exps, configs):
-                base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)])
-                if args.runall == 'local':
-                    for i in range(len(configs)):
-                        cmd = 'python3 '+base + ' --id '+str(i)
-                        print('running ', cmd, 'yes/no?')
-                        x = input()
-                        if x == 'yes':
-                            os.system(cmd)
+                _base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)])
+
+                if args.seed is None:
+                    seeds = [None]
                 else:
-                    for i in range(len(configs)):
-                        silent = ' --silent ' if args.silent else ''
-                        cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{} '.format(expname, i)
-                        os.system(cmd)
+                    seeds = args.seed.split(',')
+
+                for seed in seeds:
+                    base = _base
+                    if seed is not None:
+                        base = _base + ' --seed ' + seed
+
+                    if args.runall == 'local':
+                        for i in range(len(configs)):
+                            cmd = 'python3 '+base + ' --id '+str(i)
+                            print('running ', cmd, 'yes/no?')
+                            x = input()
+                            if x == 'yes':
+                                os.system(cmd)
+                    else:
+                        for i in range(len(configs)):
+                            silent = ' --silent ' if args.silent else ''
+                            seed_info = ' -seed-' + str(seed) if seed is not None else ''
+                            cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
+                            os.system(cmd)
                     
         else:
             configs = sum(configs, [])
@@ -282,7 +294,10 @@ class Experiment(Configurable):
                 if args.download:
                     os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
                     exit(0)
-                exp.run_config(configs[args.id])
+
+                cfg = configs[args.id]
+                cfg.seed = args.seed
+                exp.run_config(cfg)
             else:
                 if args.download:
                     for i in range(len(configs)):
@@ -301,6 +316,8 @@ def build_exp(**kwargs):
     parser.add_argument('--runall', default=None, type=str)
     parser.add_argument('--download', action='store_true', help='download data')
     parser.add_argument('--silent', action='store_true', help='silent')
+
+    parser.add_argument('--seed', default=None)
 
     exp = Experiment.parse(parser=parser)
     exp.parser = parser
