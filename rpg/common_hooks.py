@@ -212,19 +212,23 @@ class save_traj(HookBase):
                 plt.title(name)
                 plt.tight_layout()
                 images[name] = plt_save_fig_array()[:, :, :3]
-                
-
-
 
             # plot z.
-            clear()
             z = traj.get_tensor('z', device='cpu')
             import torch
             if z.dtype == torch.int64:
                 print('zbin', torch.bincount(z.long().flatten()))
+
+            if not isinstance(data['state'], dict):
                 print('z.shape', z.shape, 'data state shape', data['state'].shape)
-            plot_colored_embedding(z, data['state'], s=2)
-            get('latent')
+                clear()
+                plot_colored_embedding(z, data['state'], s=2)
+                get('latent')
+            else:
+                for k, v in data['state'].items():
+                    clear()
+                    plot_colored_embedding(z, v, s=2)
+                    get(k)
 
             if 'actions' in data:
                 clear(use_bg=False)
@@ -247,7 +251,7 @@ class save_traj(HookBase):
 
                 
             # traj _attrs, record 
-            if '_attrs' in traj.traj[0]:
+            if '_attrs' in traj.traj[0] and not isinstance(data['state'], dict):
                 others = []
                 for k in traj.traj[0]['_attrs']:
                     v = [i['_attrs'][k] for i in traj.traj]

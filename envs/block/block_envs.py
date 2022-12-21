@@ -14,8 +14,6 @@ from .sapien_sim import SimulatorBase, Pose
 from .sapien_utils import add_link, identity, x2y
 
 
-
-
 def sample_blocks(n, block_size, world_size, previous=()):
     objects = list(previous)
     for i in range(n):
@@ -38,7 +36,6 @@ COLORS = [
 ]
 
 
-
 def set_actor_xy(actor, xy):
     p = actor.get_pose()
     new_p = p.p
@@ -55,7 +52,12 @@ class BlockEnv(gym.Env, SimulatorBase):
         random_goals=False,
         n_block=3,
         success_reward=0,
+        reward=False,
+
+        obs_dim=0,
     ):
+
+        self.obs_dim = obs_dim
 
         
         self.n_block = n_block
@@ -78,6 +80,8 @@ class BlockEnv(gym.Env, SimulatorBase):
         self.action_space = spaces.Box(low=-1, high=1, shape=(2,))
         self.success_reward = success_reward
 
+        self.reward = reward
+
 
     def get_agent_pos(self):
         return self.agent.get_qpos()
@@ -97,14 +101,18 @@ class BlockEnv(gym.Env, SimulatorBase):
 
     def step(self, action: np.ndarray):
         action = np.asarray(action)
-
         for i in range(self.frameskip):
             self.agent.set_qvel(action.clip(-1, 1) * 4)
             self._scene.step()
 
-        r = self.compute_reward()
-        # d = np.linalg.norm(self.block.get_qpos() - self.goal)
-        return self._get_obs(), r, False, {'success': self.success}
+        if self.reward:
+            r = self.compute_reward()
+            info = {'success': self.success}
+        else:
+            r = 0.
+            info = {}
+
+        return self._get_obs(), r, False, info
 
     def reset(self):
         SimulatorBase.reset(self)
@@ -199,26 +207,38 @@ class BlockEnv(gym.Env, SimulatorBase):
             self.ranges, "pusher", friction=0, damping=0, material=self.material)
         self.objects.append(self.agent)
 
-        
-    def _render_traj_rgb(self, traj, **kwargs):
-        import matplotlib.pyplot
-        from tools.utils import plt_save_fig_array
-        import matplotlib.pyplot as plt
-        from solver.draw_utils import plot_colored_embedding
-        import torch
-        #states = states.detach().cpu().numpy()
-        states = traj.get_tensor('obs', device='cpu')
-        z = traj.get_tensor('z', device='cpu')
+    def get_obs_from_traj(self, traj):
+        if isinstance(traj, dict):
+            obs = traj['next_obs']
+        else:
+            obs = traj.get_tensor('next_obs')
+        agent_pos = obs[..., -4:-2].reshape(-1, 2)
+        box_pos = obs[..., :6].reshape(-1, 3, 2)
+        return {
+            'obs': agent_pos.detach().cpu().numpy(),
+            'box0': box_pos[:, 0].detach().cpu().numpy(),
+            'box1': box_pos[:, 1].detach().cpu().numpy(),
+            'box2': box_pos[:, 2].detach().cpu().numpy(),
+        }
 
-        if z.dtype == torch.float64:
-            print(torch.bincount(z.long().flatten()))
-
-        states = states[..., -4:-2] # this is the observation of the block push
-        plt.clf()
-        # plt.imshow(np.uint8(img[...,::-1]*255))
-        plot_colored_embedding(z, states[:, :, :2], s=2)
-
-        # plt.xlim([0, 256])
-        # plt.ylim([0, 256])
-        out = plt_save_fig_array()[:, :, :3]
-        return out
+    def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
+        obs = self.get_obs_from_traj(traj)
+        # if occ_val >= 0:
+        #     occupancy = self.counter(obs) 
+        #     if history is not None:
+        #         occupancy += history['occ']
+        # else:
+        #     occupancy = None
+        #obs = obs.detach().cpu().numpy()
+        output = {
+            'state': obs,
+            'background': {
+                'image':  None,
+                'xlim': [-self.world_size, self.world_size],
+                'ylim': [-self.world_size, self.world_size],
+            },
+            # 'image': {'occupancy': occupancy / occupancy.max()},
+            # 'history': {'occ': occupancy},
+            # 'metric': {'occ': (occupancy > occ_val).mean()},
+        }
+        return output

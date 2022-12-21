@@ -344,4 +344,8 @@ if __name__ == '__main__':
         'treerl2', dict(hidden=dict(n=[1, 6]), env_cfg=dict(n=1), info=dict(coef=0.02)), names=['rl', 'rpg'], base='small',
     )
 
+    exp.add_exps(
+        'bufrl', dict(rnd=dict(buffer_size=[1000, 10000, 100000, int(1e6)]), hidden=dict(n=1)), ['bs3', 'bs4', 'bs5', 'bs6'], base='small',
+    )
+
     exp.main()
