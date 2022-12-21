@@ -284,7 +284,7 @@ class Experiment(Configurable):
                     else:
                         for i in range(len(configs)):
                             silent = ' --silent ' if args.silent else ''
-                            seed_info = ' -seed-' + str(seed) if seed is not None else ''
+                            seed_info = '-seed-' + str(seed) if seed is not None else ''
                             cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
                             os.system(cmd)
                     
@@ -297,6 +297,9 @@ class Experiment(Configurable):
 
                 cfg = configs[args.id]
                 cfg.seed = args.seed
+                if args.seed is not None and cfg.path is not None:
+                    cfg.path += '_seed' + str(args.seed)
+
                 exp.run_config(cfg)
             else:
                 if args.download:
@@ -343,4 +346,9 @@ if __name__ == '__main__':
     exp.add_exps(
         'infoloss', dict(info=dict(coef=[0.02, 0.05, 0.08, 0.1])), base='small',
     )
+
+    exp.add_exps(
+        'treerl', dict(hidden=dict(n=[1, 6]), info=dict(coef=0.02)), names=['rl', 'rpg'], base='small',
+    )
+
     exp.main()
