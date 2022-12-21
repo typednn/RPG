@@ -57,21 +57,21 @@ class AntManEnv(PacManEnv):
 
 
     def get_obs(self):
-        high = self._high_background.copy()
-        x, y = map(int, self.loc)
-        high[4, y, x] = 1
-        _x, _y = map(int, self.goal)
-        high[5, _y, _x] = 1
-        dx = self.loc - np.floor(self.loc)
-        if self.include_low_obs > 0:
-            high[6:8] = dx[:, None, None] * self.include_low_obs # should ignore it at the beginning..
+        # high = self._high_background.copy()
+        # x, y = map(int, self.loc)
+        # high[4, y, x] = 1
+        # _x, _y = map(int, self.goal)
+        # high[5, _y, _x] = 1
+        # dx = self.loc - np.floor(self.loc)
+        # if self.include_low_obs > 0:
+        #     high[6:8] = dx[:, None, None] * self.include_low_obs # should ignore it at the beginning..
 
-        subgoal = tuple(map(int, self.subgoal))
-        diff = np.array(subgoal) + 0.5 - self.loc
+        # subgoal = tuple(map(int, self.subgoal))
+        # diff = np.array(subgoal) + 0.5 - self.loc
 
-        obs = self.low_obs.copy()
-        obs[:2] *= 0.0003
-        #return [np.concatenate((obs, high[y, x][:4], diff)), high]
+        # obs = self.low_obs.copy()
+        # obs[:2] *= 0.0003
+        # #return [np.concatenate((obs, high[y, x][:4], diff)), high]
 
         return self.low_obs
 

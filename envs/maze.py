@@ -307,9 +307,6 @@ class LargeMaze(Configurable):
         return None
 
     def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
-        # assert z is None
-        from tools.utils import plt_save_fig_array
-        import matplotlib.pyplot as plt
         obs = self.get_obs_from_traj(traj)
 
         if occ_val >= 0:

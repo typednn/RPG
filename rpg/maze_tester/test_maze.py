@@ -73,6 +73,8 @@ if __name__ == '__main__':
             path='tmp/rndreward'),
 
             small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
+
+            ant=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='AntMaze', path='tmp/antmaze'),
         ),
     ) # do not know if we need max_grad_norm
     trainer.run_rpgm()

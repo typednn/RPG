@@ -201,7 +201,7 @@ class save_traj(HookBase):
             def clear(use_bg=True):
                 plt.clf()
                 if use_bg:
-                    if 'image' in background:
+                    if 'image' in background and background['image'] is not None:
                         plt.imshow(np.uint8(background['image']*255))
                     if 'xlim' in background:
                         plt.xlim(background['xlim'])

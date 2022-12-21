@@ -47,6 +47,10 @@ class GymVecEnv(VecEnv):
                 from envs.triple_ant import TripleAntEnv
                 return TimeLimit(TripleAntEnv( **kwargs), 100)
 
+            elif env_name == 'AntMaze':
+                from envs.ant_maze import AntMaze
+                return TimeLimit(AntMaze( **kwargs), 100)
+
             elif env_name == 'BlockPush':
                 import os
                 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
