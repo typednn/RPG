@@ -1,16 +1,3 @@
-"""
-experiment template; needs to specify
-  naming: 
-    env_name + variant module (base, can be omited) + ablation factor
-        - we can register base variant names
-        - ablation factors, we can register its types and so on
-  algorithm variants: basis
-  factors:
-        - 
-  envs 
-  metric 
-  ways of saving and visualization
-"""
 import os
 import glob
 import copy
@@ -308,6 +295,7 @@ class Experiment(Configurable):
                     exit(0)
                 exp.plot(configs, 'test_occ_metric')
 
+
 def build_exp(**kwargs):
     import argparse
     parser = argparse.ArgumentParser()
@@ -325,6 +313,7 @@ def build_exp(**kwargs):
     exp = Experiment.parse(parser=parser)
     exp.parser = parser
     return exp
+
 
 if __name__ == '__main__':
     exp = build_exp()
