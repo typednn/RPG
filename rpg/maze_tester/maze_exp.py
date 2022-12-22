@@ -21,7 +21,7 @@ base_config = dict(
     update_train_step=1,
     horizon=3,
     actor_delay=4, #10,
-    z_delay=4,
+    z_delay=0,
 
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
     pi_a=dict(ent=dict(coef=0.0, target_mode='fixed'),),
