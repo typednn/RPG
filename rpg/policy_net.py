@@ -30,13 +30,11 @@ class PolicyBase(AlphaPolicyBase):
         feature = self.backbone(inp)
         dist =  self.head(feature)
 
-
         if isinstance(dist, NormalAction):
             scale = dist.dist.scale
             logger.logkvs_mean({'std_min': float(scale.min()), 'std_max': float(scale.max())})
 
         a, logp = dist.rsample()
-
         return Aout(a, logp, -logp)
 
 
@@ -49,13 +47,12 @@ class DiffPolicy(PolicyBase):
         return -rollout['value'][..., 0].mean()
 
 
-
 class QPolicy(PolicyBase):
     def __init__(
         self, state_dim, hidden_dim, head, cfg=None,
+        first_state=True,
     ) -> None:
         super().__init__(state_dim, hidden_dim, head)
-        #self.qnet = self.build_backbone(state_dim, hidden_dim, head.get_input_dim())
 
     def q_value(self, state):
         return self.backbone(state)
@@ -78,7 +75,7 @@ class QPolicy(PolicyBase):
             q_target = q_value
             extra_rewards = rollout['extra_rewards']
             for k, v in extra_rewards.items():
-                if k!='ent_z':
+                if k != 'ent_z':
                     q_target = q_target + v.detach()
 
         q_val = self.q_value(state[:-1])

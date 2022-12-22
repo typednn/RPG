@@ -52,7 +52,9 @@ def inherit(key, variants):
         father = inherit(var.pop('_inherit'), variants)
         father.set_new_allowed(True)
         now = CN(var)
-        return merge_a_into_b_builder(now, father)
+        out = merge_a_into_b_builder(now, father)
+
+        return out
     return CN(var)
 
 
@@ -99,6 +101,7 @@ def parse_args(default_cfg_path='', parser=None, parse_prefix=None, strict=False
                 if opts.var not in _variants:
                     raise KeyError(f"Exp {opts.var} not in {_variants.keys()}")
                 #base = CN(_variants[opts.var])
+                
                 base = inherit(opts.var, _variants)
                 if update is not None:
                     merge_a_into_b_builder(CN(update), base)

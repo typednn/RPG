@@ -273,7 +273,7 @@ class save_traj(HookBase):
                 img = np.concatenate([v for k, v in images.items()], axis=1)
                 self.imgs.append(img)
                 if len(self.imgs) % self.save_gif_epochs == 0:
-                    logger.animate(self.imgs, self.traj_name + '.gif')
+                    logger.animate(self.imgs, self.traj_name + '.mp4')
 
 
 @as_hook

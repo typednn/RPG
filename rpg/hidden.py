@@ -88,12 +88,12 @@ class Categorical(HiddenSpace):
 
 class Gaussian(HiddenSpace):
     def __init__(
-        self, cfg=None, dim=6,
+        self, cfg=None, n=6,
         head = Normal.gdc(linear=True, std_mode='fix_no_grad', std_scale=0.3989)
     ) -> None:
         super().__init__()
-        self._dim = dim 
-        self._space = Box(-1, 1, (dim,))
+        self._dim = n
+        self._space = Box(-1, 1, (n,))
         self.head = Normal(self.space, head).cuda()
 
     @property

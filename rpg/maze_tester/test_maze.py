@@ -24,7 +24,7 @@ if __name__ == '__main__':
         update_train_step=1,
         horizon=3,
         actor_delay=4, #10,
-        z_delay=4,
+        z_delay=0,
 
 
         trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
@@ -74,8 +74,15 @@ if __name__ == '__main__':
 
             small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
 
-            ant=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='AntMaze', path='tmp/antmaze'),
+            ant=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze'),
             block=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='BlockPush', path='tmp/block'),
+
+            gaussian=dict(_inherit='small', env_cfg=dict(n=1),
+                hidden=dict(TYPE='Gaussian', n=5), 
+                info=dict(coef=0.001, weight=dict(TYPE='linear', min_value=1., end=8000)),
+                # head=dict(std_scale=0.01),
+                path = 'tmp/gaussian_maze',
+            ),
         ),
     ) # do not know if we need max_grad_norm
     trainer.run_rpgm()

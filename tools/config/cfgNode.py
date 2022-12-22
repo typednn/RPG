@@ -261,7 +261,7 @@ def merge_a_into_b_builder(a: CN, b: CN, key_list=[]):
                 b[k] = v
         elif b.is_new_allowed():
             b[k] = v
-        else:
+        elif '_exemption' not in b or k not in b['_exemption']:
             # we don't consider any deprecated or renamed key
             print(a, '\n', '-'*60, '\n', b)
             raise KeyError("Non-existent config key: {}".format(full_key))

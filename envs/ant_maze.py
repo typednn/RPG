@@ -85,4 +85,4 @@ class AntMaze(gym.Env):
         #print(obs.shape, anchor.shape)
         reached = torch.abs(obs[None, None, :, :] - anchor[:, :, None, :])
         reached = torch.logical_and(reached[..., 0] < 0.5, reached[..., 1] < 0.5)
-        return reached.sum(axis=-1).float().detach().cpu().numpy()
+        return reached.sum(axis=-1).float().detach().cpu().numpy()[::-1]

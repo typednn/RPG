@@ -69,6 +69,11 @@ base_config = dict(
         path='tmp/rndreward'),
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
+
+        gaussian=dict(_inherit='small', env_cfg=dict(n=1),
+            hidden=dict(TYPE='Gaussian', n=5), 
+            info=dict(coef=0.001, weight=dict(TYPE='linear', min_value=1., end=8000)),
+        ),
     ),
 )
 
@@ -346,6 +351,10 @@ if __name__ == '__main__':
 
     exp.add_exps(
         'bufrl', dict(rnd=dict(buffer_size=[1000, 10000, 100000, int(1e6)]), hidden=dict(n=1)), ['bs3', 'bs4', 'bs5', 'bs6'], base='small',
+    )
+
+    exp.add_exps(
+        'normalinfo', dict(info=dict(coef=[0.001, 0.005, 0.01, 0.05, 0.1])), base='gaussian',
     )
 
     exp.main()

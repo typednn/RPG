@@ -116,7 +116,7 @@ class GeneralizedQ(torch.nn.Module):
             ts.append(timestep)
 
             if len(z_seq) <= idx:
-                z, _logp_z, z_new, logp_z_new, _entz = pi_z(s, z, prev_action=z, timestep=timestep)
+                z, _logp_z, _entz , z_new, logp_z_new = pi_z(s, z, prev_action=z, timestep=timestep)
                 logp_z.append(_logp_z[..., None])
                 entz.append(_entz[..., None])
                 z_seq.append(z)

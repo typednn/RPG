@@ -99,8 +99,8 @@ class Trainer(Configurable, RLAlgo):
 
         # z learning ..
         z_head = self.z_space.make_policy_head(z_head)
-        pi_z_net = QPolicy(state_dim + z_space.dim, hidden_dim, z_head, time_embedding=time_embedding).cuda()
-        self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z)
+        pi_z_net = QPolicy(state_dim, hidden_dim, z_head, time_embedding=time_embedding).cuda()
+        self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z, ignore_hidden=True)
 
         #self.info_net = lambda x: x['rewards'], 0, 0
         self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, cfg=trainer)
@@ -134,8 +134,6 @@ class Trainer(Configurable, RLAlgo):
         z = seg.z
         # .obs_seq[0], seg.timesteps[0], seg.z
         if self._cfg.relabel > 0.:
-            #TODO: other relabel method, use the future state's info to relabel the current state's z
-            #new_z = self.info_learner.sample_z(self.dynamics_net.enc_s(state))[0]
             assert seg.future is not None
             o, no, a = seg.future
             traj = self.dynamics_net.enc_s(torch.stack((o, no)))
@@ -192,14 +190,14 @@ class Trainer(Configurable, RLAlgo):
         if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
             o, z, t = self.buffer.sample_start(self._cfg.batch_size)
             assert (t < 1).all()
-            z = self.relabel_z(o, t, z)
+            #z = self.relabel_z(o, t, z) relabel does not makes any sense here
             rollout = self.dynamics_net.inference(o, z, t, self.horizon, self.pi_z, self.pi_a, intrinsic_reward=self.intrinsic_reward)
             self.pi_z.update(rollout)
 
     def update(self):
         self.update_dynamcis()
         self.update_pi_a()
-        # self.update_pi_z()
+        self.update_pi_z()
         self.update_step += 1
         if self.update_step % self._cfg.update_target_freq == 0:
             self.model_learner.ema(self._cfg.tau)
