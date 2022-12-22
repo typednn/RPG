@@ -16,6 +16,10 @@ class AntMaze(gym.Env):
 
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, shape=obs.shape, dtype=np.float32)
         self.action_space = self.ant_env.action_space
+
+        self.action_scale = self.action_space.high[0]
+        self.action_space = gym.spaces.Box(-1, 1, shape=self.action_space.shape, dtype=np.float32)
+
         self.obs_dim = obs_dim
         self.grid_size = self.ant_env.ant_env.MAZE_SIZE_SCALING
 
@@ -29,7 +33,7 @@ class AntMaze(gym.Env):
         return self.get_obs()
 
     def step(self, action):
-        self.low_obs, _, _, _ = self.ant_env.step(action)
+        self.low_obs, _, _, _ = self.ant_env.step(action * self.action_scale)
         self.loc = self.low_obs[:2].copy() #/self.ant_env.MAZE_SIZE_SCALING
         reward = 0.
         return self.get_obs(), reward, False, {}

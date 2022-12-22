@@ -13,4 +13,4 @@ for i in range(10):
     images.append(env.render(mode='rgb_array'))
 
 from tools.utils import animate
-animate(images, 'output.gif', _return=False)
+animate(images, 'output.mp4', _return=False)
