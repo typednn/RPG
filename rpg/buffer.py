@@ -88,12 +88,16 @@ class ReplayBuffer(Configurable):
         self.capacity = max_episode_num * episode_length
         self.horizon = horizon
 
-        dtype = torch.float32 # if cfg.modality == 'state' else torch.uint8
+        dtype = torch.float32
+        obs_device = self.device if len(obs_space.shape) == 1 else 'cpu'
+
+        obs_dtype = self.obs_dtype = dtype if len(obs_space.shape) == 'state' else torch.uint8
+        self.obs_device = obs_device
 
         if not isinstance(obs_space, dict):
             obs_shape = obs_space.shape
-            self._obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device) # avoid last buggy..
-            self._next_obs = torch.empty((self.capacity, *obs_shape), dtype=dtype, device=self.device)
+            self._obs = torch.empty((self.capacity, *obs_shape), dtype=obs_dtype, device=obs_device) # avoid last buggy..
+            self._next_obs = torch.empty((self.capacity, *obs_shape), dtype=obs_dtype, device=obs_device)
             self.obs_shape = obs_shape
         else:
             self._obs = {}
@@ -132,8 +136,9 @@ class ReplayBuffer(Configurable):
 
         # assert self.episode_length == traj.timesteps, "episode length mismatch"
         length = traj.timesteps
-        cur_obs = traj.get_tensor('obs', self.device)
-        next_obs = traj.get_tensor('next_obs', self.device)
+        cur_obs = traj.get_tensor('obs', self.obs_device, dtype=None)
+        next_obs = traj.get_tensor('next_obs', self.obs_device, dtype=None)
+
         actions = traj.get_tensor('a', self.device)
         rewards = traj.get_tensor('r', self.device)
         timesteps = traj.get_tensor('timestep', self.device)
@@ -204,7 +209,7 @@ class ReplayBuffer(Configurable):
         def get_obs_by_idx(_obs, idxs):
             if isinstance(_obs, dict):
                 return {k: v[idxs.cpu()].to(self.device) for k, v in _obs.items()}
-            return _obs[idxs]
+            return _obs[idxs.to(self.obs_device)].to(self.device)
 
         obs = get_obs_by_idx(self._obs, idxs)
         if isinstance(self._obs, dict):

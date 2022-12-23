@@ -12,6 +12,6 @@ if __name__ == '__main__':
 
     trainer = Trainer.parse(
         None, 
-        cfg=base_config
+        **base_config
     ) # do not know if we need max_grad_norm
     trainer.run_rpgm()

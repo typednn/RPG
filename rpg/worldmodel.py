@@ -227,7 +227,11 @@ class HiddenDynamicNet(Network, GeneralizedQ):
                 args.append(BN(latent_dim))
 
             if not isinstance(obs_space, dict):
-                enc_s = Seq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+                if len(obs_space.shape) == 1:
+                    enc_s = Seq(mlp(obs_space.shape[0], hidden_dim, latent_dim), *args) # encode state with time step ..
+                else:
+                    from .pixel_encoder import make_cnn
+                    enc_s = make_cnn(obs_space.shape, latent_dim, 32)
             else:
                 from nn.modules.point import PointNet
                 assert not state_layer_norm and not state_batch_norm

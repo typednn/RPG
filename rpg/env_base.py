@@ -72,6 +72,10 @@ class GymVecEnv(VecEnv):
                 from envs.softbody.plb_envs import RopeEnv
                 return TimeLimit(RopeEnv(**kwargs), 50)
 
+            elif env_name == 'PixelCheetah':
+                from envs.mujoco_env import make
+                return make('HalfCheetah-v3', **kwargs)
+
             return gym.make(env_name)
 
         self.nenv = n
