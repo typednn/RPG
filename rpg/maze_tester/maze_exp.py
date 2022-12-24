@@ -69,7 +69,19 @@ base_config = dict(
         path='tmp/rndreward'),
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
-        ant=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze', save_video=1000),
+        ant=dict(
+            _inherit='small', env_cfg=dict(n=1, obs_dim=8), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze', save_video=1000,
+            head=dict(linear=False, squash=False),
+            hooks=dict(save_traj=dict(n_epoch=40, save_gif_epochs=10, occupancy=1)),
+            max_epoch=200000,
+            steps_per_epoch=150,
+            buffer=dict(max_episode_num=10000),
+        ),
+        ant_squash=dict(
+            _inherit='ant', head=dict(squash=True, linear=False), path='tmp/antmaze_squash',
+        ),
+        ant_test=dict(_inherit='ant', hooks=dict(plot_anchor=dict(n_epoch=1)), path='tmp/antmaze_test'),
+
         block=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='BlockPush', path='tmp/block', save_video=1000),
         gaussian=dict(_inherit='small', env_cfg=dict(n=1),
             hidden=dict(TYPE='Gaussian', n=5), 

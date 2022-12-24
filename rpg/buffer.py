@@ -91,7 +91,7 @@ class ReplayBuffer(Configurable):
         dtype = torch.float32
         obs_device = self.device if len(obs_space.shape) == 1 else 'cpu'
 
-        obs_dtype = self.obs_dtype = dtype if len(obs_space.shape) == 'state' else torch.uint8
+        obs_dtype = self.obs_dtype = dtype if len(obs_space.shape) == 1 else torch.uint8
         self.obs_device = obs_device
 
         if not isinstance(obs_space, dict):

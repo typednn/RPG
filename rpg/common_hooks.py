@@ -318,3 +318,26 @@ class monitor_action_std(HookBase):
 
             if self.std_decay is not None:
                 self.head.std_scale = self.scheduler.step(epoch=trainer.total)
+
+
+
+@as_hook
+class plot_anchor(HookBase):
+    def __init__(self, n_epoch=1) -> None:
+        super().__init__()
+        self.n_epoch = n_epoch
+
+    def init(self, trainer):
+        self.env = trainer.env
+        info = self.env.anchor_state[0]
+        self.state = info['state']
+        self.coord = info['coord']
+
+    def on_epoch(self, trainer, **locals_):
+        from solver.draw_utils import plot_colored_embedding, plot_point_values
+        if trainer.epoch_id % self.n_epoch == 0:
+            rnd = trainer.exploration.intrinsic_reward(self.state).detach().cpu().numpy()
+            import matplotlib.pyplot as plt
+            plt.clf()
+            plot_point_values(rnd, self.coord, s=2)
+            logger.savefig('rnd.png')

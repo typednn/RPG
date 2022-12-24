@@ -69,14 +69,15 @@ class Trainer(Configurable, RLAlgo):
         if seed is not None:
             from tools.utils import set_seed
             set_seed(seed)
-    
-        Configurable.__init__(self)
-        RLAlgo.__init__(self, None, build_hooks(hooks))
 
         if env is None:
             from tools.config import CN
             from .env_base import make
             env = make(env_name, **CN(env_cfg))
+        self.env = env
+    
+        Configurable.__init__(self)
+        RLAlgo.__init__(self, None, build_hooks(hooks))
 
         obs_space = env.observation_space
         #self.z_space = z_space = create_hidden_space(z_dim, z_cont_dim)
@@ -85,7 +86,6 @@ class Trainer(Configurable, RLAlgo):
         self.z_space = z_space
 
         self.horizon = horizon
-        self.env = env
         self.device = 'cuda:0'
         self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
         self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model).cuda()

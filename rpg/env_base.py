@@ -49,7 +49,7 @@ class GymVecEnv(VecEnv):
 
             elif env_name == 'AntMaze':
                 from envs.ant_maze import AntMaze
-                return TimeLimit(AntMaze( **kwargs), 100)
+                return TimeLimit(AntMaze( **kwargs), 150)
 
             elif env_name == 'BlockPush':
                 import os
@@ -91,6 +91,10 @@ class GymVecEnv(VecEnv):
         self.action_space = self.vec_env.action_space[0]
 
         self.max_time_steps = self.vec_env._max_episode_steps[0]
+
+    @property
+    def anchor_state(self):
+        return self.vec_env.anchor_state
 
     def start(self, reset=False, **kwargs):
         self.kwargs = kwargs
