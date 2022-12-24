@@ -12,7 +12,7 @@ from gym.spaces import Box
 
 class InfoNet(Network):
     def __init__(self, 
-                state_dim, action_space, hidden_dim, hidden_space, cfg=None):
+                state_dim, action_space, hidden_dim, hidden_space, cfg=None, learn_posterior=False):
         super().__init__()
         action_dim = action_space.shape[0]
         from .hidden import HiddenSpace
@@ -20,6 +20,9 @@ class InfoNet(Network):
         self.info_net = Seq(mlp(state_dim + action_dim, hidden_dim, self.hidden.get_input_dim()))
 
         self.config = self.hidden._cfg
+
+        if learn_posterior:
+            self.posterior_z = Seq(mlp(state_dim, hidden_dim, self.hidden.get_input_dim()))
 
     def compute_feature(self, states, a_seq):
         states = states * self.config.obs_weight
@@ -55,8 +58,13 @@ class InfoNet(Network):
     def enc_s(self, obs, timestep):
         return self.enc_s(obs, timestep=timestep)
 
-    # def get_posterior(self, states):
-    #     return self.posterior_z(states)
+    def get_posterior(self, state, z=None):
+        #return self.posterior_z(states)
+        inp = self.posterior_z(state)
+        if z is not None:
+            return self.hidden.likelihood(inp, z, timestep=None)
+        else:
+            return self.hidden.sample(inp)
 
 
 from tools.utils.scheduler import Scheduler
@@ -65,13 +73,15 @@ class InfoLearner(LossOptimizer):
                  net=InfoNet.dc,
                  coef=1.,
                  weight=Scheduler.to_build(TYPE='constant'),
-                 hidden_dim=256,
+                 hidden_dim=256, learn_posterior=False
         ):
         net = InfoNet(
-            state_dim, action_space, hidden_dim, hidden_space, cfg=net
+            state_dim, action_space, hidden_dim, hidden_space, cfg=net,
+            learn_posterior=learn_posterior
         ).cuda()
         self.coef = coef
         self.info_decay: Scheduler = Scheduler.build(weight)
+        self.learn_posterior = learn_posterior
         super().__init__(net)
         self.net = net
 
@@ -91,11 +101,12 @@ class InfoLearner(LossOptimizer):
         z_detach = rollout['z'].detach()
 
         mutual_info = self.net(rollout, mode='likelihood').mean()
-        #posterior = self.net.get_posterior(rollout['state'][1:].detach()).log_prob(z_detach).mean()
-        posterior = 0. # TODO: adding this later. if necessary
+        if self.learn_posterior:
+            posterior = self.net.get_posterior(rollout['state'][1:].detach()).log_prob(z_detach).mean()
 
         self.optimize(-mutual_info - posterior)
 
+        # TODO: estimate the posterior
         logger.logkv_mean('info_ce_loss', float(-mutual_info))
         logger.logkv_mean('info_posterior_loss', float(-posterior))
 
@@ -113,3 +124,6 @@ class InfoLearner(LossOptimizer):
             },
             mode='sample'
         )[0]
+
+    def sample_z_by_posteior(self, states):
+        return self.net.get_posterior(states)[0]

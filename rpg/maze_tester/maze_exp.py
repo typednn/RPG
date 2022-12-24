@@ -78,7 +78,7 @@ base_config = dict(
             buffer=dict(max_episode_num=10000),
         ),
         ant_squash=dict(
-            _inherit='ant', head=dict(squash=True, linear=False), path='tmp/antmaze_squash',
+            _inherit='ant', head=dict(squash=True, linear=False, std_scale=0.4), path='tmp/antmaze_squash',
         ),
         ant_test=dict(_inherit='ant', hooks=dict(plot_anchor=dict(n_epoch=1)), path='tmp/antmaze_test'),
 

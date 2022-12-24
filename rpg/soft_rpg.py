@@ -61,6 +61,7 @@ class Trainer(Configurable, RLAlgo):
         # trainer utils ..
         hooks=None, path=None, wandb=None, log_date=False,
         tau=0.005, relabel=0.,
+        relabel_method='forward',
 
         time_embedding=0,
 
@@ -110,7 +111,9 @@ class Trainer(Configurable, RLAlgo):
 
         self.intrinsics = [self.pi_a, self.pi_z]
         if self.z_space.learn:
-            self.info_learner = InfoLearner(state_dim, env.action_space, z_space, cfg=info, hidden_dim=hidden_dim)
+            learn_posterior = (relabel > 0. and relabel_method != 'future')
+            self.info_learner = InfoLearner(state_dim, env.action_space, z_space, cfg=info,
+                                            hidden_dim=hidden_dim, learn_posterior=learn_posterior)
             self.intrinsics.append(self.info_learner)
         self.make_rnd()
 
@@ -134,17 +137,26 @@ class Trainer(Configurable, RLAlgo):
         z = seg.z
         # .obs_seq[0], seg.timesteps[0], seg.z
         if self._cfg.relabel > 0.:
-            assert seg.future is not None
-            o, no, a = seg.future
-            traj = self.dynamics_net.enc_s(torch.stack((o, no)))
-            new_z = self.info_learner.sample_z(traj, a)[0]
-            # if self.update_step % 100 == 0:
-            #     print(z)
-            #     print(new_z)
+            if self._cfg.relabel_method == 'future':
+                assert seg.future is not None
+                o, no, a = seg.future
+                traj = self.dynamics_net.enc_s(torch.stack((o, no)))
+                new_z = self.info_learner.sample_z(traj, a)[0]
+                # if self.update_step % 100 == 0:
+                #     print(z)
+                #     print(new_z)
+            else:
+                t = seg.timesteps[0]
+                # we need to compute new_z with pi_z for t == 0 or sample_z for t > 0
+                is_start = (t == 0)
+                states = self.dynamics_net.enc_s(seg.obs_seq[0])
+                new_z = self.info_learner.sample_posteror(states)
+                if is_start.any():
+                    new_z[is_start] = self.pi_z(states[is_start], seg.z, prev_action=None).a
 
             mask = torch.rand(size=(len(z),)) < self._cfg.relabel
             if new_z.dtype == torch.float32:
-                #new_z = new_z.to(torch.int64)
+                # discard samples with too low probability
                 prior = torch.distributions.Normal(0, 1)
                 mask[prior.log_prob(new_z).mean(axis=-1) < -2.] = False
                 
