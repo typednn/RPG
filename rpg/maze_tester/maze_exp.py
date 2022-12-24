@@ -370,4 +370,17 @@ if __name__ == '__main__':
         'normalinfo', dict(info=dict(coef=[0.001, 0.005, 0.01, 0.05, 0.1])), base='gaussian',
     )
 
+    exp.add_exps(
+        'antsquashstd', dict(head=dict(std_scale=[0.2, 0.3, 0.4, 0.5])), base='ant_squash',
+    )
+
+    exp.add_exps(
+        'antstd', dict(head=dict(std_scale=[0.2, 0.3, 0.4, 0.5])), base='ant',
+    )
+
+    exp.add_exps(
+        'antinfo', dict(info=dict(coef=[0.01, 0.05, 0.1, 0.001])), base='ant',
+    )
+
+
     exp.main()
