@@ -123,6 +123,7 @@ class Experiment(Configurable):
             'SmallMaze': dict(n=5),
             'MediumMaze': dict(n=5),
             'TreeMaze': dict(n=5),
+            'AntMaze': dict(n=1, obs_dim=8),
         }
 
     def build_configs(self, env_name, expname, verbose=False):
@@ -207,10 +208,10 @@ class Experiment(Configurable):
         for name, k in zip(names, variants):
             k =CN(k)
             var_cfg = cfg.clone()
-            merge_a_into_b(k, var_cfg)
             merge_a_into_b(
                 CN(dict(env_name=env_name, env_cfg=env_cfg)), var_cfg
             )
+            merge_a_into_b(k, var_cfg)
             cfg_name = f'{env_name}_{expname}_{name}'
 
             var_cfg.set_new_allowed(True)
