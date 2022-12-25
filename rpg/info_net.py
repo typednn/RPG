@@ -102,7 +102,7 @@ class InfoLearner(LossOptimizer):
 
         mutual_info = self.net(rollout, mode='likelihood').mean()
         if self.learn_posterior:
-            posterior = self.net.get_posterior(rollout['state'][1:].detach()).log_prob(z_detach).mean()
+            posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
 
         self.optimize(-mutual_info - posterior)
 
@@ -125,5 +125,5 @@ class InfoLearner(LossOptimizer):
             mode='sample'
         )[0]
 
-    def sample_z_by_posteior(self, states):
+    def sample_posterior(self, states):
         return self.net.get_posterior(states)[0]

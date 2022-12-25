@@ -136,7 +136,7 @@ class Trainer(Configurable, RLAlgo):
     def relabel_z(self, seg):
         z = seg.z
         # .obs_seq[0], seg.timesteps[0], seg.z
-        if self._cfg.relabel > 0.:
+        if self._cfg.relabel > 0. and self.update_step > 100:
             if self._cfg.relabel_method == 'future':
                 assert seg.future is not None
                 o, no, a = seg.future
@@ -150,7 +150,7 @@ class Trainer(Configurable, RLAlgo):
                 # we need to compute new_z with pi_z for t == 0 or sample_z for t > 0
                 is_start = (t == 0)
                 states = self.dynamics_net.enc_s(seg.obs_seq[0])
-                new_z = self.info_learner.sample_posteror(states)
+                new_z = self.info_learner.sample_posterior(states)
                 if is_start.any():
                     new_z[is_start] = self.pi_z(states[is_start], seg.z, prev_action=None).a
 

@@ -360,7 +360,7 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'treerl2', dict(hidden=dict(n=[1, 6]), env_cfg=dict(n=1), info=dict(coef=0.02)), names=['rl', 'rpg'], base='small',
+        'treerl2', dict(relabel=[0., 0., 0.8], hidden=dict(n=[1, 6, 6]), env_cfg=dict(n=1), info=dict(coef=0.02)), names=['rl', 'rpg', 'relabel'], base='small',
     )
 
     exp.add_exps(
