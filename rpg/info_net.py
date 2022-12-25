@@ -103,6 +103,8 @@ class InfoLearner(LossOptimizer):
         mutual_info = self.net(rollout, mode='likelihood').mean()
         if self.learn_posterior:
             posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
+        else:
+            posterior = 0.
 
         self.optimize(-mutual_info - posterior)
 
