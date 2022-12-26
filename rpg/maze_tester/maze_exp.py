@@ -106,12 +106,13 @@ class Experiment(Configurable):
         self.exps = {}
         self.opt = opt
 
-    def add_exps(self, expname, cfgs, names=None, base=None):
+    def add_exps(self, expname, cfgs, names=None, base=None, default_env=None):
         if names is not None:
             cfgs['_names'] = names
         self.exps[expname] = {
             'cfgs': cfgs,
-            'base': base
+            'base': base,
+            'default_env': default_env,
         }
 
     def get_variants(self):
@@ -140,6 +141,9 @@ class Experiment(Configurable):
         exp_config = copy.deepcopy(self.exps[expname])
         base = exp_config.pop('base', None)
         cfgs = exp_config.pop('cfgs')
+        if env_name is None:
+            env_name = exp_config.pop('default_env', None)
+        assert env_name is not None
 
         names = cfgs.pop('_names', [])
         names = [[i] for i in names]
@@ -203,13 +207,19 @@ class Experiment(Configurable):
             
 
         outputs = []
-        env_cfg = self.env_configs[env_name]
+
+        env_cfg = None
+        if 'env_name' in self.env_configs:
+            env_cfg = self.env_configs[env_name]
 
         for name, k in zip(names, variants):
             k =CN(k)
             var_cfg = cfg.clone()
+            kws = dict(env_name=env_name)
+            if env_cfg is not None:
+                kws['env_cfg'] = env_cfg
             merge_a_into_b(
-                CN(dict(env_name=env_name, env_cfg=env_cfg)), var_cfg
+                CN(kws), var_cfg
             )
             merge_a_into_b(k, var_cfg)
             cfg_name = f'{env_name}_{expname}_{name}'
@@ -268,7 +278,9 @@ class Experiment(Configurable):
             # run on cluster
             import sys
             for expname, configs in zip(exps, configs):
-                _base = ' '.join([sys.argv[0], '--env_name', args.env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)])
+                env_name = configs.env_name
+                arguments = [sys.argv[0], '--env_name', env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)]
+                _base = ' '.join(arguments)
 
                 if args.seed is None:
                     seeds = [None]
@@ -319,7 +331,7 @@ def build_exp(**kwargs):
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--env_name', default=kwargs.get('env_name', 'MediumMaze'), type=str, help='env name')
+    parser.add_argument('--env_name', default=None, type=str, help='env name')
     parser.add_argument('--exp', default=kwargs.get('exp', 'zdim'), type=str, help='experiment to run')
 
     parser.add_argument('--id', default=None, type=int, help='id')
@@ -386,8 +398,15 @@ if __name__ == '__main__':
     exp.add_exps(
         'antrl', dict(hidden=dict(n=[1, 6, 6, 6, 6, 6]), info=dict(coef=[0., 0., 0.01, 0.05, 0.1, 0.001])),
                     names=['rl', 'rpg0.', 'rpg0.01', 'rpg0.05', 'rpg0.1', 'rpg0.001'], base='ant',
+        default_env='AntMaze',
     )
 
+
+    exp.add_exps(
+        'ant2rl', dict(hidden=dict(n=[1, 6, 6]), info=dict(coef=[0., 0.05, 0.001])),
+                    names=['rl', 'rpg0.05', 'rpg0.001'], base='ant',
+        default_env='AntMaze2',
+    )
 
 
     exp.main()

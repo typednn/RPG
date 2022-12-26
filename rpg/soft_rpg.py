@@ -76,6 +76,7 @@ class Trainer(Configurable, RLAlgo):
             from .env_base import make
             env = make(env_name, **CN(env_cfg))
         self.env = env
+        print('path', path)
     
         Configurable.__init__(self)
         RLAlgo.__init__(self, None, build_hooks(hooks))
