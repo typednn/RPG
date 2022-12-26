@@ -80,7 +80,8 @@ base_config = dict(
         ant_squash=dict(
             _inherit='ant', head=dict(squash=True, linear=False, std_scale=0.4), path='tmp/antmaze_squash',
         ),
-        ant_test=dict(_inherit='ant', hooks=dict(plot_anchor=dict(n_epoch=1)), path='tmp/antmaze_test'),
+        ant_nornd=dict(_inherit='ant_squash', rnd=dict(scale=0.), path='tmp/antmaze_nornd'),
+        # ant_test=dict(_inherit='ant', hooks=dict(plot_anchor=dict(n_epoch=1)), path='tmp/antmaze_test'),
 
         block=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='BlockPush', path='tmp/block', save_video=1000),
         gaussian=dict(_inherit='small', env_cfg=dict(n=1),
@@ -410,5 +411,9 @@ if __name__ == '__main__':
         default_env='AntMaze2',
     )
 
+    exp.add_exps(
+        'antnornd', dict(hidden=dict(n=[6, 6]), info=dict(coef=[0.05, 0.001])), names=['rpg0.05', 'rpg0.001'], base='ant_nornd',
+        default_env='AntMaze2',
+    )
 
     exp.main()
