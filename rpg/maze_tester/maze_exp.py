@@ -406,7 +406,7 @@ if __name__ == '__main__':
 
     exp.add_exps(
         'ant2rl', dict(hidden=dict(n=[1, 6, 6]), info=dict(coef=[0., 0.05, 0.001])),
-                    names=['rl', 'rpg0.05', 'rpg0.001'], base='ant',
+                    names=['rl', 'rpg0.05', 'rpg0.001'], base='ant_squash',
         default_env='AntMaze2',
     )
 
