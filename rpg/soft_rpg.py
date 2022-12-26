@@ -158,7 +158,7 @@ class Trainer(Configurable, RLAlgo):
             if new_z.dtype == torch.float32:
                 # discard samples with too low probability
                 prior = torch.distributions.Normal(0, 1)
-                mask[prior.log_prob(new_z).mean(axis=-1) < -2.] = False
+                mask[prior.log_prob(new_z).mean(axis=-1) < -1.] = False
                 
 
             z = z.clone()
@@ -166,6 +166,7 @@ class Trainer(Configurable, RLAlgo):
 
             if new_z.dtype == torch.float32:
                 logger.logkv_mean('relabel', new_z.std())
+                logger.logkv_mean('relabel_ratio', mask.float().mean())
         return z
 
     def update_dynamcis(self):

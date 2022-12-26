@@ -383,5 +383,11 @@ if __name__ == '__main__':
         'antinfo', dict(info=dict(coef=[0.01, 0.05, 0.1, 0.001])), base='ant',
     )
 
+    exp.add_exps(
+        'antrl', dict(hidden=dict(n=[1, 6, 6, 6, 6, 6]), info=dict(coef=[0., 0., 0.01, 0.05, 0.1, 0.001])),
+                    names=['rl', 'rpg0.', 'rpg0.01', 'rpg0.05', 'rpg0.1', 'rpg0.001'], base='ant',
+    )
+
+
 
     exp.main()

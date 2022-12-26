@@ -31,7 +31,7 @@ class HiddenSpace(Configurable):
     def likelihood(self, inp, z, timestep):
         raise NotImplementedError
 
-    def sample(self, inp):
+    def sample(self, inp, mode='sample'):
         return self.head(inp).sample()
 
     def reward(self, inp, z, timestep):
@@ -116,3 +116,12 @@ class Gaussian(HiddenSpace):
 
     def likelihood(self, inp, z, timestep):
         return self.head(inp).log_prob(z)
+
+    def sample(self, inp, mode='sample'):
+        if mode == 'sample':
+            return super().sample(inp, mode)
+        else:
+            # print(inp.shape)
+            # print(self.head(inp).dist.loc.shape)
+            # print(super().sample(inp, mode).shape)
+            return (self.head(inp).dist.loc, None)

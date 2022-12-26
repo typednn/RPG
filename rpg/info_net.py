@@ -64,7 +64,7 @@ class InfoNet(Network):
         if z is not None:
             return self.hidden.likelihood(inp, z, timestep=None)
         else:
-            return self.hidden.sample(inp)
+            return self.hidden.sample(inp, mode='mean')
 
 
 from tools.utils.scheduler import Scheduler
@@ -106,7 +106,7 @@ class InfoLearner(LossOptimizer):
         else:
             posterior = 0.
 
-        self.optimize(-mutual_info - posterior)
+        self.optimize(- mutual_info - posterior)
 
         # TODO: estimate the posterior
         logger.logkv_mean('info_ce_loss', float(-mutual_info))
