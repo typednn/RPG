@@ -88,6 +88,12 @@ base_config = dict(
             hidden=dict(TYPE='Gaussian', n=5), 
             info=dict(coef=0.001, weight=dict(TYPE='linear', min_value=1., end=8000)), path = 'tmp/gaussian_maze',
         ),
+
+        ant_gaussian=dict(
+            _inherit='ant_squash',
+            hidden=dict(TYPE='Gaussian', n=5), 
+            info=dict(coef=0.001), path = 'tmp/gaussian_maze',
+        ),
     ),
 )
 
@@ -414,6 +420,10 @@ if __name__ == '__main__':
     exp.add_exps(
         'ant2nornd', dict(hidden=dict(n=[6, 6]), info=dict(coef=[0.05, 0.001])), names=['rpg0.05', 'rpg0.001'], base='ant_nornd',
         default_env='AntMaze2',
+    )
+
+    exp.add_exps(
+        'ant2normal', dict(info=dict(coef=[0.001, 0.005, 0.01])), base='ant_gaussian', default_env='AntMaze2',
     )
 
     exp.main()
