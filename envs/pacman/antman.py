@@ -27,7 +27,7 @@ class AntManEnv(PacManEnv):
                  reset_goal = True,
                  block_size=20,
                  reward_type='sparse',
-                 include_low_obs=1., penalty=0.2):
+                 include_low_obs=1., penalty=0.2, reset_seed=0):
         Configurable.__init__(self)
 
         self.ant_env = AntMazeEnv(height, width, maze_size_scaling=4.8, wall_size=0.1)
@@ -51,7 +51,7 @@ class AntManEnv(PacManEnv):
         self.maze = None
         import random
         state = random.getstate()
-        random.seed(0)
+        random.seed(reset_seed)
         self.reset()
         random.setstate(state)
 

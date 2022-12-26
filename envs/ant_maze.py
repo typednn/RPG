@@ -7,12 +7,13 @@ from .maze import get_embedder
 
 
 class AntMaze(gym.Env):
-    def __init__(self, obs_dim=8, reward=False) -> None:
+    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0) -> None:
         super().__init__()
         assert not reward
         self.reward = reward
+        self.init_pos = init_pos
 
-        self.ant_env = AntManEnv(reset_maze=False)
+        self.ant_env = AntManEnv(reset_maze=False, reset_seed=maze_id)
 
         self.obs_dim = obs_dim
         if self.obs_dim > 0:
@@ -43,7 +44,7 @@ class AntMaze(gym.Env):
         return self.decorate_obs(self.low_obs.copy())
 
     def reset(self):
-        self.low_obs = self.ant_env.reset(player=[3, 3])
+        self.low_obs = self.ant_env.reset(player=list(self.init_pos))
         return self.get_obs()
 
     def step(self, action):

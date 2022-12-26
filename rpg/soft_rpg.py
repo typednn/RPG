@@ -55,7 +55,7 @@ class Trainer(Configurable, RLAlgo):
         # update parameters..
         horizon=6, batch_size=512, update_target_freq=2, update_train_step=1, warmup_steps=1000, steps_per_epoch=None,
 
-        actor_delay=2, z_delay=0,
+        actor_delay=2, z_delay=0, info_delay=0,
         eval_episode=10, save_video=0,
 
         # trainer utils ..
@@ -181,23 +181,30 @@ class Trainer(Configurable, RLAlgo):
             seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
     
     def update_pi_a(self):
-        if self.update_step % self._cfg.actor_delay == 0:
+        actor_delay = self._cfg.actor_delay
+        info_delay = self._cfg.info_delay
+
+        update_pi_a = self.update_step % actor_delay == 0
+        update_info = (info_delay > 0 and self.update_step % info_delay == 0) or (info_delay == 0 and update_pi_a)
+
+        if update_pi_a or update_info:
             seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
             z = self.relabel_z(seg)
             rollout = self.dynamics_net.inference(
                 seg.obs_seq[0], z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
                 intrinsic_reward=self.intrinsic_reward
             )
-            self.pi_a.update(rollout)
-            if self.z_space.learn:
-                self.info_learner.update(rollout)
 
-            if self.exploration is not None:
-                self.exploration.update_by_rollout(rollout)
+            if update_pi_a:
+                self.pi_a.update(rollout)
+                if self.exploration is not None:
+                    self.exploration.update_by_rollout(rollout)
+                for k, v in rollout['extra_rewards'].items():
+                    logger.logkv_mean(f'reward_{k}', float(v.mean()))
 
-
-            for k, v in rollout['extra_rewards'].items():
-                logger.logkv_mean(f'reward_{k}', float(v.mean()))
+            if update_info:
+                if self.z_space.learn:
+                    self.info_learner.update(rollout)
 
     def update_pi_z(self):
         if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
