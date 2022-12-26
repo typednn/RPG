@@ -278,9 +278,13 @@ class Experiment(Configurable):
             # run on cluster
             import sys
             for expname, configs in zip(exps, configs):
-                env_name = configs.env_name
-                arguments = [sys.argv[0], '--env_name', env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)]
-                _base = ' '.join(arguments)
+                def make_base(configs, seed=None):
+                    env_name = configs.env_name
+                    arguments = [sys.argv[0], '--env_name', env_name, '--exp', expname, '--wandb', str(exp._cfg.wandb)]
+                    base = ' '.join(arguments)
+                    if seed is not None:
+                        base = base + ' --seed ' + seed
+                    return base
 
                 if args.seed is None:
                     seeds = [None]
@@ -288,19 +292,17 @@ class Experiment(Configurable):
                     seeds = args.seed.split(',')
 
                 for seed in seeds:
-                    base = _base
-                    if seed is not None:
-                        base = _base + ' --seed ' + seed
 
                     if args.runall == 'local':
                         for i in range(len(configs)):
-                            cmd = 'python3 '+base + ' --id '+str(i)
+                            cmd = 'python3 '+ make_base(configs[i], seed) + ' --id '+str(i)
                             print('running ', cmd, 'yes/no?')
                             x = input()
                             if x == 'yes':
                                 os.system(cmd)
                     else:
                         for i in range(len(configs)):
+                            base = make_base(configs[i], seed)
                             silent = ' --silent ' if args.silent else ''
                             seed_info = '-seed-' + str(seed) if seed is not None else ''
                             cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
