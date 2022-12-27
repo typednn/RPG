@@ -431,7 +431,7 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'ant2nornd', dict(hidden=dict(n=[6, 6]), info=dict(coef=[0.05, 0.001])), names=['rpg0.05', 'rpg0.001'], base='ant_nornd',
+        'ant2nornd', dict(hidden=dict(n=[6, 6, 6, 6, 6, 6]), info=dict(coef=[0.05, 0.1, 0.5, 1., 5., 10.])), base='ant_nornd',
         default_env='AntMaze2',
     )
 
