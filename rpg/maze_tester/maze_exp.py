@@ -69,6 +69,12 @@ base_config = dict(
         path='tmp/rndreward'),
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
+        small_optimz=dict(_inherit='small', 
+            z_delay=8,
+            pi_z=dict(ent=dict(coef=5., target_mode='none', schedule=dict(TYPE='linear', min_value=1., end=1000))), path='tmp/small_optimz'),
+        #small_optimz2=dict(_inherit='small_optimz', pi_z=dict(ent=dict(coef=0.1)), path='tmp/small_optimz2'),; 0.1 is too small.
+        small_optimz2=dict(_inherit='small_optimz', pi_z=dict(ent=dict(coef=0.8)), path='tmp/small_optimz2'),
+
         ant=dict(
             _inherit='small', env_cfg=dict(n=1, obs_dim=8), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze', save_video=1000,
             head=dict(linear=False, squash=False),
@@ -419,8 +425,8 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'ant2rlv2', dict(hidden=dict(n=[1, 6]), info=dict(coef=[0., 0.05])),
-                    names=['rl', 'rpg0.05'], base='ant_squash',
+        'ant2rlv2', dict(hidden=dict(n=[1, 6, 6, 6]), info=dict(coef=[0., 0.05, 0.1, 0.5])),
+                    names=['rl', 'rpg0.05', 'rpg0.1', 'rpg0.5'], base='ant_squash',
         default_env='AntMaze2',
     )
 
