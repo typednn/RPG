@@ -76,6 +76,7 @@ base_config = dict(
             max_epoch=200000,
             steps_per_epoch=150,
             buffer=dict(max_episode_num=10000),
+            pi_a=dict(ent=dict(coef=0.01 * 0.001))
         ),
         ant_squash=dict(
             _inherit='ant', head=dict(squash=True, linear=False, std_scale=0.4), path='tmp/antmaze_squash',
@@ -423,7 +424,7 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'ant2normal', dict(info=dict(coef=[0.001, 0.005, 0.01, 0.0001])), base='ant_gaussian', default_env='AntMaze2',
+        'ant2normal', dict(info=dict(coef=[0.001, 0.005, 0.01,])), base='ant_gaussian', default_env='AntMaze2',
     )
 
     exp.main()
