@@ -66,6 +66,9 @@ class Trainer(Configurable, RLAlgo):
         time_embedding=0,
 
         seed=None,
+
+        
+        backbone=None,
     ):
         if seed is not None:
             from tools.utils import set_seed
@@ -90,18 +93,19 @@ class Trainer(Configurable, RLAlgo):
         self.horizon = horizon
         self.device = 'cuda:0'
         self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
-        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model).cuda()
+        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model, value_backbone=backbone).cuda()
 
         state_dim = self.dynamics_net.state_dim
         hidden_dim = 256
 
         from .policy_net import DiffPolicy, QPolicy
-        pi_a_net = DiffPolicy(state_dim + z_space.dim, hidden_dim, Normal(env.action_space, cfg=head), time_embedding=time_embedding).cuda()
+        pi_a_net = DiffPolicy(state_dim, z_space.dim, hidden_dim, Normal(env.action_space, cfg=head),
+                              cfg=backbone, time_embedding=time_embedding).cuda()
         self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, z_space.tokenize, cfg=pi_a)
 
         # z learning ..
         z_head = self.z_space.make_policy_head(z_head)
-        pi_z_net = QPolicy(state_dim, hidden_dim, z_head, time_embedding=time_embedding).cuda()
+        pi_z_net = QPolicy(state_dim, hidden_dim, z_head, cfg=backbone, time_embedding=time_embedding).cuda()
         self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z, ignore_hidden=True)
 
         #self.info_net = lambda x: x['rewards'], 0, 0

@@ -10,16 +10,19 @@ from tools.nn_base import Network
 from gym import spaces
 
 
-class AlphaPolicyBase(Network):
-    def __init__(self, cfg=None, observe_alpha=False, time_embedding=0) -> None:
+class BackboneBase(Network):
+    def __init__(self, cfg=None, observe_alpha=False, time_embedding=0, backbone_type='mlp') -> None:
         super().__init__()
+        assert time_embedding == 0, "time embedding is not supported yet"
         self.observe_alpha = observe_alpha
         self.alpha_dim = 2 if observe_alpha else 0
         self.alpha = None
 
         self.time_embedding = time_embedding
+        self.backbone_type = backbone_type
 
     def add_alpha(self, *args, timestep=None):
+        raise NotImplementedError()
         if self.time_embedding > 0:
             assert timestep is not None
             from .utils import positional_encoding
@@ -31,8 +34,15 @@ class AlphaPolicyBase(Network):
             x = torch.cat([x, v], dim=-1)
         return x
 
-    def build_backbone(self, inp_dim, hidden_dim, output_shape):
-        return mlp(inp_dim + self.alpha_dim + self.time_embedding, hidden_dim, output_shape)
+    def build_backbone(self, inp_dim, z_dim, hidden_dim, output_shape):
+        if self.backbone_type == 'mlp' or z_dim == 0:
+            net = mlp(inp_dim + self.alpha_dim + self.time_embedding + z_dim, hidden_dim, output_shape)
+            return Seq(net)
+        else:
+            assert self.alpha_dim == 0
+            assert self.time_embedding == 0
+            from nn.modules.sequence import SequentialBackbone
+            return SequentialBackbone(inp_dim, z_dim, output_shape)
 
 
 def batch_select(values, z=None):
@@ -43,12 +53,12 @@ def batch_select(values, z=None):
         #print(values[2, 10, z[2, 10]], out[2, 10])
         return out
 
-class SoftQPolicy(AlphaPolicyBase):
+class SoftQPolicy(BackboneBase):
     def __init__(
         self,state_dim, action_dim, z_space, hidden_dim, cfg = None,
     ) -> None:
         #nn.Module.__init__(self)
-        AlphaPolicyBase.__init__(self)
+        BackboneBase.__init__(self)
         self.z_space = z_space
         self.enc_z = z_space.tokenize
         self.q = self.build_backbone(state_dim + action_dim + z_space.dim, hidden_dim, 1)
@@ -58,6 +68,7 @@ class SoftQPolicy(AlphaPolicyBase):
     from tools.utils import print_input_args
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
+        raise NotImplementedError("Q is not supported yet ..")
         z = self.enc_z(z)
         if self.action_dim > 0:
             inp = self.add_alpha(s, a, z, timestep=timestep)
@@ -78,27 +89,27 @@ class SoftQPolicy(AlphaPolicyBase):
         return reward + (1-done_gt.float()) * gamma * vtarg
 
 
-class ValuePolicy(AlphaPolicyBase):
+class ValuePolicy(BackboneBase):
     def __init__(
         self,state_dim, action_dim, z_space, hidden_dim, cfg = None,
         zero_done_value=True,
     ) -> None:
         #nn.Module.__init__(self)
-        AlphaPolicyBase.__init__(self)
+        BackboneBase.__init__(self)
         self.z_space = z_space
         self.enc_z = z_space.tokenize
         # assert isinstance(z_space, spaces.Discrete)
-        self.q = self.build_backbone(state_dim + z_space.dim, hidden_dim, 1)
-        self.q2 = self.build_backbone(state_dim + z_space.dim, hidden_dim, 1)
+        self.q = self.build_backbone(state_dim, z_space.dim, hidden_dim, 1)
+        self.q2 = self.build_backbone(state_dim, z_space.dim, hidden_dim, 1)
 
     def forward(self, s, z, a, prevz=None, timestep=None, r=None, done=None, new_s=None, gamma=None):
         # return the Q value .. if it's value, return self._cfg.gamma
         z = self.enc_z(z)
         mask = 1. if done is None else (1-done.float())
         # print(new_s.shape, new_s.device, z.shape, z.device)
-        inp = self.add_alpha(new_s, z, timestep=timestep+1)
+        #inp = self.add_alpha(new_s, z, timestep=timestep+1)
 
-        v1, v2 = self.q(inp), self.q2(inp)
+        v1, v2 = self.q(new_s, z), self.q2(new_s, z)
         values = torch.cat((v1, v2), dim=-1)
         if self._cfg.zero_done_value:
             mask = 1. # ignore the done in the end ..

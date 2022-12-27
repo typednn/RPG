@@ -1,7 +1,7 @@
 import torch
 from collections import namedtuple
 from tools.utils import logger
-from .critic import AlphaPolicyBase
+from .critic import BackboneBase
 from nn.distributions import NormalAction
 
 def batch_select(values, z=None):
@@ -13,12 +13,13 @@ def batch_select(values, z=None):
 
 Aout = namedtuple('Aout', ['a', 'logp', 'ent'])
 
-class PolicyBase(AlphaPolicyBase):
-    def __init__(self, state_dim, hidden_dim, head, cfg=None):
+class PolicyBase(BackboneBase):
+    def __init__(self, state_dim, z_dim, hidden_dim, head, cfg=None):
         super().__init__()
         self.head = head
         self.backbone = self.build_backbone(
             state_dim,
+            z_dim,
             hidden_dim,
             head.get_input_dim()
         )
@@ -26,8 +27,8 @@ class PolicyBase(AlphaPolicyBase):
     def loss(self, rollout, alpha):
         return self.head.loss(rollout, alpha)
 
-    def forward(self, inp, alpha):
-        feature = self.backbone(inp)
+    def forward(self, inp, hidden, alpha):
+        feature = self.backbone(inp, hidden)
         dist =  self.head(feature)
 
         if isinstance(dist, NormalAction):
@@ -39,8 +40,8 @@ class PolicyBase(AlphaPolicyBase):
 
 
 class DiffPolicy(PolicyBase):
-    def __init__(self, state_dim, hidden_dim, head, cfg=None):
-        super().__init__(state_dim, hidden_dim, head)
+    def __init__(self, state_dim, z_dim, hidden_dim, head, cfg=None):
+        super().__init__(state_dim, z_dim, hidden_dim, head)
 
     def loss(self, rollout, alpha):
         assert rollout['value'].shape[-1] == 2
@@ -52,12 +53,13 @@ class QPolicy(PolicyBase):
         self, state_dim, hidden_dim, head, cfg=None,
         first_state=True,
     ) -> None:
-        super().__init__(state_dim, hidden_dim, head)
+        super().__init__(state_dim, 0, hidden_dim, head)
 
     def q_value(self, state):
-        return self.backbone(state)
+        return self.backbone(state, None) #hidden is None
 
-    def forward(self, state, alpha):
+    def forward(self, state, hidden, alpha):
+        assert hidden is None
         q = self.q_value(state)
         logits = q / alpha
         out = self.head(logits)

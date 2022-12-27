@@ -99,6 +99,9 @@ trainer = Trainer.parse(
             z_delay=8,
             pi_z=dict(ent=dict(coef=1000., target_mode='none', schedule=dict(TYPE='linear', min_value=0.00001, end=1000))),
         ),
+
+        
+        seqz = dict(_inherit='z2', backbone=dict(backbone_type='seq'), path='tmp/seqz'),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

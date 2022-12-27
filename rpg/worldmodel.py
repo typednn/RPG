@@ -198,6 +198,8 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
         have_done=False,
         hidden_dim=256,
+
+        value_backbone=None,
     ):
         # Encoder
         # TODO: layer norm?
@@ -273,7 +275,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         # Q
         #enc_z = ZTransform(z_space)
         action_dim = action_space.shape[0]
-        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim, time_embedding=time_embeddding)
+        q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim, time_embedding=time_embeddding, cfg=value_backbone)
 
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)

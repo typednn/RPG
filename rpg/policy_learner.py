@@ -62,7 +62,7 @@ class EntropyLearner(Configurable):
 
 Zout = namedtuple('Zout', ['a', 'logp', 'entropy', 'new', 'logp_new'])
 
-def select_newz(policy, state, alpha, z, timestep, K):
+def select_newz(policy, state, hidden, alpha, z, timestep, K):
     new = (timestep % K == 0)
     log_new_prob = torch.zeros_like(new).float()
     z = z.clone()
@@ -71,7 +71,7 @@ def select_newz(policy, state, alpha, z, timestep, K):
     entropy = torch.zeros_like(log_new_prob) 
 
     if new.any():
-        newz, newz_logp, ent = policy(state[new], alpha)
+        newz, newz_logp, ent = policy(state[new], hidden[new] if hidden is not None else None, alpha)
         z[new] = newz
         logp_z[new] = newz_logp
         entropy[new] = ent
@@ -114,9 +114,8 @@ class PolicyLearner(LossOptimizer):
 
     def __call__(self, s, hidden, prev_action=None, timestep=None):
         inps = [s]
-        if not self._cfg.ignore_hidden:
-            inps += [self.enc_z(hidden)]
-        s = self.policy.add_alpha(*inps, timestep=timestep) # concatenate the two
+        hidden = self.enc_z(hidden) if not self._cfg.ignore_hidden else None
+        #s = self.policy.add_alpha(*inps, timestep=timestep) # concatenate the two
 
         with torch.no_grad():
             alpha = self.ent.alpha
@@ -124,9 +123,9 @@ class PolicyLearner(LossOptimizer):
         if prev_action is not None:
             assert timestep is not None
             # TODO: allow to ignore the previous? not need now
-            return select_newz(self.policy, s, alpha, prev_action, timestep, self.freq)
+            return select_newz(self.policy, s, hidden, alpha, prev_action, timestep, self.freq)
         else:
-            return self.policy(s, alpha)
+            return self.policy(s, hidden, alpha)
 
     def intrinsic_reward(self, rollout):
         with torch.no_grad():
