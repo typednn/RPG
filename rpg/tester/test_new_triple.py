@@ -63,8 +63,8 @@ trainer = Trainer.parse(
         ),
 
         normal_relabel = dict(
-             _inherit='normal',
-             relabel=0.8,
+            _inherit='normal',
+            relabel=0.8,
             info=dict(coef=0.03, weight=dict(TYPE='linear', min_value=0.1, end=8000)),
             path='tmp/normal_relabel'
         ),
