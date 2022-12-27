@@ -424,7 +424,7 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'ant2normal', dict(info=dict(coef=[0.001, 0.005, 0.01,])), base='ant_gaussian', default_env='AntMaze2',
+        'ant2normal', dict(info=dict(coef=[0.001, 0.005, 0.01,0.0001])), base='ant_gaussian', default_env='AntMaze2',
     )
 
     exp.main()
