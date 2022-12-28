@@ -73,7 +73,7 @@ base_config = dict(
             z_delay=8,
             pi_z=dict(ent=dict(coef=5., target_mode='none', schedule=dict(TYPE='linear', min_value=1., end=1000))), path='tmp/small_optimz'),
         #small_optimz2=dict(_inherit='small_optimz', pi_z=dict(ent=dict(coef=0.1)), path='tmp/small_optimz2'),; 0.1 is too small.
-        small_optimz2=dict(_inherit='small_optimz', pi_z=dict(ent=dict(coef=0.8)), path='tmp/small_optimz2'),
+        small_optimz2=dict(_inherit='small_optimz', pi_z=dict(ent=dict(coef=2.)), path='tmp/small_optimz2'),
 
         ant=dict(
             _inherit='small', env_cfg=dict(n=1, obs_dim=8), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze', save_video=1000,

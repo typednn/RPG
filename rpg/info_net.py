@@ -8,6 +8,7 @@ from tools.config import Configurable
 from tools.utils import totensor
 from nn.space import Discrete
 from gym.spaces import Box
+from einops import repeat
 
 
 class InfoNet(Network):
@@ -69,12 +70,19 @@ class InfoNet(Network):
 
 from tools.utils.scheduler import Scheduler
 class InfoLearner(LossOptimizer):
-    def __init__(self, state_dim, action_space, hidden_space, cfg=None,
+    def __init__(self, obs_space, state_dim, action_space, hidden_space, cfg=None,
                  net=InfoNet.dc,
                  coef=1.,
                  weight=Scheduler.to_build(TYPE='constant'),
-                 hidden_dim=256, learn_posterior=False
+                 hidden_dim=256, learn_posterior=False,
+
+                 use_latent=True,
         ):
+        self.use_latent = use_latent
+
+        if not use_latent:
+            state_dim = obs_space.shape[0]
+
         net = InfoNet(
             state_dim, action_space, hidden_dim, hidden_space, cfg=net,
             learn_posterior=learn_posterior
@@ -85,10 +93,10 @@ class InfoLearner(LossOptimizer):
         super().__init__(net)
         self.net = net
 
-    @classmethod
-    def build_from_cfgs(self, net_cfg, learner_cfg, *args, **kwargs):
-        net = InfoNet(*args, cfg=net_cfg, **kwargs)
-        return InfoLearner(net, cfg=learner_cfg)
+    # @classmethod
+    # def build_from_cfgs(self, net_cfg, learner_cfg, *args, **kwargs):
+    #     net = InfoNet(*args, cfg=net_cfg, **kwargs)
+    #     return InfoLearner(net, cfg=learner_cfg)
 
     def get_coef(self):
         return self.coef * self.info_decay.get()
@@ -97,23 +105,42 @@ class InfoLearner(LossOptimizer):
         info_reward = self.net(traj, mode='reward')
         return 'info', info_reward * self.get_coef()
     
-    def update(self, rollout):
-        z_detach = rollout['z'].detach()
+    def update(self, rollout, update_with_latent=True):
+        if update_with_latent  == self.use_latent:
+            z_detach = rollout['z'].detach()
 
-        mutual_info = self.net(rollout, mode='likelihood').mean()
-        if self.learn_posterior:
-            posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
-        else:
-            posterior = 0.
+            mutual_info = self.net(rollout, mode='likelihood').mean()
+            if self.learn_posterior:
+                posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
+            else:
+                posterior = 0.
 
-        self.optimize(- mutual_info - posterior)
+            self.optimize(- mutual_info - posterior)
 
-        # TODO: estimate the posterior
-        logger.logkv_mean('info_ce_loss', float(-mutual_info))
-        logger.logkv_mean('info_posterior_loss', float(-posterior))
+            # TODO: estimate the posterior
+            logger.logkv_mean('info_ce_loss', float(-mutual_info))
+            logger.logkv_mean('info_posterior_loss', float(-posterior))
 
-        self.info_decay.step()
-        logger.logkv_mean('info_decay', self.info_decay.get())
+            self.info_decay.step()
+            logger.logkv_mean('info_decay', self.info_decay.get())
+
+    def seg2rollout(self, seg):
+        obs = seg.obs_seq
+        a = seg.action
+        z = seg.z
+
+        rollout = {
+            'state': obs,#torch.stack([obs, obs], dim=0),
+            'a': a,
+            'z': repeat(z, '... -> b ...', b=a.shape[0]),
+            'timestep': seg.timesteps,
+        }
+        return rollout
+
+    def update_batch(self, seg):
+        if not self.use_latent:
+            self.update(self.seg2rollout(seg), update_with_latent=False)
+
 
     def sample_z(self, states, a):
         #print(states.shape)
