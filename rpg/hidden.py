@@ -28,14 +28,14 @@ class HiddenSpace(Configurable):
         # return parameters for identify the hidden variables in maximizing the mutual information
         raise NotImplementedError
 
-    def likelihood(self, inp, z, timestep):
+    def likelihood(self, inp, z, timestep, **kwargs):
         raise NotImplementedError
 
     def sample(self, inp, mode='sample'):
         return self.head(inp).sample()
 
     def reward(self, inp, z, timestep):
-        return self.likelihood(inp, z, timestep)
+        return self.likelihood(inp, z, timestep, is_reward=True)
 
     def relabel(self):
         raise NotImplementedError
@@ -82,8 +82,13 @@ class Categorical(HiddenSpace):
     def get_input_dim(self):
         return self.n
 
-    def likelihood(self, inp, z, timestep):
-        return self.head(inp).log_prob(z)
+    def likelihood(self, inp, z, timestep, is_reward=False, **kwargs):
+        prob = self.head(inp)
+        if not is_reward:
+            from tools.utils import logger
+            logger.logkv_mean('info_acc', (prob.logits.argmax(dim=-1) == z).float().mean())
+            
+        return prob.log_prob(z)
 
 
 class Gaussian(HiddenSpace):
@@ -114,7 +119,7 @@ class Gaussian(HiddenSpace):
         default = Normal.gdc(linear=True, std_scale=1., std_mode='fix_no_grad', nocenter=True, squash=False)
         return Normal(self.space, cfg=merge_a_into_b(CN(cfg), default))
 
-    def likelihood(self, inp, z, timestep):
+    def likelihood(self, inp, z, timestep, **kwargs):
         return self.head(inp).log_prob(z)
 
     def sample(self, inp, mode='sample'):

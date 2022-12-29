@@ -51,10 +51,7 @@ class GeneralizedQ(torch.nn.Module):
         return dones
 
     def pred_rewards(self, traj):
-        if not self.reward_predictor.reward_with_latent:
-            traj['reward'] = self.reward_predictor(traj['state'][1:], traj['a_embed'])
-        else:
-            traj['reward'] = self.reward_predictor(traj['state'][:-1], traj['a_embed'], self.enc_z(traj['z']))
+        traj['reward'] = self.reward_predictor(traj['state'][1:], traj['a_embed'])
         return traj['reward']
 
     def pred_q_value(self, traj):
@@ -70,6 +67,21 @@ class GeneralizedQ(torch.nn.Module):
         traj['pred_values'] = values
         return q_values
 
+    def inference_with_actions(self, obs, timestep, step, z_seq, a_seq):
+        s = self.enc_s(obs)
+        states = [s]
+        # for dynamics part ..
+        h = self.init_h(s)[None,:]
+        a_embeds = []
+        for idx in range(step):
+            h, s, a_embed = self.core(h, a_seq[idx])
+            a_embeds.append(a_embed)
+            states.append(s)
+        out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds), z=z_seq)
+        self.pred_done(out)
+        self.pred_rewards(out)
+        self.pred_q_value(out)
+        return out
 
     def inference(
         self, obs, z, timestep, step,
@@ -123,6 +135,7 @@ class GeneralizedQ(torch.nn.Module):
 
         ts = torch.stack(ts)
         out.update(state=torch.stack(states), a_embed=torch.stack(a_embeds), timestep=ts)
+        self.pred_rewards(out)
 
         if sample_a:
             a_seq = out['a'] = torch.stack(a_seq)
@@ -137,8 +150,7 @@ class GeneralizedQ(torch.nn.Module):
             out['ent_z'] = torch.stack(entz)
         else:
             out['z'] = z_seq
-
-        self.pred_rewards(out)
+            
         dones = self.pred_done(out)
         #q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma)
         q_values = self.pred_q_value(out)
@@ -186,8 +198,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
 
         have_done=False,
         hidden_dim=256,
-
-        reward_with_latent=False,
 
         value_backbone=None,
     ):
@@ -259,8 +269,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
             raise NotImplementedError
 
         # reawrd and done
-        reward_predictor = Seq(mlp(a_dim + latent_dim + (0 if not reward_with_latent else z_space.dim), hidden_dim, 1)) # s, a predict reward .. 
-        reward_predictor.reward_with_latent = reward_with_latent
+        reward_predictor = Seq(mlp(a_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
         done_fn = mlp(latent_dim, hidden_dim, 1) if have_done else None
 
         # Q
@@ -271,7 +280,6 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         Network.__init__(self, cfg)
         GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
         self.apply(orthogonal_init)
-        self.enc_z = z_space.tokenize
 
     def inference(self, *args, **kwargs):
         out = super().inference(*args, **kwargs)
@@ -290,10 +298,11 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         return out
 
 
+from typing import Optional
 class DynamicsLearner(LossOptimizer):
     # optimizer of the dynamics model ..
     def __init__(
-        self, models: HiddenDynamicNet,
+        self, models: HiddenDynamicNet, auxilary: Optional[HiddenDynamicNet],
         pi_a, pi_z,
         
         cfg=None,
@@ -303,12 +312,18 @@ class DynamicsLearner(LossOptimizer):
         max_grad_norm=1.,
         lr=3e-4,
     ):
-        super().__init__(models, cfg)
+        if auxilary is not None:
+            model_to_train = torch.nn.ModuleList([models, auxilary])
+        else:
+            model_to_train = models
+
+        super().__init__(model_to_train, cfg)
         self.pi_a = pi_a
         self.pi_z = pi_z
         self.intrinsic_reward = None
 
         self.nets = models
+        self.auxilary = auxilary
         with torch.no_grad():
             import copy
             self.target_net = copy.deepcopy(self.nets)
@@ -365,6 +380,13 @@ class DynamicsLearner(LossOptimizer):
             logger.logkv_mean('done_acc', ((pred_traj['done'] > 0.5) == done_gt).float().mean())
 
         dyna_loss_total = sum([dyna_loss[k] * self._cfg.weights[k] for k in dyna_loss]).mean(axis=0)
+
+        if self.auxilary is not None:
+            # mutual info optimization.. hack here
+            mutual_info = self.auxilary(pred_traj, mode='likelihood').mean()
+            dyna_loss_total += -mutual_info * 0.1  # maximize the likelihood
+            logger.logkv_mean('info_ce_loss', float(-mutual_info))
+
         self.optimize(dyna_loss_total)
 
         info = {'dyna_' + k + '_loss': float(v.mean()) for k, v in dyna_loss.items()}

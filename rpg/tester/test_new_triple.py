@@ -104,6 +104,9 @@ trainer = Trainer.parse(
         seqz = dict(_inherit='z2', backbone=dict(backbone_type='seq'), path='tmp/seqz'),
 
         info_obs = dict(_inherit='z2', info=dict(use_latent=False), path='tmp/info_obs'),
+        jointinfo=dict(_inherit='z2', info=dict(use_latent=True, learn_with_dynamics=True), trainer=dict(weights=dict(state=10000.)), path='tmp/jointinfo'),
+
+        stateinfo=dict(_inherit='z2', hidden=dict(use_next_state=True, action_weight=0.), path='tmp/stateinfo'),
     ),
 ) # do not know if we need max_grad_norm
 trainer.run_rpgm()

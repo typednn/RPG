@@ -69,6 +69,7 @@ class Trainer(Configurable, RLAlgo):
 
         
         backbone=None,
+        reward_scale=1.,
     ):
         if seed is not None:
             from tools.utils import set_seed
@@ -92,11 +93,11 @@ class Trainer(Configurable, RLAlgo):
 
         self.horizon = horizon
         self.device = 'cuda:0'
-        self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
 
-        reward_with_latent = self.z_space.learn and (not info.use_latent)
-        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model,
-                                             value_backbone=backbone, reward_with_latent=reward_with_latent).cuda()
+        # reward_with_latent = self.z_space.learn and info.use_latent
+
+        self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
+        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model, value_backbone=backbone).cuda()
 
         state_dim = self.dynamics_net.state_dim
         hidden_dim = 256
@@ -116,16 +117,21 @@ class Trainer(Configurable, RLAlgo):
 
         self.intrinsics = [self.pi_a, self.pi_z]
 
+        auxilary = None
         if self.z_space.learn:
             learn_posterior = (relabel > 0. and relabel_method != 'future')
             self.info_learner = InfoLearner(obs_space, state_dim, env.action_space, z_space, cfg=info,
                                             hidden_dim=hidden_dim, learn_posterior=learn_posterior)
+            assert self.info_learner.use_latent
             if self.info_learner.use_latent:
                 self.intrinsics.append(self.info_learner)
 
+            if self.info_learner.learn_with_dynamics:
+                auxilary = self.info_learner.net
+
 
         #self.info_net = lambda x: x['rewards'], 0, 0
-        self.model_learner = DynamicsLearner(self.dynamics_net, self.pi_a, self.pi_z, cfg=trainer)
+        self.model_learner = DynamicsLearner(self.dynamics_net, auxilary, self.pi_a, self.pi_z, cfg=trainer)
 
         self.make_rnd()
 
@@ -178,30 +184,32 @@ class Trainer(Configurable, RLAlgo):
 
             if new_z.dtype == torch.float32:
                 logger.logkv_mean('relabel', new_z.std())
-                logger.logkv_mean('relabel_ratio', mask.float().mean())
+            logger.logkv_mean('relabel_ratio', mask.float().mean())
+
         return z
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
         z = self.relabel_z(seg)
         
+        seg.reward = seg.reward * self._cfg.reward_scale
         if self.exploration is not None and self.exploration.as_reward:
             seg.reward = seg.reward + self.exploration.intrinsic_reward(seg.obs_seq[1:])
 
-        if self.z_space.learn:
-            seg.z = z
-            rollout = self.info_learner.seg2rollout(seg)
-            r = self.info_learner.intrinsic_reward(rollout)[1]
-            seg.reward = seg.reward + r
-            logger.logkv_mean('reward_info', r.mean())
-        #   self.info_learner.update_batch(seg)
+        # if self.z_space.learn:
+        #     seg.z = z
+        #     rollout = self.info_learner.seg2rollout(seg)
+        #     r = self.info_learner.intrinsic_reward(rollout)[1]
+        #     seg.reward = seg.reward + r
+        #     logger.logkv_mean('reward_info', r.mean())
+        # #   self.info_learner.update_batch(seg)
 
         prev_z = z[None, :].expand(len(seg.obs_seq), *seg.z.shape)
         self.model_learner.learn_dynamics(
             seg.obs_seq, seg.timesteps, seg.action, seg.reward, seg.done, seg.truncated_mask, prev_z)
 
-        if self.z_space.learn:
-            self.info_learner.update_batch(seg)
+        # if self.z_space.learn:
+        #     self.info_learner.update_batch(seg)
     
     def update_pi_a(self):
         actor_delay = self._cfg.actor_delay

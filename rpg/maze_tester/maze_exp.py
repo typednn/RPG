@@ -87,8 +87,18 @@ base_config = dict(
         ant_squash=dict(
             _inherit='ant', head=dict(squash=True, linear=False, std_scale=0.4), path='tmp/antmaze_squash',
         ),
-        ant_nornd=dict(_inherit='ant_squash', rnd=dict(scale=0.), path='tmp/antmaze_nornd'),
-        # ant_test=dict(_inherit='ant', hooks=dict(plot_anchor=dict(n_epoch=1)), path='tmp/antmaze_test'),
+        ant_nornd=dict(_inherit='ant_squash', rnd=dict(scale=0.), info=dict(coef=10.), path='tmp/antmaze_nornd'),
+        ant_nornd2=dict(_inherit='ant_nornd',  path='tmp/antmaze_nornd2', hidden=dict(use_next_state=True, action_weight=0.)),
+        ant_nornd3=dict(_inherit='ant_nornd2',  path='tmp/antmaze_nornd3',  head=dict(std_scale=0.3, squash=False)),
+
+
+        ant_nornd_zdim20=dict(_inherit='ant_nornd', hidden=dict(n=20), path='tmp/antmaze_zdim20'),
+        ant_nornd_normal = dict(_inherit='ant_nornd', path='tmp/antmaze_nornd_normal', trainer=dict(weights=dict(q_value=1.)), hidden=dict(TYPE='Gaussian', n=5)),
+
+        ant_state = dict(_inherit='ant_nornd_normal', path='tmp/ant_state', info=dict(coef=1.), hidden=dict(use_next_state=True, action_weight=0.)),
+        ant_explore = dict(_inherit='ant_state', path='tmp/ant_explore', head=dict(std_scale=1.2)),
+
+        ant_maxent = dict(_inherit='ant_explore', path='tmp/ant_maxent', head=dict(std_scale=1.0, std_mode='statewise'), pi_a=dict(ent=dict(coef=1., target_mode='none'))),
 
         block=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='BlockPush', path='tmp/block', save_video=1000),
         gaussian=dict(_inherit='small', env_cfg=dict(n=1),
@@ -106,7 +116,7 @@ base_config = dict(
 
 
 class Experiment(Configurable):
-    def __init__(self, cfg=None, path='maze_exp', wandb=False, opt=None) -> None:
+    def __init__(self, base_config, cfg=None, path='maze_exp', wandb=False, opt=None) -> None:
         super().__init__()
         self.basis = base_config.pop('_variants')
 
@@ -343,7 +353,7 @@ class Experiment(Configurable):
                 exp.plot(configs, 'test_occ_metric')
 
 
-def build_exp(**kwargs):
+def build_exp(base_config, **kwargs):
     import argparse
     parser = argparse.ArgumentParser()
 
@@ -357,13 +367,13 @@ def build_exp(**kwargs):
 
     parser.add_argument('--seed', default=None)
 
-    exp = Experiment.parse(parser=parser)
+    exp = Experiment.parse(base_config, parser=parser)
     exp.parser = parser
     return exp
 
 
 if __name__ == '__main__':
-    exp = build_exp()
+    exp = build_exp(base_config)
     exp.add_exps(
         'zdim', dict(hidden=dict(n=[1, 3, 6, 2])), ['rl', 'rpg1', 'rpg2', 'rpg3'], base='small',
     )

@@ -10,6 +10,20 @@ from nn.space import Discrete
 from gym.spaces import Box
 from einops import repeat
 
+def seg2rollout(seg):
+    if not isinstance(seg, dict):
+        obs = seg.obs_seq
+        a = seg.action
+        z = seg.z
+
+    rollout = {
+        'state': obs,#torch.stack([obs, obs], dim=0),
+        'a': a,
+        'z': repeat(z, '... -> b ...', b=a.shape[0]),
+        'timestep': seg.timesteps,
+    }
+    return rollout
+
 
 class InfoNet(Network):
     def __init__(self, 
@@ -76,9 +90,16 @@ class InfoLearner(LossOptimizer):
                  weight=Scheduler.to_build(TYPE='constant'),
                  hidden_dim=256, learn_posterior=False,
 
-                 use_latent=True,
+                 use_latent=True,  # if this is not True, the network will take the original observation as input
+                 learn_with_dynamics=False, # if this is true, the network will be trained with dynamics model
         ):
+        assert use_latent
         self.use_latent = use_latent
+        self.learn_with_dynamics = learn_with_dynamics
+
+        if learn_with_dynamics:
+            assert use_latent, 'learn_with_dynamics requires use_latent'
+            assert not learn_posterior, 'learn_with_dynamics requires not learn_posterior'
 
         if not use_latent:
             state_dim = obs_space.shape[0]
@@ -106,7 +127,7 @@ class InfoLearner(LossOptimizer):
         return 'info', info_reward * self.get_coef()
     
     def update(self, rollout, update_with_latent=True):
-        if update_with_latent  == self.use_latent:
+        if update_with_latent  == self.use_latent and not self.learn_with_dynamics:
             z_detach = rollout['z'].detach()
 
             mutual_info = self.net(rollout, mode='likelihood').mean()
@@ -124,27 +145,15 @@ class InfoLearner(LossOptimizer):
             self.info_decay.step()
             logger.logkv_mean('info_decay', self.info_decay.get())
 
-    def seg2rollout(self, seg):
-        obs = seg.obs_seq
-        a = seg.action
-        z = seg.z
-
-        rollout = {
-            'state': obs,#torch.stack([obs, obs], dim=0),
-            'a': a,
-            'z': repeat(z, '... -> b ...', b=a.shape[0]),
-            'timestep': seg.timesteps,
-        }
-        return rollout
 
     def update_batch(self, seg):
-        if not self.use_latent:
-            self.update(self.seg2rollout(seg), update_with_latent=False)
+        if not self.use_latent and not self.learn_with_dynamics:
+            self.update(seg2rollout(seg), update_with_latent=False)
 
 
     def sample_z(self, states, a):
-        #print(states.shape)
-        #return self.net.get_posterior(states).sample()
+        raise NotImplementedError
+        assert not self.learn_with_dynamics
         return self.net(
             {
                 'state': states,
@@ -155,4 +164,6 @@ class InfoLearner(LossOptimizer):
         )[0]
 
     def sample_posterior(self, states):
+        assert not self.learn_with_dynamics
+
         return self.net.get_posterior(states)[0]
