@@ -21,6 +21,12 @@ if __name__ == '__main__':
             pi_a=dict(ent=dict(coef=0.1, target_mode='auto', target=-2.)),
         )
     )
+    add_var(
+        'ant_sa', dict(
+            _inherit='ant_maxentrl2',
+            hidden=dict(use_next_state=False, action_weight=1.),
+        )
+    )
 
     exp = build_exp(base_config)
 
@@ -37,6 +43,13 @@ if __name__ == '__main__':
             info=dict(coef=[0., 0.05, 0.01]),
             hidden=dict(TYPE=['Categorical', 'Categorical', 'Gaussian'], n=[1, 6, 5]), ), 
         base='ant_maxentrl2', default_env='AntMaze2',
+    )
+    exp.add_exps(
+        'repr_sa',
+        dict(
+            info=dict(coef=[0.01, 0.005]),
+            hidden=dict(TYPE=['Categorical', 'Gaussian'], n=[6, 5]), ), 
+        base='ant_sa', default_env='AntMaze2',
     )
 
     # search for suitable RND value first: reward scale, action scale + [info scale in the end]
