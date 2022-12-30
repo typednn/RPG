@@ -54,7 +54,7 @@ if __name__ == '__main__':
         base='ant_maxentrl2', default_env='AntMaze2',
     )
     exp.add_exps(
-        'repr_sa',
+        'reprsa',
         dict(
             info=dict(coef=[0.01, 0.005]),
             hidden=dict(TYPE=['Categorical', 'Gaussian'], n=[6, 5]), ), 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         'mazer', dict(
             _inherit='ant_maxentrl2',
             rnd=dict(scale=[1.0, 1.0], hidden=dict(n=1), normalizer=['ema','none']),
-        ), base = 'ant_maxentrl2', default_env='MediumMazeR',
+        ), base = 'small', default_env='MediumMazeR',
     )
 
     exp.main()
