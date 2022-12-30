@@ -231,7 +231,7 @@ class Trainer(Configurable, RLAlgo):
                 if self.exploration is not None:
                     self.exploration.update_by_rollout(rollout)
                 for k, v in rollout['extra_rewards'].items():
-                    logger.logkv_mean(f'reward_{k}', float(v.mean()))
+                    logger.logkv_mean_std(f'reward_{k}', float(v.mean()))
 
             if update_info:
                 if self.z_space.learn:

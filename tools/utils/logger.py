@@ -304,6 +304,14 @@ def logkv_mean(key, val):
     get_current().logkv_mean(key, val)
 
 
+def logkv_mean_std(key, val):
+    """
+    The same as logkv(), but if called many times, values averaged.
+    """
+    get_current().logkv_mean_std(key, val)
+
+
+
 def logkvs(d):
     """
     Log a dictionary of key-value pairs
@@ -587,9 +595,9 @@ class Logger(object):
         oldval, cnt = self.name2val[key], self.name2cnt[key]
 
         self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
-        self.name2sqr[key] = self.name2sqr[key] * cnt / (cnt + 1) + (val * val) / (cnt + 1)
+        self.name2sqr[key] = (self.name2sqr[key] * cnt + (val * val)) / (cnt + 1)
         self.name2cnt[key] = cnt + 1
-        raise NotImplementedError("logkv_mean_std not implemented")
+        # raise NotImplementedError("logkv_mean_std not implemented")
 
     def dump_media(self, kvs):
         for fmt in self.output_formats:
@@ -598,6 +606,7 @@ class Logger(object):
     def dumpkvs(self):
         if self.comm is None:
             d = self.name2val
+            name2sqr = self.name2sqr
         else:
             d = self.comm.weighted_mean(
                 {
@@ -605,10 +614,23 @@ class Logger(object):
                     for (name, val) in self.name2val.items()
                 },
             )
-        out = d.copy()  # Return the dict for unit testing purposes
+            name2sqr = self.comm.weighted_mean(
+                {
+                    name: (val, self.name2cnt.get(name, 1))
+                    for (name, val) in self.name2sqr.items()
+                },
+            )
+
+        import numpy as np 
+        out = {}
+        for k, v in d.items():
+            out[k] = v
+            if k in name2sqr:
+                out[k + '-std'] = np.sqrt(name2sqr[k] - v * v)
         for fmt in self.output_formats:
             #if self.comm.rank == 0:
-            fmt.writekvs(d)
+            fmt.writekvs(out)
+
         self.name2val.clear()
         self.name2cnt.clear()
         return out
