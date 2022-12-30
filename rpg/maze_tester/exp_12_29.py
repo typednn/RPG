@@ -11,8 +11,14 @@ if __name__ == '__main__':
             _inherit='ant_squash', 
             hidden=dict(n=1), info=dict(coef=0.0),
             head=dict(std_scale=1.0, std_mode='statewise'),
-            pi_a=dict(ent=dict(coef=1., target_mode='none')),
+            pi_a=dict(ent=dict(coef=0.1, target_mode='none')),
             rnd=dict(scale=1.),
+        )
+    )
+    add_var(
+        'ant_maxentrl2', dict(
+            _inherit='ant_maxentrl',
+            pi_a=dict(ent=dict(coef=0.1, target_mode='auto', target=-2.)),
         )
     )
 
@@ -22,6 +28,15 @@ if __name__ == '__main__':
     exp.add_exps(
         'entcoef', dict(pi_a=dict(ent=dict(coef=[1., 0.1, 0.01, 0.001]),)), 
         base='ant_maxentrl', default_env='AntMaze2',
+    )
+
+    # search for pi_a coef
+    exp.add_exps(
+        'repr',
+        dict(
+            info=dict(coef=[0., 0.05, 0.01]),
+            hidden=dict(TYPE=['Categorical', 'Categorical', 'Gaussian'], n=[1, 6, 5]), ), 
+        base='ant_maxentrl2', default_env='AntMaze2',
     )
 
     # search for suitable RND value first: reward scale, action scale + [info scale in the end]
