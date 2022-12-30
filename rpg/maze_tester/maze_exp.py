@@ -26,10 +26,10 @@ base_config = dict(
     trainer=dict(weights=dict(reward=10000., q_value=100., state=1000.)),
     pi_a=dict(ent=dict(coef=0.0, target_mode='fixed'),),
     head=dict(
-            linear=False,
-            squash=True,
-            std_mode='fix_no_grad',
-            std_scale = 0.2
+        linear=False,
+        squash=True,
+        std_mode='fix_no_grad',
+        std_scale = 0.2
     ),
     pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
 

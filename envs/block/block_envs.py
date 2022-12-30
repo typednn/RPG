@@ -191,7 +191,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         for i in range(self.n_block):
             self.blocks.append(
                 self.add_articulation(
-                    (i - 1) * 1.4, 0.0, self.block_size, COLORS[i],
+                    (i - 1) * 1.2, 0.0, self.block_size, COLORS[i],
                     ranges, f"block{i}", friction=0,
                     damping=5000, material=material)
             )

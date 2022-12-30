@@ -71,13 +71,14 @@ if __name__ == '__main__':
 
     # TODO: test relabel
 
-    # TODO: consider adding reward back
-    # - MediumMazeR where RND is None
     exp.add_exps(
         'mazer', dict(
-            env_cfg=dict(reward=True), hidden=dict(n=[1, 1, 6]),
+            env_cfg=dict(reward=True),
+            trainer=dict(weights=dict(reward=10., q_value=10., state=1000.)),
+            hidden=dict(n=[1, 1, 6]),
             rnd=dict(scale=1., normalizer=['ema','none', 'none']),
         ), base = 'small', default_env='MediumMazeR',
     )
+    # TODO: reduce the reward scale
 
     exp.main()
