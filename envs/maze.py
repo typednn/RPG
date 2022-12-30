@@ -250,6 +250,7 @@ class LargeMaze(Configurable):
                     x, y = k
                     reward = reward + torch.logical_and(self.pos[..., 0].long() == x, self.pos[..., 1].long() == y).float() * v
                 return reward
+        return 0
 
     def init_pos(self):
         return torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)

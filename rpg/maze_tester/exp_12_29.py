@@ -62,10 +62,10 @@ if __name__ == '__main__':
     )
 
     # search for suitable RND value first: reward scale, action scale + [info scale in the end]
-    exp.add_exps(
-        'entrnd', dict(rnd=dict(scale=[1., 10., 100., 1000.],)), 
-        base='ant_maxent', default_env='AntMaze2',
-    )
+    # exp.add_exps(
+    #     'entrnd', dict(rnd=dict(scale=[1., 10., 100., 1000.],)), 
+    #     base='ant_maxent', default_env='AntMaze2',
+    # )
 
     # TODO: consider harder env.
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     # - MediumMazeR where RND is None
     exp.add_exps(
         'mazer', dict(
-            _inherit='ant_maxentrl2',
+            env_cfg=dict(reward=True),
             rnd=dict(scale=[1.0, 1.0], hidden=dict(n=1), normalizer=['ema','none']),
         ), base = 'small', default_env='MediumMazeR',
     )
