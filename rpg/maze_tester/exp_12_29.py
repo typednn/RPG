@@ -75,8 +75,8 @@ if __name__ == '__main__':
     # - MediumMazeR where RND is None
     exp.add_exps(
         'mazer', dict(
-            env_cfg=dict(reward=True),
-            rnd=dict(scale=[1.0, 1.0], hidden=dict(n=1), normalizer=['ema','none']),
+            env_cfg=dict(reward=True), hidden=dict(n=[1, 1, 6]),
+            rnd=dict(scale=1., normalizer=['ema','none', 'none']),
         ), base = 'small', default_env='MediumMazeR',
     )
 
