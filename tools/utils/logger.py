@@ -66,11 +66,15 @@ class HumanOutputFormat(KVWriter, SeqWriter):
         # Create strings for printing
         key2str = []
         for (key, val) in sorted(kvs.items()):
-            if hasattr(val, "__float__"):
-                valstr = "%-8.5g" % val
-            else:
-                valstr = str(val)
-            key2str.append((self._truncate(key), self._truncate(valstr)))
+            if ':std' not in key:
+                if hasattr(val, "__float__"):
+                    valstr = "%-8.5g" % val
+                else:
+                    valstr = str(val)
+                if key + ':std' in kvs:
+                    valstr = "%0.5g" % val + ' +/- ' + "%-8.5g" % (kvs[key + ':std'])
+
+                key2str.append((self._truncate(key), self._truncate(valstr)))
 
         # Find max widths
         if len(key2str) == 0:
@@ -626,7 +630,7 @@ class Logger(object):
         for k, v in d.items():
             out[k] = v
             if k in name2sqr:
-                out[k + '-std'] = np.sqrt(name2sqr[k] - v * v)
+                out[k + ':std'] = np.sqrt(name2sqr[k] - v * v)
         for fmt in self.output_formats:
             #if self.comm.rank == 0:
             fmt.writekvs(out)
