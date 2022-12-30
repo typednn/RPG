@@ -72,4 +72,12 @@ if __name__ == '__main__':
     # TODO: test relabel
 
     # TODO: consider adding reward back
+    # - MediumMazeR where RND is None
+    exp.add_exps(
+        'mazer', dict(
+            _inherit='ant_maxentrl2',
+            rnd=dict(scale=[1.0, 1.0], hidden=dict(n=1), normalizer=['ema','none']),
+        ), base = 'ant_maxentrl2', default_env='MediumMazeR',
+    )
+
     exp.main()

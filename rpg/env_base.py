@@ -203,6 +203,11 @@ class TorchEnv(VecEnv):
             from envs.maze import MediumMaze
             self.goal_env = MediumMaze(**kwargs)
 
+
+        elif env_name == 'MediumMazeR':
+            from envs.maze import MediumMaze
+            self.goal_env = MediumMaze(**kwargs, reward_mapping=[[[6, 1], 10], [[6, 6], 20]])
+
         else:
             raise NotImplementedError
 

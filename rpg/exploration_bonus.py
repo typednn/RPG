@@ -89,7 +89,7 @@ class ExplorationBonus(OptimModule):
         self.batch_size = batch_size
         self.enc_s = enc_s
 
-        if normalizer is None:
+        if normalizer is None or normalizer == 'none':
             self.normalizer = None
         elif normalizer == 'ema':
             self.normalizer = RunningMeanStd(last_dim=True)
