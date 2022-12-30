@@ -75,8 +75,8 @@ if __name__ == '__main__':
         'mazer', dict(
             env_cfg=dict(reward=True),
             trainer=dict(weights=dict(reward=10., q_value=10., state=1000.)),
-            hidden=dict(n=[1, 1, 6]),
-            rnd=dict(scale=1., normalizer=['ema','none', 'none']),
+            hidden=dict(n=[1, 1, 6, 6]),
+            rnd=dict(scale=1., normalizer=['ema','none', 'ema', 'none']),
         ), base = 'small', default_env='MediumMazeR',
     )
     # TODO: reduce the reward scale
