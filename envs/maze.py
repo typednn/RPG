@@ -170,11 +170,14 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0) -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0, reward_mapping=None) -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
         self.device = device
+
+        self.reward_mapping = reward_mapping
+
         if mode != 'batch':
             batch_size = 1
         self.batch_size = batch_size
@@ -239,9 +242,14 @@ class LargeMaze(Configurable):
 
     def get_reward(self):
         if self._cfg.reward:
-            return self.pos.sum(axis=-1)
-        else:
-            return 0
+            if self.reward_mapping is None:
+                return self.pos.sum(axis=-1)
+            else:
+                reward = torch.zeros_like(self.pos[..., 0])
+                for k, v in self.reward_mapping:
+                    x, y = k
+                    reward = reward + torch.logical_and(self.pos[..., 0].long() == x, self.pos[..., 1].long() == y).float() * v
+                return reward
 
     def init_pos(self):
         return torch.zeros(self.batch_size, 2, device=self.device, dtype=torch.float64)
@@ -279,6 +287,14 @@ class LargeMaze(Configurable):
             left = self.pos2pixel(left)
             right = self.pos2pixel(right)
             cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
+
+        if self.reward_mapping:
+            for k, v in self.reward_mapping:
+                x, y = k
+                A = self.pos2pixel(np.array([x, y]))
+                B = self.pos2pixel(np.array([x + 1., y + 1.]))
+                cv2.rectangle(self.screen, tuple(A), tuple(B), (0, 0, 255), -1)
+
         return self.screen
 
     def render(self, mode):

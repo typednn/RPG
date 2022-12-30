@@ -119,6 +119,7 @@ RUN pip install --no-cache imageio[ffmpeg]
 RUN pip install --no-cache trimesh
 RUN pip install --no-cache open3d
 RUN pip install --no-cache rtree
+RUN pip install --no-cache einops
 
 WORKDIR /root/
 ARG MANISKILL_KEY

@@ -37,6 +37,15 @@ if __name__ == '__main__':
     )
 
     # search for pi_a coef
+    # TODO: reduce the mutual info weight?
+    # exp.add_exps(
+    #     'entrnd', dict(rnd=dict(scale=[1., 10., 100., 1000.],)), 
+    #     base='ant_maxent', default_env='AntMaze2',
+    # )
+
+
+    # test various representation:
+    #  - normal RL - discrete - gaussian - uniform
     exp.add_exps(
         'repr',
         dict(
@@ -58,16 +67,9 @@ if __name__ == '__main__':
         base='ant_maxent', default_env='AntMaze2',
     )
 
-    # TODO: reduce the mutual info weight?
-    # exp.add_exps(
-    #     'entrnd', dict(rnd=dict(scale=[1., 10., 100., 1000.],)), 
-    #     base='ant_maxent', default_env='AntMaze2',
-    # )
-
-    # TODO: test various representation:
-    #  - normal RL - discrete - gaussian - uniform
-
     # TODO: consider harder env.
+
+    # TODO: test relabel
 
     # TODO: consider adding reward back
     exp.main()
