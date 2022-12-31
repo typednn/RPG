@@ -69,6 +69,7 @@ base_config = dict(
         path='tmp/rndreward'),
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
+        rndz=dict(_inherit='small', rnd=dict(include_latent=True), path='tmp/rndz'),
         small_optimz=dict(_inherit='small', 
             z_delay=8,
             pi_z=dict(ent=dict(coef=5., target_mode='none', schedule=dict(TYPE='linear', min_value=1., end=1000))), path='tmp/small_optimz'),

@@ -1,4 +1,5 @@
 import tqdm
+from einops import repeat
 import torch
 from .common_hooks import RLAlgo, build_hooks
 from .env_base import GymVecEnv, TorchEnv
@@ -70,6 +71,8 @@ class Trainer(Configurable, RLAlgo):
         
         backbone=None,
         reward_scale=1.,
+
+        actor_buffer=None, # use the limit the data for training the policy network .. tend to use the latest data if necessary
     ):
         if seed is not None:
             from tools.utils import set_seed
@@ -144,7 +147,7 @@ class Trainer(Configurable, RLAlgo):
     def make_rnd(self):
         rnd = self._cfg.rnd
         if rnd.scale > 0.:
-            self.exploration = RNDExplorer(self.env.observation_space, self.dynamics_net.state_dim, self.buffer, self.dynamics_net.enc_s, cfg=rnd)
+            self.exploration = RNDExplorer(self.env.observation_space, self.dynamics_net.state_dim, self.buffer, self.dynamics_net.enc_s, self.z_space, cfg=rnd)
 
             if not self.exploration.as_reward:
                 self.intrinsics.append(self.exploration)
@@ -194,7 +197,8 @@ class Trainer(Configurable, RLAlgo):
         
         seg.reward = seg.reward * self._cfg.reward_scale
         if self.exploration is not None and self.exploration.as_reward:
-            seg.reward = seg.reward + self.exploration.intrinsic_reward(seg.obs_seq[1:])
+            seg.reward = seg.reward + self.exploration.intrinsic_reward(
+                seg.obs_seq[1:], repeat(z, "... -> t ...", t=len(seg.obs_seq) - 1))
 
         # if self.z_space.learn:
         #     seg.z = z
@@ -219,7 +223,7 @@ class Trainer(Configurable, RLAlgo):
         update_info = (info_delay > 0 and self.update_step % info_delay == 0) or (info_delay == 0 and update_pi_a)
 
         if update_pi_a or update_info:
-            seg = self.buffer.sample(self._cfg.batch_size, horizon=1)
+            seg = self.buffer.sample(self._cfg.batch_size, horizon=1, latest=self._cfg.actor_buffer)
             z = self.relabel_z(seg)
             rollout = self.dynamics_net.inference(
                 seg.obs_seq[0], z, seg.timesteps[0], self.horizon, self.pi_z, self.pi_a,
@@ -313,7 +317,7 @@ class Trainer(Configurable, RLAlgo):
                         self.z[j] = z_space.sample() * 0
 
             if mode == 'training' and self.exploration is not None:
-                self.exploration.add_data(obs)
+                self.exploration.add_data(obs, prevz)
 
             if self.buffer.total_size() > self._cfg.warmup_steps and self._cfg.update_train_step > 0 and mode == 'training':
                 if idx % self._cfg.update_train_step == 0:

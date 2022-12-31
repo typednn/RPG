@@ -188,11 +188,20 @@ class ReplayBuffer(Configurable):
             self._full = self._full or self.idx == 0
 
     @torch.no_grad()
-    def sample(self, batch_size, horizon=None):
+    def sample(self, batch_size, horizon=None, latest=None):
         # NOTE that the data after truncated will be something random ..
         horizon = horizon or self.horizon
         total = self.total_size()
-        idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
+
+        if latest is not None:
+            assert latest <= self.capacity
+            latest = min(latest, total)
+            idxs = np.random.choice(latest, batch_size, replace=(latest < batch_size))
+            idxs = (self.idx - latest - idxs + self.capacity) % self.capacity
+
+            idxs = torch.from_numpy(idxs).to(self.device)
+        else:
+            idxs = torch.from_numpy(np.random.choice(total, batch_size, replace=not self._full)).to(self.device)
 
         if isinstance(self._obs, dict):
             obs_seq = []

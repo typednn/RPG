@@ -7,34 +7,6 @@ import numpy as np
 from tools.utils import RunningMeanStd
 from tools.optim import OptimModule
 
-"""
-The intrinsic reward:
-
-Data-source:
-
-Data-source and When to do the update:
-    # - onpolicy: trained with the off-policy data sampled from the replay buffer 
-    # - off-policy: trained with the recent data, (or only maintain a buffer of fixed size)
-    no matter what or not, we just need to maintain a buffer of fixed size to mimic the two
-
-    - buffer size
-    - parameters:
-        - update frequency (=1, per step, or epoch length per epoch)
-        - update steps / epochs
-
----
-Reward mode:
-    - if the input is the encoding state: we can directly use it as the intrinsic reward ..
-    - otherwise, use it to modify the original reward .. 
-
-Observation:
-    - Use state or observation as the input?
-
-Normalization:
-    - normalization with EMA.. this does not seem to work well as the loss decays exponentially
-    - another way is to maintain a loss buffer and normalize them correspondingly
-
-"""
 
 class ScalarNormalizer:
     # maintain a deque of fixed size and update the parameters with the recent data
@@ -77,7 +49,9 @@ class ExplorationBonus(OptimModule):
 
                  as_reward=False,
                  training_on_rollout=False,
-                 scale=0.
+                 scale=0.,
+
+                 include_latent=False,
     ) -> None:
 
         super().__init__(module)
@@ -86,6 +60,7 @@ class ExplorationBonus(OptimModule):
 
         self.step = 0
         self.buffer = deque(maxlen=buffer_size)
+        self.bufferz = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.enc_s = enc_s
 
@@ -107,15 +82,22 @@ class ExplorationBonus(OptimModule):
         
         self.scale = scale
 
-    def add_data(self, data):
+        self.include_latent = include_latent
+        if include_latent:
+            assert self.obs_mode != 'state'
+            assert not self.training_on_rollout
+
+    def add_data(self, data, prevz):
         if not self.training_on_rollout:
             with torch.no_grad():
-                for i in data:
+                for i, z in zip(data, prevz):
                     self.buffer.append(i)
+                    self.bufferz.append(z)
+
             self.step += 1
             if self.step % self.update_freq == 0 and len(self.buffer) > self.batch_size:
                 for _ in range(self.update_step):
-                    bonus = self.update(self.sample_data())
+                    bonus = self.update(*self.sample_data())
                     if self.normalizer is not None:
                         self.normalizer.update(bonus)
 
@@ -130,21 +112,25 @@ class ExplorationBonus(OptimModule):
         assert not self.training_on_rollout
         index = np.random.choice(len(self.buffer), self.batch_size)
         obs = totensor([self.buffer[i] for i in index], device='cuda:0')
+        if self.include_latent:
+            latent = totensor([self.bufferz[i] for i in index], device='cuda:0', dtype=None)
+        else:
+            latent = None
         obs = self.process_obs(obs)
-        return obs
+        return obs, latent
 
-    def update(self, inp) -> torch.Tensor: 
+    def update(self, inp, latent) -> torch.Tensor: 
         # the input is the same with the compute_bonus
         raise NotImplementedError
 
-    def compute_bonus(self, inp) -> torch.Tensor:
+    def compute_bonus(self, inp, latent) -> torch.Tensor:
         # when obs_mode is state, obs is the state
         # otherwise, it is the obs
         raise NotImplementedError
 
-    def compute_bonus_by_obs(self, obs):
+    def compute_bonus_by_obs(self, obs, latent):
         obs = self.process_obs(obs)
-        return self.compute_bonus(obs)
+        return self.compute_bonus(obs, latent)
         
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
@@ -153,9 +139,9 @@ class ExplorationBonus(OptimModule):
             attrs['r'] = tonumpy(transition['r'])[..., 0] # just record one value ..
 
         if self.obs_mode == 'state':
-            attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_state']))
+            attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_state'], transition['z']))
         else:
-            attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_obs']))
+            attrs['bonus'] = tonumpy(self.compute_bonus(transition['next_obs'], transition['z']))
         transition['_attrs'] = attrs
 
 
@@ -168,7 +154,7 @@ class ExplorationBonus(OptimModule):
             if self.normalizer is not None:
                 self.normalizer.update(bonus)
 
-    def intrinsic_reward(self, rollout):
+    def intrinsic_reward(self, rollout, latent):
         if not self.as_reward:
             assert self.obs_mode == 'state'
             bonus = self.compute_bonus(rollout['state'][1:])
@@ -177,7 +163,7 @@ class ExplorationBonus(OptimModule):
             return self.name, bonus * self.scale
         else:
             # rollout is the obs
-            bonus = self.compute_bonus_by_obs(rollout)
+            bonus = self.compute_bonus_by_obs(rollout, latent)
             if self.normalizer is not None:
                 bonus = self.normalizer.normalize(bonus)
             return bonus * self.scale
