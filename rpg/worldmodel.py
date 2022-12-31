@@ -12,7 +12,7 @@ from .critic import SoftQPolicy, ValuePolicy
 
 class GeneralizedQ(torch.nn.Module):
     def __init__(
-        self, enc_s, enc_a, init_h, dynamic_fn, state_dec, reward_predictor, q_fn, done_fn, gamma,
+        self, enc_s, enc_a, init_h, dynamic_fn, state_dec, reward_predictor, q_fn, done_fn, gamma, z_space,
     ) -> None:
         super().__init__()
         # self.pi_a, self.pi_z = pi_a, pi_z
@@ -25,6 +25,7 @@ class GeneralizedQ(torch.nn.Module):
         self.q_fn: Union[SoftQPolicy, ValuePolicy] = q_fn
         self.done_fn = done_fn
         self.gamma = gamma
+        self.z_space = z_space
 
     def core(self, h, a):
         a_embed = self.enc_a(a)
@@ -51,7 +52,12 @@ class GeneralizedQ(torch.nn.Module):
         return dones
 
     def pred_rewards(self, traj):
-        traj['reward'] = self.reward_predictor(traj['state'][1:], traj['a_embed'])
+        inps = [traj['state'][1:], traj['a_embed']]
+
+        if self.reward_predictor.requires_latent:
+            inps.append(self.z_space.tokenize(traj['z']))
+
+        traj['reward'] = self.reward_predictor(*inps)
         return traj['reward']
 
     def pred_q_value(self, traj):
@@ -66,22 +72,6 @@ class GeneralizedQ(torch.nn.Module):
         traj['q_value'] = q_values
         traj['pred_values'] = values
         return q_values
-
-    def inference_with_actions(self, obs, timestep, step, z_seq, a_seq):
-        s = self.enc_s(obs)
-        states = [s]
-        # for dynamics part ..
-        h = self.init_h(s)[None,:]
-        a_embeds = []
-        for idx in range(step):
-            h, s, a_embed = self.core(h, a_seq[idx])
-            a_embeds.append(a_embed)
-            states.append(s)
-        out = dict(state=torch.stack(states), a_embed=torch.stack(a_embeds), z=z_seq)
-        self.pred_done(out)
-        self.pred_rewards(out)
-        self.pred_q_value(out)
-        return out
 
     def inference(
         self, obs, z, timestep, step,
@@ -135,7 +125,6 @@ class GeneralizedQ(torch.nn.Module):
 
         ts = torch.stack(ts)
         out.update(state=torch.stack(states), a_embed=torch.stack(a_embeds), timestep=ts)
-        self.pred_rewards(out)
 
         if sample_a:
             a_seq = out['a'] = torch.stack(a_seq)
@@ -151,6 +140,7 @@ class GeneralizedQ(torch.nn.Module):
         else:
             out['z'] = z_seq
             
+        self.pred_rewards(out)
         dones = self.pred_done(out)
         #q_values, values = self.q_fn(states[:-1], z_seq, a_seq, new_s=states[1:], r=reward, done=dones, gamma=self.gamma)
         q_values = self.pred_q_value(out)
@@ -200,6 +190,8 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         hidden_dim=256,
 
         value_backbone=None,
+
+        reward_requires_latent=False,
     ):
         # Encoder
         # TODO: layer norm?
@@ -269,7 +261,8 @@ class HiddenDynamicNet(Network, GeneralizedQ):
             raise NotImplementedError
 
         # reawrd and done
-        reward_predictor = Seq(mlp(a_dim + latent_dim, hidden_dim, 1)) # s, a predict reward .. 
+        reward_predictor = Seq(mlp(a_dim + latent_dim + (z_space.dim if reward_requires_latent else 0), hidden_dim, 1)) # s, a predict reward .. 
+        reward_predictor.requires_latent = reward_requires_latent
         done_fn = mlp(latent_dim, hidden_dim, 1) if have_done else None
 
         # Q
@@ -278,7 +271,7 @@ class HiddenDynamicNet(Network, GeneralizedQ):
         q_fn = (SoftQPolicy if qmode == 'Q' else ValuePolicy)(state_dim, action_dim, z_space, hidden_dim, time_embedding=time_embeddding, cfg=value_backbone)
 
         Network.__init__(self, cfg)
-        GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma)
+        GeneralizedQ.__init__(self, enc_s, enc_a, init_h, dynamics, state_dec, reward_predictor, q_fn, done_fn, gamma, z_space)
         self.apply(orthogonal_init)
 
     def inference(self, *args, **kwargs):

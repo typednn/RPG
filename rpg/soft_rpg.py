@@ -100,7 +100,12 @@ class Trainer(Configurable, RLAlgo):
         # reward_with_latent = self.z_space.learn and info.use_latent
 
         self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
-        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model, value_backbone=backbone).cuda()
+
+        reward_requires_latent=False
+        if self._cfg.rnd.scale > 0. and self._cfg.rnd.include_latent:
+            reward_requires_latent=True
+
+        self.dynamics_net = HiddenDynamicNet(obs_space, env.action_space, z_space, time_embedding, cfg=model, value_backbone=backbone, reward_requires_latent=reward_requires_latent).cuda()
 
         state_dim = self.dynamics_net.state_dim
         hidden_dim = 256
@@ -134,9 +139,9 @@ class Trainer(Configurable, RLAlgo):
 
 
         #self.info_net = lambda x: x['rewards'], 0, 0
-        self.model_learner = DynamicsLearner(self.dynamics_net, auxilary, self.pi_a, self.pi_z, cfg=trainer)
 
         self.make_rnd()
+        self.model_learner = DynamicsLearner(self.dynamics_net, auxilary, self.pi_a, self.pi_z, cfg=trainer)
 
         self.intrinsic_reward = IntrinsicMotivation(*self.intrinsics)
         self.model_learner.set_intrinsic(self.intrinsic_reward)
