@@ -27,10 +27,10 @@ class AntManEnv(PacManEnv):
                  reset_goal = True,
                  block_size=20,
                  reward_type='sparse',
-                 include_low_obs=1., penalty=0.2, reset_seed=0):
+                 include_low_obs=1., penalty=0.2, reset_seed=0, maze_type=None, lookat=(9, 9, 5)):
         Configurable.__init__(self)
 
-        self.ant_env = AntMazeEnv(height, width, maze_size_scaling=4.8, wall_size=0.1)
+        self.ant_env = AntMazeEnv(height, width, maze_size_scaling=4.8, wall_size=0.1, maze_type=maze_type, lookat=lookat)
 
         self.height = height
         self.width = width

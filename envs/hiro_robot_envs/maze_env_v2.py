@@ -31,6 +31,7 @@ class MazeEnvV2(gym.Env):
             maze_height=0.5,
             wall_size = 0.05,
             maze_size_scaling=8,
+            maze_type=None,
             *args, **kwargs
     ):
         self._maze_id = maze_id
@@ -51,12 +52,56 @@ class MazeEnvV2(gym.Env):
         tree = ET.parse(xml_path)
 
         worldbody = tree.find(".//worldbody")
-        for i in range(width+1):
-            for j in range(height+1):
-                if i != width:
-                    self.add_wall(worldbody, f"wall_{i}_{j}_h", i, j, 0)
-                if j != height:
-                    self.add_wall(worldbody, f"wall_{i}_{j}_v", i, j, 1)
+
+        self.maze_type = maze_type
+
+        if maze_type is None or maze_type == 'regular':
+            for i in range(width+1):
+                for j in range(height+1):
+                    if i != width:
+                        self.add_wall(worldbody, f"wall_{i}_{j}_h", i, j, 0)
+                    if j != height:
+                        self.add_wall(worldbody, f"wall_{i}_{j}_v", i, j, 1)
+        elif maze_type == 'cross':
+            w = self.MAZE_SIZE_SCALING
+            h = self.MAZE_SIZE_SCALING * 2
+            x = h + w/2
+            pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+w], [-w/2, x+h+w], [-w/2, x+ 2*h + w]]
+            pts += [[-i[0], i[1]]for i in pts[::-1]]
+            pts += [[i[1], i[0]]for i in pts[-2::-1]]
+            pts += [[-i[1], -i[0]]for i in pts[-2:0:-1]]
+
+            anchors = [[0, 2*x], [-w, 2*x], [-h, 2*x], [w, 2*x], [h, 2*x], [0, 2 * x + w], [0, 2*x + h], [0, 2 * x - w], [0, 2*x - h]]
+            anchors += [[i[1], i[0]]for i in anchors]
+            anchors += [[-i[1], -i[0]]for i in anchors]
+            
+            for i in [-h, -w, 0, w, h]:
+                for j in [-h, -w, 0, w, h]:
+                    anchors.append([i, j])
+
+            self.anchors = np.array(anchors)
+            # values = np.random.random(len(anchors))
+
+            # xy = np.int64(self.anchors / self.MAZE_SIZE_SCALING)
+            # from solver.draw_utils import plot_grid_point_values
+            # import matplotlib.pyplot as plt
+            # plot_grid_point_values(xy, values)
+            # plt.savefig("test.png")
+            # exit(0)
+            
+            # aa = np.array(anchors) / self.MAZE_SIZE_SCALING
+            # print(max(self.anchors))
+            # import matplotlib.pyplot as plt
+            # pp = np.array(pts) / self.MAZE_SIZE_SCALING
+            # plt.plot([i[0] for i in pp], [i[1] for i in pp])
+            # plt.scatter([i[0] for i in aa], [i[1] for i in aa])
+            # plt.savefig("test.png")
+
+            for i in range(len(pts)):
+                j = (i + 1) % len(pts)
+                self.add_obstacles(worldbody, f"wall_{i}", np.array(pts[i]), np.array(pts[j]))
+        else:
+            raise NotImplementedError
 
         torso = tree.find(".//body[@name='torso']")
         geoms = torso.findall(".//geom")
@@ -71,6 +116,29 @@ class MazeEnvV2(gym.Env):
         self.wrapped_env = model_cls(*args, file_path=file_path, **kwargs)
 
         self._init_poses = self.wrapped_env.model.geom_pos[:].copy()
+
+    def add_obstacles(self, worldbody, name, p1, p2):
+        scale = self.MAZE_SIZE_SCALING
+
+        mid = (p1 + p2) / 2
+        pos = "%f %f %f" % (mid[0], mid[1], self.MAZE_HEIGHT / 2 * scale)
+
+        width = height = self.wall_size * scale
+        if p1[0] == p2[0]:
+            assert p2[1] != p1[1]
+            height += abs(p2[1] - p1[1]) / 2
+        elif p1[1] == p2[1]:
+            assert p2[0] != p1[0]
+            width += abs(p2[0] - p1[0]) / 2
+        else:
+            raise NotImplementedError
+
+        size = "%f %f %f" % (width, height, self.MAZE_HEIGHT / 2 * scale)
+
+        ET.SubElement(
+            worldbody, "geom", name=name, pos=pos, size=size,
+            type="box", material="", contype="1", conaffinity="1", rgba="0.4 0.4 0.4 1",
+        )
 
     def add_wall(self, worldbody, name, x, y, type=0):
         scale = self.MAZE_SIZE_SCALING
@@ -88,20 +156,21 @@ class MazeEnvV2(gym.Env):
         )
 
     def set_map(self, map):
-        poses = self._init_poses.copy()
+        if self.maze_type == 'regular' or self.maze_type is None:
+            poses = self._init_poses.copy()
 
-        for i in range(self.width):
-            for j in range(self.height):
-                if not map[0, j, i]:
-                    name = f"wall_{i}_{j}_h"
-                    id = self.wrapped_env.model.geom_name2id(name)
-                    poses[id][:2] -= 200
-                if not map[2, j, i]:
-                    name = f"wall_{i}_{j}_v"
-                    id = self.wrapped_env.model.geom_name2id(name)
-                    poses[id][:2] -= 200
-        self.wrapped_env.model.geom_pos[:] = poses
-        self.wrapped_env.sim.forward()
+            for i in range(self.width):
+                for j in range(self.height):
+                    if not map[0, j, i]:
+                        name = f"wall_{i}_{j}_h"
+                        id = self.wrapped_env.model.geom_name2id(name)
+                        poses[id][:2] -= 200
+                    if not map[2, j, i]:
+                        name = f"wall_{i}_{j}_v"
+                        id = self.wrapped_env.model.geom_name2id(name)
+                        poses[id][:2] -= 200
+            self.wrapped_env.model.geom_pos[:] = poses
+            self.wrapped_env.sim.forward()
 
     def _get_obs(self):
         return np.concatenate([self.wrapped_env._get_obs(),

@@ -54,7 +54,8 @@ class Trainer(Configurable, RLAlgo):
         rnd = RNDExplorer.dc,
 
         # update parameters..
-        horizon=6, batch_size=512, update_target_freq=2, update_train_step=1, warmup_steps=1000, steps_per_epoch=None,
+        horizon=6, batch_size=512, 
+        update_target_freq=2, update_train_step=1, warmup_steps=1000, steps_per_epoch=None,
 
         actor_delay=2, z_delay=0, info_delay=0,
         eval_episode=10, save_video=0,
@@ -72,7 +73,11 @@ class Trainer(Configurable, RLAlgo):
         backbone=None,
         reward_scale=1.,
 
+
         actor_buffer=None, # use the limit the data for training the policy network .. tend to use the latest data if necessary
+
+        fix_buffer=None, # offline training .. 
+        save_buffer_epoch=0,
     ):
         if seed is not None:
             from tools.utils import set_seed
@@ -99,7 +104,10 @@ class Trainer(Configurable, RLAlgo):
 
         # reward_with_latent = self.z_space.learn and info.use_latent
 
-        self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
+        if fix_buffer is not None:
+            self.buffer = torch.load(fix_buffer)
+        else:
+            self.buffer = ReplayBuffer(obs_space, env.action_space, env.max_time_steps, horizon, cfg=buffer)
 
         reward_requires_latent=False
         if self._cfg.rnd.scale > 0. and self._cfg.rnd.include_latent:
@@ -368,9 +376,12 @@ class Trainer(Configurable, RLAlgo):
                 break
 
             traj = self.inference(steps)
-            self.buffer.add(traj)
+
+            if self._cfg.fix_buffer is None:
+                self.buffer.add(traj)
 
             a = traj.get_tensor('a')
+            logger.logkv('epoch', epoch_id)
             logger.logkv_mean('a_max', float(a.max()))
             logger.logkv_mean('a_min', float(a.min()))
 
@@ -379,6 +390,9 @@ class Trainer(Configurable, RLAlgo):
 
             logger.dumpkvs()
             epoch_id += 1
+
+            if self._cfg.save_buffer_epoch > 0:
+                logger.torch_save(self.buffer, 'buffer.pt')
 
     def evaluate(self, env, steps):
         with torch.no_grad():

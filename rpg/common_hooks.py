@@ -239,6 +239,7 @@ class save_traj(HookBase):
                 for k, v in data['image'].items():
                     clear(use_bg=False)
                     plt.imshow(v)
+                    plt.axis('off')
                     get(k)
 
             if 'metric' in data:
@@ -334,7 +335,7 @@ class plot_anchor(HookBase):
         self.coord = info['coord']
 
     def on_epoch(self, trainer, **locals_):
-        from solver.draw_utils import plot_colored_embedding, plot_point_values
+        from solver.draw_utils import plot_point_values
         if trainer.epoch_id % self.n_epoch == 0:
             rnd = trainer.exploration.intrinsic_reward(self.state).detach().cpu().numpy()
             import matplotlib.pyplot as plt

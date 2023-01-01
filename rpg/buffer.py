@@ -291,3 +291,8 @@ class ReplayBuffer(Configurable):
         idx = idx[select]
         obs = self._obs[idx] if not isinstance(self._obs, dict) else {k: v[idx.cpu()].to(self.device) for k, v in self._obs.items()}
         return obs, self._z[idx], self._timesteps[idx]
+
+        
+    def save(self, path):
+        import torch
+        torch.save(self, path)

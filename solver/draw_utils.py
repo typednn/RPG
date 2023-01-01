@@ -131,6 +131,36 @@ def plot_point_values(v, points, **kwargs):
     sc = plt.scatter(points[:, 0], points[:, 1], c=colors, cmap=cm, **kwargs)
     plt.colorbar(sc)
 
+
+from tools.utils import tonumpy
+def plot_grid_point_values(anchors, values):
+    plt.clf()
+    anchors = tonumpy(anchors)
+    values = tonumpy(values)
+    x = anchors[:, 1]
+    y = anchors[:, 0]
+
+    min_x = x.min()
+    min_y = y.min()
+    max_x = x.max() + 1
+    max_y = y.max() + 1
+
+    vmin= values.min()
+    vmax = values.max()
+    import matplotlib
+    cm = plt.cm.get_cmap('RdYlBu')
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    maps = np.zeros((max_x - min_x, max_y - min_y, 3))
+    values = cm((values - vmin) / (vmax - vmin))
+    for i in range(len(anchors)):
+        maps[x[i] - min_x, y[i] - min_y] = values[i][:3]
+    ax = plt.imshow(maps) 
+    plt.xlim(-0.5, max_y - min_y-0.5)
+    plt.ylim(-0.5, max_x - min_x-0.5)
+    cbaxes = plt.gcf().add_axes([0.85, 0.1, 0.03, 0.8]) 
+    plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cm), cax=cbaxes)
+
     
 def plot_colored_embedding(z, points, **kwargs):
     # TODO:

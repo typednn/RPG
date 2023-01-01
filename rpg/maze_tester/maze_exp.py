@@ -70,6 +70,7 @@ base_config = dict(
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
         rndz=dict(_inherit='small', rnd=dict(include_latent=True), path='tmp/rndz'),
+        rndz_01=dict(_inherit='rndz', info=dict(coef=0.1), path='tmp/rndz_01'),
         small_optimz=dict(_inherit='small', 
             z_delay=8,
             pi_z=dict(ent=dict(coef=5., target_mode='none', schedule=dict(TYPE='linear', min_value=1., end=1000))), path='tmp/small_optimz'),
@@ -112,6 +113,8 @@ base_config = dict(
             hidden=dict(TYPE='Gaussian', n=5), 
             info=dict(coef=0.001), path = 'tmp/gaussian_maze',
         ),
+
+        antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross'),
     ),
 )
 

@@ -33,7 +33,7 @@ class RNDExplorer(ExplorationBonus):
         self, obs_space, state_dim, buffer, enc_s, z_space,
         cfg=None,
         normalizer='ema',
-        as_reward=False, training_on_rollout=True,
+        as_reward=True, training_on_rollout=False,
 
         include_latent=False,
     ):

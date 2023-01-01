@@ -47,7 +47,7 @@ class ExplorationBonus(OptimModule):
                  obs_mode='state',
                  normalizer=None,
 
-                 as_reward=False,
+                 as_reward=True,
                  training_on_rollout=False,
                  scale=0.,
 

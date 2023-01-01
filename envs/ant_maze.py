@@ -7,13 +7,13 @@ from .maze import get_embedder
 
 
 class AntMaze(gym.Env):
-    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0) -> None:
+    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5)) -> None:
         super().__init__()
         assert not reward
         self.reward = reward
         self.init_pos = init_pos
 
-        self.ant_env = AntManEnv(reset_maze=False, reset_seed=maze_id)
+        self.ant_env = AntManEnv(reset_maze=False, reset_seed=maze_id, maze_type=maze_type, lookat=lookat)
 
         self.obs_dim = obs_dim
         if self.obs_dim > 0:
@@ -66,6 +66,15 @@ class AntMaze(gym.Env):
             obs = obs * 100 * self.grid_size * 4
         return obs
 
+    def get_occupancy_image(self, occupancy):
+        return occupancy / occupancy.max()
+
+    def get_xlims(self):
+        return {
+            'xlim': [0, self.grid_size * 4],
+            'ylim': [0, self.grid_size * 4],
+        }
+
     def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
         obs = self.get_obs_from_traj(traj)
 
@@ -81,10 +90,9 @@ class AntMaze(gym.Env):
             'state': obs,
             'background': {
                 'image':  None,
-                'xlim': [0, self.grid_size * 4],
-                'ylim': [0, self.grid_size * 4],
+                **self.get_xlims(),
             },
-            'image': {'occupancy': occupancy / occupancy.max()},
+            'image': {'occupancy': self.get_occupancy_image(occupancy)},
             'history': {'occ': occupancy},
             'metric': {'occ': (occupancy > occ_val).mean()},
         }
@@ -125,3 +133,44 @@ class AntMaze(gym.Env):
             'state': np.stack(outs),
             'coord': np.stack(coords),
         }
+
+        
+class AntCross(AntMaze):
+    # ant maze with four 
+    def __init__(self, obs_dim=8, reward=False, init_pos=(0, 0), maze_id=0, maze_type='cross') -> None:
+        init_pos = (-0.5, -0.5)
+        super().__init__(obs_dim, reward, init_pos, maze_id, maze_type=maze_type, lookat=(0, -5, 10))
+        self.anchors = self.ant_env.ant_env.anchors
+
+    def build_anchor(self):
+        return torch.tensor(self.anchors, device=self.device, dtype=torch.float32).cuda()
+
+    def get_xlims(self):
+        return {
+            'xlim': [-16, 16],
+            'ylim': [-16, 16],
+        }
+
+    def get_occupancy_image(self, occupancy):
+        #return super().get_occupancy_image(occupancy)
+        occupancy = occupancy / occupancy.max()
+        # print(occupancy.argmax())
+        # print(occupancy.shape, self.anchors.shape)
+        # print(occupancy)
+        # print(self.anchors[occupancy.argmax()])
+        # exit(0)
+        anchors = (self.anchors / self.grid_size)
+        anchors = anchors.astype(np.int64)
+        from solver.draw_utils import plot_grid_point_values
+        from tools.utils import plt_save_fig_array
+        plot_grid_point_values(anchors, occupancy)
+        return plt_save_fig_array()
+
+    def counter(self, obs):
+        anchor = self.build_anchor()
+        obs = obs.reshape(-1, obs.shape[-1])
+
+        reached = torch.abs(obs[None, :, :] - anchor[:, None, :])
+        reached = torch.logical_and(reached[..., 0] < 0.5, reached[..., 1] < 0.5)
+        
+        return reached.sum(axis=-1).float().detach().cpu().numpy()
