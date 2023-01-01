@@ -391,7 +391,7 @@ class Trainer(Configurable, RLAlgo):
             logger.dumpkvs()
             epoch_id += 1
 
-            if self._cfg.save_buffer_epoch > 0:
+            if self._cfg.save_buffer_epoch > 0 and epoch_id % self._cfg.save_buffer_epoch == 0:
                 logger.torch_save(self.buffer, 'buffer.pt')
 
     def evaluate(self, env, steps):
