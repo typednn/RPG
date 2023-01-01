@@ -269,6 +269,9 @@ class Experiment(Configurable):
         return outputs
         
 
+    def add_var(self, k, d):
+        assert k not in self.base_config['_variants']
+        self.base_config['_variants'][k] = d
 
     def run_config(self, cfg):
         from rpg.soft_rpg import Trainer
