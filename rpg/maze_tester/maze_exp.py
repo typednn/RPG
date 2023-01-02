@@ -183,7 +183,7 @@ class Experiment(Configurable):
         variants = []
         def set_keyval(d, keys, val):
             for k in keys[:-1]:
-                if 'k' not in d:
+                if k not in d:
                     d[k] = {}
                 d = d[k]
             d[keys[-1]] = val
@@ -218,6 +218,7 @@ class Experiment(Configurable):
         process_variants(cfgs, [])
         factor_name = '_'.join(factor_name)
         names = [factor_name + '_'.join(n) for n in names]
+
 
         if verbose:
             print("name", names)

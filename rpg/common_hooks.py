@@ -1,4 +1,5 @@
 # common hooks; like saving the trajectories and so on
+import numpy as np
 import abc
 from typing import List
 from tools.config import Configurable
@@ -133,6 +134,55 @@ class log_info(HookBase):
             logger.dumpkvs()
 
     
+
+import matplotlib.pyplot as plt
+class Drawer:
+    def __init__(self, data):
+        self.data = data
+        self.images = {}
+        import numpy as np
+        self.background = data.get('background', {})
+
+    def clear(self, use_bg=True):
+        background = self.background
+        plt.clf()
+        if use_bg:
+            if 'image' in background and background['image'] is not None:
+                plt.imshow(np.uint8(background['image']*255))
+            if 'xlim' in background:
+                plt.xlim(background['xlim'])
+            if 'ylim' in background:
+                plt.ylim(background['ylim'])
+
+    def get(self, name):
+        from tools.utils import plt_save_fig_array
+        plt.title(name)
+        plt.tight_layout()
+        self.images[name] = plt_save_fig_array()[:, :, :3]
+
+
+@as_hook
+class save_train_occupancy(HookBase):
+    def __init__(self, n_epoch=10) -> None:
+        super().__init__()
+        self.n_epoch = n_epoch
+        self.history = None 
+        self.obs = []
+        
+    def on_epoch(self, trainer, env, steps, traj, **locals_):
+        #return super().on_epoch(trainer, **locals_)
+        self.obs.append(traj.get_tensor('obs').detach())
+        if trainer.epoch_id % int(self.n_epoch) == 0:
+            import torch
+            from tools.utils import logger
+            data = env.render_traj({'next_obs': torch.cat(self.obs)}, occ=True, history=self.history)
+            img = data['image']['occupancy']
+            
+            logger.logkv_mean('train_occ_metric', data['metric']['occ'])
+            logger.savefig('train_occupancy', img)
+            self.obs = []
+
+
     
 @as_hook
 class save_traj(HookBase):
@@ -189,29 +239,30 @@ class save_traj(HookBase):
             traj.old_obs = old_obs
 
             data = env.render_traj(traj, occ=self.occupancy, history=self.history)
+            drawer = Drawer(data)
 
-            from tools.utils import plt_save_fig_array
             from solver.draw_utils import plot_colored_embedding, plot_point_values
-            import matplotlib.pyplot as plt
+            from tools.utils import plt_save_fig_array
+            # # import matplotlib.pyplot as plt
 
-            images = {}
-            import numpy as np
-            background = data.get('background', {})
+            # images = {}
+            # import numpy as np
+            # background = data.get('background', {})
 
-            def clear(use_bg=True):
-                plt.clf()
-                if use_bg:
-                    if 'image' in background and background['image'] is not None:
-                        plt.imshow(np.uint8(background['image']*255))
-                    if 'xlim' in background:
-                        plt.xlim(background['xlim'])
-                    if 'ylim' in background:
-                        plt.ylim(background['ylim'])
+            # def clear(use_bg=True):
+            #     plt.clf()
+            #     if use_bg:
+            #         if 'image' in background and background['image'] is not None:
+            #             plt.imshow(np.uint8(background['image']*255))
+            #         if 'xlim' in background:
+            #             plt.xlim(background['xlim'])
+            #         if 'ylim' in background:
+            #             plt.ylim(background['ylim'])
 
-            def get(name):
-                plt.title(name)
-                plt.tight_layout()
-                images[name] = plt_save_fig_array()[:, :, :3]
+            # def get(name):
+            #     plt.title(name)
+            #     plt.tight_layout()
+            #     images[name] = plt_save_fig_array()[:, :, :3]
 
             # plot z.
             z = traj.get_tensor('z', device='cpu')
@@ -221,26 +272,26 @@ class save_traj(HookBase):
 
             if not isinstance(data['state'], dict):
                 print('z.shape', z.shape, 'data state shape', data['state'].shape)
-                clear()
+                drawer.clear()
                 plot_colored_embedding(z, data['state'], s=2)
-                get('latent')
+                drawer.get('latent')
             else:
                 for k, v in data['state'].items():
-                    clear()
+                    drawer.clear()
                     plot_colored_embedding(z, v, s=2)
-                    get(k)
+                    drawer.get(k)
 
             if 'actions' in data:
-                clear(use_bg=False)
+                drawer.clear(use_bg=False)
                 plot_colored_embedding(z, data['actions'])
-                get('action')
+                drawer.get('action')
 
             if 'image' in data:
                 for k, v in data['image'].items():
-                    clear(use_bg=False)
+                    drawer.clear(use_bg=False)
                     plt.imshow(v)
                     plt.axis('off')
-                    get(k)
+                    drawer.get(k)
 
             if 'metric' in data:
                 for k, v in data['metric'].items():
@@ -259,19 +310,19 @@ class save_traj(HookBase):
                     v = np.array(v)
                     print(k, v.shape)
 
-                    clear()
+                    drawer.clear()
                     v = v.reshape(-1)
                     plot_point_values(v.reshape(-1), data['state'], s=2)
-                    get(k)
-                    others.append(images.pop(k))
-                images['attrs'] = np.concatenate(others, axis=1)
+                    drawer.get(k)
+                    others.append(drawer.images.pop(k))
+                drawer.images['attrs'] = np.concatenate(others, axis=1)
 
-            for k, v in images.items():
+            for k, v in drawer.images.items():
                 logger.savefig(k + '.png', v)
 
             #logger.savefig(self.traj_name + '.png', img)
             if self.save_gif_epochs > 0:
-                img = np.concatenate([v for k, v in images.items()], axis=1)
+                img = np.concatenate([v for k, v in drawer.images.items()], axis=1)
                 self.imgs.append(img)
                 if len(self.imgs) % self.save_gif_epochs == 0:
                     logger.animate(self.imgs, self.traj_name + '.mp4')
