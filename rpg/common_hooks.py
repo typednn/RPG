@@ -177,6 +177,8 @@ class save_train_occupancy(HookBase):
             from tools.utils import logger
             data = env.render_traj({'next_obs': torch.cat(self.obs)}, occ=True, history=self.history)
             img = data['image']['occupancy']
+
+            self.history = data['history']
             
             logger.logkv_mean('train_occ_metric', data['metric']['occ'])
             logger.savefig('train_occupancy', img)

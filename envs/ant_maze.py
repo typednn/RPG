@@ -141,14 +141,16 @@ class AntCross(AntMaze):
         init_pos = (-0.5, -0.5)
         super().__init__(obs_dim, reward, init_pos, maze_id, maze_type=maze_type, lookat=(0, -5, 10))
         self.anchors = self.ant_env.ant_env.anchors
+        self.minL = self.anchors.min()
+        self.maxL = self.anchors.max()
 
     def build_anchor(self):
         return torch.tensor(self.anchors, device=self.device, dtype=torch.float32).cuda()
 
     def get_xlims(self):
         return {
-            'xlim': [-16, 16],
-            'ylim': [-16, 16],
+            'xlim': [-self.minL, self.maxL],
+            'ylim': [-self.minL, self.maxL],
         }
 
     def get_occupancy_image(self, occupancy):
