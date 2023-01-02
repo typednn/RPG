@@ -292,6 +292,27 @@ def batch_input(x, device, dtype=torch.float32):
 
 #totensor = batch_input
 
+def gettensortype(x):
+    if isinstance(x, torch.Tensor):
+        return {'dtype': x.dtype, 'device': x.device, 'cls': 'torch'}
+    elif isinstance(x, np.ndarray):
+        return {'dtype': x.dtype, 'device': 'cpu', 'cls': 'numpy'}
+    else:
+        raise NotImplementedError
+
+def totensortype(x, type):
+    if type['cls'] == 'torch':
+        return torch.tensor(x, dtype=type['dtype']).to(type['device'])
+    elif type['cls'] == 'numpy':
+        if isinstance(x, torch.Tensor):
+            x = x.detach().cpu().numpy()
+        return np.array(x, dtype=type['dtype'])
+    else:
+        raise NotImplementedError
+
+def tensor_like(a, b):
+    return totensortype(a, gettensortype(b))
+
 def tonumpy(x):
     if isinstance(x, torch.Tensor):
         return x.detach().cpu().numpy()

@@ -72,6 +72,7 @@ class Trainer(Configurable, RLAlgo):
         
         backbone=None,
         reward_scale=1.,
+        reward_relabel = None,
 
 
         actor_buffer=None, # use the limit the data for training the policy network .. tend to use the latest data if necessary
@@ -156,6 +157,12 @@ class Trainer(Configurable, RLAlgo):
 
         z_space.callback(self)
 
+        if reward_relabel is not None:
+            from .reward_relabel import relabel
+            self.reward_relabel = lambda *args: relabel(reward_relabel, *args)
+        else:
+            self.reward_relabel = None
+
 
     def make_rnd(self):
         rnd = self._cfg.rnd
@@ -207,6 +214,9 @@ class Trainer(Configurable, RLAlgo):
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
         z = self.relabel_z(seg)
+        
+        if self.reward_relabel is not None:
+            seg.reward = self.reward_relabel(seg.obs_seq[:-1], seg.action, seg.obs_seq[1:])
         
         seg.reward = seg.reward * self._cfg.reward_scale
         if self.exploration is not None and self.exploration.as_reward:
@@ -315,6 +325,10 @@ class Trainer(Configurable, RLAlgo):
                     images.append(self.env.render('rgb_array')[0])
 
                 transition.update(**data, a=a, z=prevz)
+                if self.reward_relabel is not None:
+                    newr = self.reward_relabel(transition['obs'], transition['a'], transition['next_obs'])
+                    assert newr.shape == transition['r'].shape
+                    transition['r'] = newr
 
                 if mode != 'training' and self.exploration is not None:
                     # for visualize the transitions ..
