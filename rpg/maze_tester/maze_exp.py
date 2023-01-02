@@ -34,7 +34,7 @@ base_config = dict(
     pi_z=dict(ent=dict(coef=1000., target_mode='none'),),
 
     path='tmp/maze',
-    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10, occupancy=1)),
+    hooks=dict(save_traj=dict(n_epoch=4, save_gif_epochs=10, occupancy=1), save_train_occupancy=dict(n_epoch=10)),
     info=dict(coef=0.0),
     # info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
 
@@ -80,7 +80,7 @@ base_config = dict(
         ant=dict(
             _inherit='small', env_cfg=dict(n=1, obs_dim=8), info=dict(coef=0.01), env_name='AntMaze', path='tmp/antmaze', save_video=1000,
             head=dict(linear=False, squash=False),
-            hooks=dict(save_traj=dict(n_epoch=40, save_gif_epochs=10, occupancy=1)),
+            hooks=dict(save_traj=dict(n_epoch=40, save_gif_epochs=10, occupancy=1), save_train_occupancy=dict(n_epoch=10)),
             max_epoch=200000,
             steps_per_epoch=150,
             buffer=dict(max_episode_num=10000),
