@@ -58,7 +58,7 @@ class GymVecEnv(VecEnv):
 
             elif env_name == 'AntMaze3':
                 from envs.ant_maze import AntCross
-                return TimeLimit(AntCross(**kwargs), 150)
+                return TimeLimit(AntCross(**kwargs), 200)
 
             elif env_name == 'BlockPush':
                 import os

@@ -30,11 +30,15 @@ class RNDNet(Network):
         
 class RNDExplorer(ExplorationBonus):
     def __init__(
-        self, obs_space, state_dim, buffer, enc_s, z_space,
+        self,
+        obs_space,
+        state_dim,
+        buffer,
+        enc_s,
+        z_space,
         cfg=None,
         normalizer='ema',
         as_reward=True, training_on_rollout=False,
-
         include_latent=False,
     ):
 

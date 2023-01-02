@@ -114,7 +114,7 @@ base_config = dict(
             info=dict(coef=0.001), path = 'tmp/gaussian_maze',
         ),
 
-        antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross'),
+        antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross', steps_per_epoch=200),
     ),
 )
 
