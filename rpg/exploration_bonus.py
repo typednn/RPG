@@ -9,37 +9,6 @@ from tools.optim import OptimModule
 from .density import DensityEstimator
 
 
-class ScalarNormalizer:
-    # maintain a deque of fixed size and update the parameters with the recent data
-    def __init__(self, size=10000):
-        self.size = size
-        self.data = deque()
-        self.sum = 0.
-        self.sumsq = 1.
-        self.step = 0
-
-    def update(self, data):
-        sum = float(data.sum())
-        sumsq = float((data**2).sum())
-        self.data.append([sum, sumsq])
-        self.sum += sum
-        self.sumsq += sumsq
-        if len(self.data)> self.size:
-            sum, sumsq = self.data.popleft()
-            self.sum -= sum
-            self.sumsq -= sumsq
-
-    @property
-    def mean(self):
-        return self.sum / len(self.data)
-
-    @property
-    def std(self):
-        return np.sqrt(self.sumsq / len(self.data) - self.mean**2 + 1e-16)
-
-    def normalize(self, data):
-        return (data - self.mean) / self.std
-
 
 class ExplorationBonus(Configurable):
     name = 'bonus'
@@ -60,7 +29,6 @@ class ExplorationBonus(Configurable):
         buffer_size=None,
         update_step=1, update_freq=1, batch_size=512,
         obs_mode='state',
-        normalizer=None,
 
         as_reward=True,
         training_on_rollout=False,
@@ -73,6 +41,7 @@ class ExplorationBonus(Configurable):
         if buffer_size is None:
             buffer_size = buffer.capacity
 
+        self.z_space = z_space
         self.density_space = self.make_inp_space(obs_space, state_dim, z_space)
         self.estimator: DensityEstimator = DensityEstimator.build(self.density_space, cfg=density).cuda()
 
@@ -83,15 +52,6 @@ class ExplorationBonus(Configurable):
 
         self.batch_size = batch_size
         self.enc_s = enc_s
-
-        if normalizer is None or normalizer == 'none':
-            self.normalizer = None
-        elif normalizer == 'ema':
-            self.normalizer = RunningMeanStd(last_dim=True)
-        elif isinstance(normalizer, int):
-            self.normalizer = ScalarNormalizer(normalizer)
-        else:
-            raise NotImplementedError
             
         self.as_reward = as_reward
         self.training_on_rollout = training_on_rollout
@@ -139,9 +99,9 @@ class ExplorationBonus(Configurable):
             self.step += 1
             if self.step % self.update_freq == 0 and len(self.buffer) > self.batch_size:
                 for _ in range(self.update_step):
-                    bonus = self.update(*self.sample_data())
-                    if self.normalizer is not None:
-                        self.normalizer.update(bonus)
+                    self.update(*self.sample_data())
+                    #if self.normalizer is not None:
+                    #    self.normalizer.update(bonus)
 
     def process_obs(self, obs):
         if self.obs_mode == 'state':
@@ -161,10 +121,6 @@ class ExplorationBonus(Configurable):
         obs = self.process_obs(obs)
         return obs, latent
 
-    def update(self, inp, latent) -> torch.Tensor: 
-        inp = self.make_inp(inp, latent)
-        return self.estimator.log_prob(inp)
-
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
         if 'r' not in attrs:
@@ -183,24 +139,22 @@ class ExplorationBonus(Configurable):
         #raise NotImplementedError
         if self.training_on_rollout:
             assert self.obs_mode == 'state'
-            bonus = self.update(rollout['state'][1:].detach())
-            if self.normalizer is not None:
-                self.normalizer.update(bonus)
+            self.update(rollout['state'][1:].detach())
 
     def intrinsic_reward(self, rollout, latent):
         if not self.as_reward:
             assert self.obs_mode == 'state'
             bonus = self.compute_bonus(rollout['state'][1:])
-            if self.normalizer is not None:
-                bonus = self.normalizer.normalize(bonus)
             return self.name, bonus * self.scale
         else:
             # rollout is the obs
             bonus = self.compute_bonus_by_obs(rollout, latent)
-            if self.normalizer is not None:
-                bonus = self.normalizer.normalize(bonus)
             return bonus * self.scale
             
+
+    def update(self, inp, latent) -> torch.Tensor: 
+        inp = self.make_inp(inp, latent)
+        return self.estimator.update(inp)
 
     def compute_bonus(self, inp, latent) -> torch.Tensor:
         inp = self.make_inp(inp, latent)
