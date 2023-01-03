@@ -100,8 +100,6 @@ class Env2DDataset(DatasetBase):
         count2d = occupancy.detach().cpu().numpy()
         plt.pcolormesh(self.xedges, self.yedges, count2d, shading='auto')
         pass
-        
-
 
 
 def make_dataset(dataset_name):

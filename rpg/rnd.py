@@ -50,10 +50,8 @@ class RNDExplorer(ExplorationBonus):
             raise NotImplementedError
         if include_latent:
             inp_dim += z_space.dim
+
         self.inp_dim = inp_dim
-        # if include_latent:
-        #     print(z_space.dim)
-        #     raise NotImplementedError
         self.z_space = z_space
 
 
@@ -90,3 +88,11 @@ class RNDExplorer(ExplorationBonus):
         self.optimize(loss.mean())
         logger.logkv_mean(self.name + '_loss', loss.mean())
         return loss.detach()
+
+        
+
+# from tools.utils import mlp, logger
+# class VAEExplorer(ExplorationBonus):
+#     def make_autoencoder(self):
+#         self.encoder = mlp(self.obs_space.shape[0], [256, 512, 512, 256], self.latent.get_input_dim())
+#         self.decoder = mlp(self.latent.embed_dim(), [256, 512, 512, 256], self.obs_space.shape[0])
