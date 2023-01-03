@@ -6,6 +6,7 @@ from collections import deque
 import numpy as np
 from tools.utils import RunningMeanStd
 from tools.optim import OptimModule
+from .density import DensityEstimator
 
 
 class ScalarNormalizer:
@@ -40,27 +41,46 @@ class ScalarNormalizer:
         return (data - self.mean) / self.std
 
 
-class ExplorationBonus(OptimModule):
+class ExplorationBonus(Configurable):
     name = 'bonus'
-    def __init__(self, module, buffer: ReplayBuffer, enc_s,
-                 cfg=None, buffer_size=None, update_step=1, update_freq=1, batch_size=512,
-                 obs_mode='state',
-                 normalizer=None,
+    def __init__(
+        self,
 
-                 as_reward=True,
-                 training_on_rollout=False,
-                 scale=0.,
+        obs_space,
+        state_dim, 
+        z_space,
 
-                 include_latent=False,
+        enc_s,
+        buffer: ReplayBuffer,
+
+        cfg=None,
+
+        density=DensityEstimator.to_build(TYPE='RND'),
+
+        buffer_size=None,
+        update_step=1, update_freq=1, batch_size=512,
+        obs_mode='state',
+        normalizer=None,
+
+        as_reward=True,
+        training_on_rollout=False,
+        scale=0.,
+
+        include_latent=False,
     ) -> None:
 
-        super().__init__(module)
+        super().__init__()
         if buffer_size is None:
             buffer_size = buffer.capacity
+
+        self.density_space = self.make_inp_space(obs_space, state_dim, z_space)
+        self.estimator: DensityEstimator = DensityEstimator.build(self.density_space, cfg=density).cuda()
+
 
         self.step = 0
         self.buffer = deque(maxlen=buffer_size)
         self.bufferz = deque(maxlen=buffer_size)
+
         self.batch_size = batch_size
         self.enc_s = enc_s
 
@@ -72,7 +92,6 @@ class ExplorationBonus(OptimModule):
             self.normalizer = ScalarNormalizer(normalizer)
         else:
             raise NotImplementedError
-
             
         self.as_reward = as_reward
         self.training_on_rollout = training_on_rollout
@@ -86,6 +105,29 @@ class ExplorationBonus(OptimModule):
         if include_latent:
             assert self.obs_mode != 'state'
             assert not self.training_on_rollout
+
+    def make_inp_space(self, obs_space, state_dim, hidden_space):
+        cfg = self._cfg
+        if cfg.obs_mode == 'state':
+            inp_dim = state_dim
+        elif cfg.obs_mode == 'obs':
+            inp_dim = obs_space.shape[0]
+        else:
+            raise NotImplementedError
+        if cfg.include_latent:
+            inp_dim += hidden_space.dim
+        from gym.spaces import Box
+        return Box(-np.inf, np.inf, shape=(inp_dim,))
+
+    def make_inp(self, obs, latent):
+        inps = obs
+        from tools.utils import totensor
+        inps = totensor(inps, device='cuda:0')
+        if self.include_latent:
+            latent = self.z_space.tokenize(totensor(latent, device='cuda:0'))
+            inps = torch.cat([inps, latent], dim=-1)
+        return inps
+
 
     def add_data(self, data, prevz):
         if not self.training_on_rollout:
@@ -120,18 +162,9 @@ class ExplorationBonus(OptimModule):
         return obs, latent
 
     def update(self, inp, latent) -> torch.Tensor: 
-        # the input is the same with the compute_bonus
-        raise NotImplementedError
+        inp = self.make_inp(inp, latent)
+        return self.estimator.log_prob(inp)
 
-    def compute_bonus(self, inp, latent) -> torch.Tensor:
-        # when obs_mode is state, obs is the state
-        # otherwise, it is the obs
-        raise NotImplementedError
-
-    def compute_bonus_by_obs(self, obs, latent):
-        obs = self.process_obs(obs)
-        return self.compute_bonus(obs, latent)
-        
     def visualize_transition(self, transition):
         attrs = transition.get('_attrs', {})
         if 'r' not in attrs:
@@ -168,3 +201,12 @@ class ExplorationBonus(OptimModule):
                 bonus = self.normalizer.normalize(bonus)
             return bonus * self.scale
             
+
+    def compute_bonus(self, inp, latent) -> torch.Tensor:
+        inp = self.make_inp(inp, latent)
+        return -self.estimator.log_prob(inp)
+
+    def compute_bonus_by_obs(self, obs, latent):
+        obs = self.process_obs(obs)
+        return self.compute_bonus(obs, latent)
+        

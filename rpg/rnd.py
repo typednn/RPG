@@ -12,20 +12,6 @@ from .exploration_bonus import ExplorationBonus
 from tools.nn_base import concat
 
 
-class RNDNet(Network):
-    def __init__(self, inp_dim, cfg=None, n_layers=3, dim=512):
-        super(RNDNet, self).__init__()
-        self.inp_dim = inp_dim
-        layers = []
-        for i in range(n_layers):
-            if i > 0:
-                layers.append(nn.LeakyReLU())
-            layers.append(nn.Linear(inp_dim, dim))
-            inp_dim = dim
-        self.main = nn.Sequential(*layers)
-        
-    def forward(self, x):
-        return self.main(x)
 
         
 class RNDExplorer(ExplorationBonus):
@@ -42,14 +28,6 @@ class RNDExplorer(ExplorationBonus):
         include_latent=False,
     ):
 
-        if cfg.obs_mode == 'state':
-            inp_dim = state_dim
-        elif cfg.obs_mode == 'obs':
-            inp_dim = obs_space.shape[0]
-        else:
-            raise NotImplementedError
-        if include_latent:
-            inp_dim += z_space.dim
 
         self.inp_dim = inp_dim
         self.z_space = z_space
@@ -91,8 +69,10 @@ class RNDExplorer(ExplorationBonus):
 
         
 
-# from tools.utils import mlp, logger
-# class VAEExplorer(ExplorationBonus):
-#     def make_autoencoder(self):
-#         self.encoder = mlp(self.obs_space.shape[0], [256, 512, 512, 256], self.latent.get_input_dim())
-#         self.decoder = mlp(self.latent.embed_dim(), [256, 512, 512, 256], self.obs_space.shape[0])
+from tools.utils import mlp, logger
+class VAEExplorer(ExplorationBonus):
+    def __init__(self, module, buffer, enc_s, cfg=None, buffer_size=None, update_step=1, update_freq=1, batch_size=512, obs_mode='state', normalizer=None, as_reward=True, training_on_rollout=False, scale=0, include_latent=False) -> None:
+        super().__init__(module, buffer, enc_s, cfg, buffer_size, update_step, update_freq, batch_size, obs_mode, normalizer, as_reward, training_on_rollout, scale, include_latent)
+    def make_autoencoder(self):
+        self.encoder = mlp(self.obs_space.shape[0], [256, 512, 512, 256], self.latent.get_input_dim())
+        self.decoder = mlp(self.latent.embed_dim(), [256, 512, 512, 256], self.obs_space.shape[0])

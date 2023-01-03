@@ -7,7 +7,8 @@ from .buffer import ReplayBuffer
 from .info_net import InfoLearner
 from .traj import Trajectory
 from .intrinsic import IntrinsicMotivation
-from .rnd import RNDExplorer
+#from .rnd import RNDExplorer
+from .exploration_bonus import ExplorationBonus
 from .utils import create_hidden_space
 from nn.distributions import Normal
 from typing import Union
@@ -51,7 +52,7 @@ class Trainer(Configurable, RLAlgo):
 
         # mutual information term ..
         info = InfoLearner.dc,
-        rnd = RNDExplorer.dc,
+        rnd = ExplorationBonus.dc, # rnd can be any density estimator 
 
         # update parameters..
         horizon=6, batch_size=512, 
@@ -167,7 +168,9 @@ class Trainer(Configurable, RLAlgo):
     def make_rnd(self):
         rnd = self._cfg.rnd
         if rnd.scale > 0.:
-            self.exploration = RNDExplorer(self.env.observation_space, self.dynamics_net.state_dim, self.buffer, self.dynamics_net.enc_s, self.z_space, cfg=rnd)
+            self.exploration = ExplorationBonus(
+                self.env.observation_space, self.dynamics_net.state_dim, self.z_space, 
+                self.dynamics_net.enc_s, self.buffer, cfg=rnd)
 
             if not self.exploration.as_reward:
                 self.intrinsics.append(self.exploration)
