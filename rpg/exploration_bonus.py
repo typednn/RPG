@@ -28,12 +28,12 @@ class ExplorationBonus(Configurable):
 
         buffer_size=None,
         update_step=1, update_freq=1, batch_size=512,
-        obs_mode='state',
+        obs_mode='obs',
+
+        scale=0.,
 
         as_reward=True,
         training_on_rollout=False,
-        scale=0.,
-
         include_latent=False,
     ) -> None:
 

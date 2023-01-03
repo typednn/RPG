@@ -48,7 +48,6 @@ class DensityEstimator(OptimModule):
         self.network = network
 
 
-
         if normalizer is None or normalizer == 'none':
             self.normalizer = None
         elif normalizer == 'ema':

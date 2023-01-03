@@ -69,10 +69,10 @@ class RNDExplorer(ExplorationBonus):
 
         
 
-from tools.utils import mlp, logger
-class VAEExplorer(ExplorationBonus):
-    def __init__(self, module, buffer, enc_s, cfg=None, buffer_size=None, update_step=1, update_freq=1, batch_size=512, obs_mode='state', normalizer=None, as_reward=True, training_on_rollout=False, scale=0, include_latent=False) -> None:
-        super().__init__(module, buffer, enc_s, cfg, buffer_size, update_step, update_freq, batch_size, obs_mode, normalizer, as_reward, training_on_rollout, scale, include_latent)
-    def make_autoencoder(self):
-        self.encoder = mlp(self.obs_space.shape[0], [256, 512, 512, 256], self.latent.get_input_dim())
-        self.decoder = mlp(self.latent.embed_dim(), [256, 512, 512, 256], self.obs_space.shape[0])
+# from tools.utils import mlp, logger
+# class VAEExplorer(ExplorationBonus):
+#     def __init__(self, module, buffer, enc_s, cfg=None, buffer_size=None, update_step=1, update_freq=1, batch_size=512, obs_mode='state', normalizer=None, as_reward=True, training_on_rollout=False, scale=0, include_latent=False) -> None:
+#         super().__init__(module, buffer, enc_s, cfg, buffer_size, update_step, update_freq, batch_size, obs_mode, normalizer, as_reward, training_on_rollout, scale, include_latent)
+#     def make_autoencoder(self):
+#         self.encoder = mlp(self.obs_space.shape[0], [256, 512, 512, 256], self.latent.get_input_dim())
+#         self.decoder = mlp(self.latent.embed_dim(), [256, 512, 512, 256], self.obs_space.shape[0])

@@ -3,6 +3,7 @@ import torch
 import numpy as np  
 from tools.utils import totensor
 from tools.config import Configurable
+from rpg.density import DensityEstimator
 
 """
 # supervised learning for density measurement
@@ -23,6 +24,9 @@ Task list
 class DatasetBase(Configurable):
     def __init__(self, cfg=None) -> None:
         super().__init__()
+
+    def get_obs_space(self):
+        raise NotImplementedError
 
     def sample(self, batch_size):
         # sample dataset
@@ -113,9 +117,11 @@ def make_dataset(dataset_name):
 
 
 class Trainer(Configurable): 
-    def __init__(self, cfg=None, dataset_name=None) -> None:
+    def __init__(self, cfg=None, dataset_name=None, 
+                 density=DensityEstimator.to_build("RND")) -> None:
         super().__init__()
         self.dataset = make_dataset(dataset_name)
+        self.density = DensityEstimator.to_build(self.dataset.get_obs_space(), cfg=density)
 
     def test_dataset(self):
         self.dataset.test()

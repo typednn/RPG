@@ -22,7 +22,7 @@ class RNDNet(Network):
 
         
 class RND(DensityEstimator):
-    def __init__(self, space, cfg=None) -> None:
+    def __init__(self, space, cfg=None, normalizer='ema') -> None:
         super().__init__(space)
 
         self.target = RNDNet(self.inp_dim)
@@ -45,11 +45,11 @@ class RND(DensityEstimator):
         loss = ((predict - target)**2).sum(axis=-1, keepdim=True)
         return loss
 
-    def update(self, samples):
+    def _update(self, samples):
         loss = self.compute_loss(samples)
         self.optimize(loss.mean())
         logger.logkv_mean(self.name + '_loss', loss.mean())
         return loss.detach()
 
-    def log_prob(self, samples):
+    def _log_prob(self, samples):
         return -self.compute_loss(samples) # negative as the log prob ..
