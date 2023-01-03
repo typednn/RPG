@@ -78,12 +78,12 @@ class GaussianDataset(DatasetBase):
         )[:, np.newaxis]
 
         inp = totensor(X, device='cuda:0').clip(-5, 4.999999)
-        output = self.embedder(inp)
-        assert torch.allclose(inp, self.embedder.decode(output))
+        output = self.embedder(inp / 5)
+        assert torch.allclose(inp, self.embedder.decode(output) * 5)
         return output
 
     def tokenize(self, inp):
-        inp = self.embedder.decode(inp)
+        inp = self.embedder.decode(inp) * 5
         inp = inp.reshape(-1)
         # print(plt.hist(inp.cpu().numpy(), bins=100)[1].shape)
         return ((inp / 10 + 0.5) * (self.N-1)).long(), self.N
