@@ -149,8 +149,8 @@ class AntCross(AntMaze):
 
     def get_xlims(self):
         return {
-            'xlim': [-self.minL, self.maxL],
-            'ylim': [-self.minL, self.maxL],
+            'xlim': [self.minL, self.maxL],
+            'ylim': [self.minL, self.maxL],
         }
 
     def get_occupancy_image(self, occupancy):

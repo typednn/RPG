@@ -176,6 +176,9 @@ class Trainer(Configurable, RLAlgo):
 
     def relabel_z(self, seg):
         z = seg.z
+        if self._cfg.fix_buffer:
+            z = torch.zeros_like(z)
+            assert self._cfg.hidden.n == 1
         # .obs_seq[0], seg.timesteps[0], seg.z
         if self._cfg.relabel > 0. and self.update_step > 100:
             if self._cfg.relabel_method == 'future':
