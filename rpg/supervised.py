@@ -76,7 +76,11 @@ class GaussianDataset(DatasetBase):
         X = np.concatenate(
             (np.random.normal(-1, 1, n1), np.random.normal(3, 0.3, batch_size - n1))
         )[:, np.newaxis]
-        return self.embedder( totensor(X, device='cuda:0').clip(-5, 4.999999) )
+
+        inp = totensor(X, device='cuda:0').clip(-5, 4.999999)
+        output = self.embedder(inp)
+        assert torch.allclose(inp, self.embedder.decode(output))
+        return output
 
     def tokenize(self, inp):
         inp = self.embedder.decode(inp)
@@ -146,11 +150,13 @@ class Trainer(Configurable):
         max_epoch=1000,
         batch_size = 256,
         batch_num=2000,
-        path = None
+        path = None,
+        vis=dict(scale=1.,),
     ) -> None:
         super().__init__()
         self.dataset = make_dataset(dataset_name, env_cfg)
         self.density: DensityEstimator = DensityEstimator.build(self.dataset.get_obs_space(), cfg=density).cuda()
+        self.density.register_discretizer(self.dataset.tokenize)
 
         self.max_epoch = max_epoch
         self.batch_size = batch_size
@@ -168,11 +174,13 @@ class Trainer(Configurable):
                 data = self.dataset.sample(self.batch_size)
                 self.density.update(data)
 
+            vis = self._cfg.vis
             with torch.no_grad():
                 data = self.dataset.sample(1000)
                 log_prob = self.density.log_prob(data)
 
-                prob = torch.softmax(log_prob[..., 0] * 10, dim=0)
+                #countprob = torch.softmax(log_prob[..., 0] * vis.scale, dim=0)
+                prob = (log_prob[..., 0] * vis.scale).exp()
                 value = self.dataset.count(data, prob, reduce='mean')
                 plt.clf()
                 self.dataset.visualize(value)

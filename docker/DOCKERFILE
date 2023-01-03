@@ -121,6 +121,8 @@ RUN pip install --no-cache open3d
 RUN pip install --no-cache rtree
 RUN pip install --no-cache einops
 
+RUN conda install pytorch-scatter -c pyg
+
 WORKDIR /root/
 ARG MANISKILL_KEY
 RUN echo "${MANISKILL_KEY}" > ~/.ssh/id_rsa_maniskill

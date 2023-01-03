@@ -57,6 +57,8 @@ class DensityEstimator(OptimModule):
         else:
             raise NotImplementedError
 
+    def register_discretizer(self, discretizer):
+        pass
 
     def make_network(self, space):
         raise NotImplementedError
