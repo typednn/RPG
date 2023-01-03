@@ -5,6 +5,7 @@ from typing import Union
 from tools.nn_base import Network
 from diffusers import DDIMScheduler
 import torch.nn.functional as F
+from einops import reduce
 
 
 #def gaussian_kl(mu, logvar):
@@ -12,7 +13,8 @@ import torch.nn.functional as F
 #    return kl.reshape(mu.shape[0], -1).mean(-1).mean()
 def gaussian_kl(mu, logsigma):
     kl = -0.5 * (1 + 2 * logsigma - mu.pow(2) - logsigma.exp().pow(2))
-    return kl.reshape(mu.shape[0], -1).mean(-1).mean()
+    #return kl.reshape(mu.shape[0], -1).mean(-1)
+    return reduce(kl, '... c -> ...', 'mean')
 
     
 class HiddenDDIM(Network):

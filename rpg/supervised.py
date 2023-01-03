@@ -9,6 +9,7 @@ from tools.utils import totensor
 from tools.config import Configurable
 from rpg.density import DensityEstimator
 from gym.spaces import Box
+from rpg.utils import Embedder
 
 """
 # supervised learning for density measurement
@@ -60,22 +61,25 @@ class DatasetBase(Configurable):
         
 
 class GaussianDataset(DatasetBase):
-    def __init__(self, cfg=None, N=100) -> None:
+    def __init__(self, cfg=None, N=100, embed_dim=0) -> None:
         super().__init__()
         self.N = N
         self.bins = np.linspace(-5, 5., self.N)
+        self.embedder = Embedder(1, embed_dim)
+        self.out_dim = self.embedder.out_dim
 
     def get_obs_space(self):
-        return gym.spaces.Box(-5, 5., shape=(1,))
+        return gym.spaces.Box(-5, 5., shape=(self.out_dim,))
 
     def sample(self, batch_size):
         n1 = int(batch_size * 0.3)
         X = np.concatenate(
             (np.random.normal(-1, 1, n1), np.random.normal(3, 0.3, batch_size - n1))
         )[:, np.newaxis]
-        return totensor(X, device='cuda:0').clip(-5, 4.999999)
+        return self.embedder( totensor(X, device='cuda:0').clip(-5, 4.999999) )
 
     def tokenize(self, inp):
+        inp = self.embedder.decode(inp)
         inp = inp.reshape(-1)
         # print(plt.hist(inp.cpu().numpy(), bins=100)[1].shape)
         return ((inp / 10 + 0.5) * (self.N-1)).long(), self.N
@@ -125,19 +129,19 @@ class Env2DDataset(DatasetBase):
         plt.colorbar()
 
 
-def make_dataset(dataset_name):
+def make_dataset(dataset_name, env_cfg=None):
     if dataset_name == 'twonormal':
-        return GaussianDataset()
+        return GaussianDataset(cfg=env_cfg)
     elif dataset_name == 'env2d':
-        return Env2DDataset()
+        return Env2DDataset(cfg=env_cfg)
     else:
         raise NotADirectoryError
-
 
 
 class Trainer(Configurable): 
     def __init__(
         self, cfg=None, dataset_name=None, 
+        env_cfg=None,
         density=DensityEstimator.to_build(TYPE="RND"),
         max_epoch=1000,
         batch_size = 256,
@@ -145,7 +149,7 @@ class Trainer(Configurable):
         path = None
     ) -> None:
         super().__init__()
-        self.dataset = make_dataset(dataset_name)
+        self.dataset = make_dataset(dataset_name, env_cfg)
         self.density: DensityEstimator = DensityEstimator.build(self.dataset.get_obs_space(), cfg=density).cuda()
 
         self.max_epoch = max_epoch
@@ -167,9 +171,9 @@ class Trainer(Configurable):
             with torch.no_grad():
                 data = self.dataset.sample(1000)
                 log_prob = self.density.log_prob(data)
-                value = self.dataset.count(data, log_prob[..., 0], reduce='mean')
 
-
+                prob = torch.softmax(log_prob[..., 0] * 10, dim=0)
+                value = self.dataset.count(data, prob, reduce='mean')
                 plt.clf()
                 self.dataset.visualize(value)
                 logger.savefig('log_prob_avg.png')

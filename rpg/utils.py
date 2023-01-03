@@ -251,7 +251,6 @@ def compute_gae_by_hand(reward, value, next_value, done, truncated, gamma, lmbda
     return torch.stack(gae).float() #* (1-lmbda) 
 
 
-
 import math
 def positional_encoding(dim, position):
     """
@@ -274,3 +273,58 @@ def positional_encoding(dim, position):
     pe[..., 0::2] = torch.sin(position * div_term)
     pe[..., 1::2] = torch.cos(position * div_term)
     return pe
+
+  
+class Embedder(torch.nn.Module):
+    def __init__(self, input_dims=2, multires=4, include_input=True, identity_scale=0.001):
+        super().__init__()
+
+        embed_fns = []
+        #d = self.kwargs['input_dims']
+        self.multires = multires
+        self.input_dims = input_dims
+        self.identity_scale = identity_scale 
+
+        if multires > 0:
+            d = input_dims
+            out_dim = 0
+
+            if include_input:
+                embed_fns.append(lambda x : x * identity_scale)
+                out_dim += d
+                
+            max_freq_log2 = multires - 1
+            num_freqs = multires
+            log_sampling = True
+            periodic_fns =  [torch.sin, torch.cos]
+
+            #max_freq = self.kwargs['max_freq_log2']
+            max_freq = max_freq_log2
+            N_freqs = num_freqs
+            # N_freqs = self.kwargs['num_freqs']
+            
+            if log_sampling:
+                freq_bands = 2.**torch.linspace(0., max_freq, steps=N_freqs)
+            else:
+                freq_bands = torch.linspace(2.**0., 2.**max_freq, steps=N_freqs)
+                
+            for freq in freq_bands:
+                for p_fn in periodic_fns:
+                    embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
+                    out_dim += d
+                        
+            self.embed_fns = embed_fns
+            self.out_dim = out_dim
+        else:
+            self.out_dim = input_dims
+        
+    def forward(self, inputs):
+        if self.multires == 0:
+            return inputs
+        return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
+
+    def decode(self, outputs):
+        if self.multires == 0:
+            return outputs
+        return outputs[..., :self.input_dims] / self.identity_scale
+ 

@@ -49,7 +49,8 @@ class RND(DensityEstimator):
         loss = self.compute_loss(samples)
         self.optimize(loss.mean())
         logger.logkv_mean(self.name + '_loss', loss.mean())
-        return loss.detach()
+
+        return -loss.detach()
 
     def _log_prob(self, samples):
         return -self.compute_loss(samples) # negative as the log prob ..

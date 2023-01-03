@@ -6,6 +6,7 @@ from diffusers import DDPMScheduler, DDIMScheduler
 import torch.nn.functional as F
 from .diffusion_utils import HiddenDDIM, gaussian_kl
 from tools.config import Configurable
+from einops import rearrange, reduce
 
 
 class DiagGaussian(Configurable, torch.nn.Module):
@@ -56,5 +57,7 @@ class VAE(Network):
 
         decoded = self.decoder(latent, context)
         assert decoded.shape == input.shape
-        losses['recon'] = F.mse_loss(decoded, input)
+        losses['recon'] = ((decoded - input) ** 2)
+
+        losses['recon'] = reduce(losses['recon'], '... c -> ...', 'mean')
         return decoded, losses
