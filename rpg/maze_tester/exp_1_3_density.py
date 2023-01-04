@@ -41,7 +41,7 @@ if __name__ == '__main__':
                     TYPE=['RND', 'RND', 'RND', 'VAE', 'VAE'],
                     normalizer='ema',
                 ),
-                scale = [0.1, 0.1, 0.1, 0.003, 0.003],
+                scale = [0.1, 0.1, 0.1, 0.03, 0.03],
             ),
             hidden=dict(
                 TYPE=['Categorical', 'Categorical', 'Gaussian', 'Categorical',  'Gaussian'],
