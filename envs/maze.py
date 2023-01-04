@@ -170,13 +170,16 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0, reward_mapping=None) -> None:
+    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0,
+                 rescale_before_embed=True,
+                 reward_mapping=None) -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
         self.device = device
 
         self.reward_mapping = reward_mapping
+        self.rescale_before_embed = rescale_before_embed
 
         if mode != 'batch':
             batch_size = 1
@@ -200,7 +203,10 @@ class LargeMaze(Configurable):
         obs = self.pos.clone().float()
         if self.obs_dim == 0:
             return obs
-        return torch.cat((obs * 0.01, self.embedder(obs)), -1)
+        inp = obs
+        if self.rescale_before_embed:
+            inp = inp / self.SIZE
+        return torch.cat((obs * 0.01, self.embedder(inp)), -1)
 
     def step(self, action):
         if self.mode != 'batch':

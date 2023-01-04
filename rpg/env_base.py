@@ -37,6 +37,10 @@ class GymVecEnv(VecEnv):
 
         import gym
         from rl.vec_envs import SubprocVectorEnv
+        if env_name.startswith('Ant'):
+            import multiprocessing as mp
+            mp.set_start_method('spawn', force=True)
+
         def make_env():
             from gym.wrappers import TimeLimit
             if env_name == 'AntPush':

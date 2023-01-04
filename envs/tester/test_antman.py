@@ -2,7 +2,7 @@
 from envs.ant_maze import AntMaze, AntCross
 
 
-env = AntMaze(init_pos=(0, 3), maze_id=4)
+env = AntCross(init_pos=(0, 3), maze_id=4)
 images = []
 
 env.reset()

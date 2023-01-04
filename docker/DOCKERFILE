@@ -36,7 +36,7 @@ RUN GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa_git -o IdentitiesOnly=yes" git clo
 
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
     chmod +x ~/miniconda.sh && \
-    ~/miniconda.sh -b -u -p /opt/conda && \
+    bash ~/miniconda.sh -b -u -p /opt/conda && \
     rm ~/miniconda.sh && \
     /opt/conda/bin/conda init && \
     /opt/conda/bin/conda install -y python=3.9 && \
@@ -120,8 +120,11 @@ RUN pip install --no-cache trimesh
 RUN pip install --no-cache open3d
 RUN pip install --no-cache rtree
 RUN pip install --no-cache einops
+RUN pip install --no-cache diffusers
+RUN pip install --no-cache pyro-ppl
 
-RUN conda install pytorch-scatter -c pyg
+RUN pip install torch-scatter -f https://data.pyg.org/whl/torch-1.13.1+cu117.html
+
 
 WORKDIR /root/
 ARG MANISKILL_KEY

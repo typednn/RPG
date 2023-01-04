@@ -39,5 +39,6 @@ def make_cnn(inp_shape, latent_dim, num_channels):
                 nn.Conv2d(num_channels, num_channels, 3, stride=2), nn.ReLU()]
 
     out_shape = _get_out_shape(inp_shape, layers)
-    layers.extend([Flatten(), nn.Linear(np.prod(out_shape), latent_dim)])
+    from tools.utils import mlp
+    layers.extend([Flatten(), mlp(np.prod(out_shape), 256, latent_dim)]) #nn.Linear(np.prod(out_shape), latent_dim)])
     return Seq(*layers)

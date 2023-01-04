@@ -217,7 +217,10 @@ class Experiment(Configurable):
                             
         process_variants(cfgs, [])
         factor_name = '_'.join(factor_name)
-        names = [factor_name + '_'.join(n) for n in names]
+        if rename:
+            names = [factor_name + '_'.join(n) for n in names]
+        else:
+            names = [n[0] for n in names ]
 
 
         if verbose:

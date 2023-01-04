@@ -226,8 +226,10 @@ class Trainer(Configurable, RLAlgo):
         
         seg.reward = seg.reward * self._cfg.reward_scale
         if self.exploration is not None and self.exploration.as_reward:
-            seg.reward = seg.reward + self.exploration.intrinsic_reward(
-                seg.obs_seq[1:], repeat(z, "... -> t ...", t=len(seg.obs_seq) - 1))
+            intrinsic_reward = self.exploration.intrinsic_reward(seg.obs_seq[1:], repeat(z, "... -> t ...", t=len(seg.obs_seq) - 1))
+            logger.logkv_mean('reward_rnd', intrinsic_reward.mean())
+            logger.logkv_mean('reward_rnd_std', intrinsic_reward.std())
+            seg.reward = seg.reward + intrinsic_reward
 
         # if self.z_space.learn:
         #     seg.z = z

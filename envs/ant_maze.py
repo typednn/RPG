@@ -7,6 +7,7 @@ from .maze import get_embedder
 
 
 class AntMaze(gym.Env):
+    SIZE = 4
     def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5)) -> None:
         super().__init__()
         assert not reward
@@ -34,7 +35,7 @@ class AntMaze(gym.Env):
         
     def decorate_obs(self, obs):
         if self.obs_dim > 0:
-            pos = obs[:2] / self.grid_size / 4
+            pos = obs[:2] / self.grid_size / self.SIZE
             obs = np.concatenate(
                 [pos/100., obs[2:]/10., self.embedder(
                     torch.tensor(pos)).detach().cpu().numpy()])
@@ -63,7 +64,7 @@ class AntMaze(gym.Env):
             obs = traj.get_tensor('next_obs')
         obs = obs[..., :2]
         if self.obs_dim > 0:
-            obs = obs * 100 * self.grid_size * 4
+            obs = obs * 100 * self.grid_size * self.SIZE
         return obs
 
     def get_occupancy_image(self, occupancy):
@@ -137,12 +138,14 @@ class AntMaze(gym.Env):
         
 class AntCross(AntMaze):
     # ant maze with four 
+    SIZE = 7
     def __init__(self, obs_dim=8, reward=False, init_pos=(0, 0), maze_id=0, maze_type='cross') -> None:
         init_pos = (-0.5, -0.5)
         super().__init__(obs_dim, reward, init_pos, maze_id, maze_type=maze_type, lookat=(0, -5, 10))
         self.anchors = self.ant_env.ant_env.anchors
         self.minL = self.anchors.min()
         self.maxL = self.anchors.max()
+        self.range = self.maxL / self.grid_size
 
     def build_anchor(self):
         return torch.tensor(self.anchors, device=self.device, dtype=torch.float32).cuda()

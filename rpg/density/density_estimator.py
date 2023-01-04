@@ -75,6 +75,9 @@ class DensityEstimator(OptimModule):
         log_prob = self._update(samples)
         if self.normalizer is not None:
             self.normalizer.update(log_prob)
+            from tools.utils import logger
+            logger.logkv(self.name + '_buffer_mean', self.normalizer.mean.item())
+            logger.logkv(self.name + '_buffer_std', self.normalizer.std.item())
 
     def log_prob(self, samples):
         log_prob = self._log_prob(samples)
