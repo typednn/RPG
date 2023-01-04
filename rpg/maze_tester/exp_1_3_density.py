@@ -31,8 +31,7 @@ if __name__ == '__main__':
     )
 
     
-    # python3 maze_tester/exp_1_3_density.py  --exp antcross --seed 1,2,3 --env_name TreeMaze --runall remote --wandb True --silent
-
+    # python3 maze_tester/exp_1_3_density.py --exp antcross3 --seed 1,2,3 --runall remote --wandb True --silent
     exp.add_exps(
         'antcross3',
         dict(
