@@ -31,11 +31,12 @@ if __name__ == '__main__':
     )
 
     
+    # python3 maze_tester/exp_1_3_density.py  --exp antcross --seed 1,2,3 --env_name TreeMaze --runall remote --wandb True --silent
+
     exp.add_exps(
         'antcross3',
         dict(
             reward_scale=0.,
-            max_epoch=100,
             rnd=dict(
                 density=dict(
                     TYPE=['RND', 'RND', 'RND', 'VAE', 'VAE'],
@@ -49,7 +50,7 @@ if __name__ == '__main__':
             ),
             info=dict(coef=[0., 0.05, 0.01, 0.05, 0.01]),
         ),
-        base='small', default_env='SmallMaze',
+        base='antcross', default_env='AntMaze3',
         names=['rndrl', 'rnddiscrete', 'rndnormal','vaediscrete', 'vaenormal']
     )
 
