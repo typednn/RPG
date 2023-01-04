@@ -356,7 +356,7 @@ class DynamicsLearner(LossOptimizer):
                 state=samples['state'][0].reshape(-1, batch_size, samples['state'].shape[-1])
             )
             logger.logkv_mean('q_value', float(gt['q_value'].mean()))
-            logger.logkv_mean_std('reward_step_mean', float(reward.mean()))
+            logger.logkv_mean_std('reward_step_mean', reward)
 
         pred_traj = self.nets.inference(
             obs_seq[0], prev_z[0], timesteps[0], len(action), a_seq=action, z_seq=prev_z[1:]) 

@@ -361,7 +361,7 @@ class Experiment(Configurable):
                     for i in range(len(configs)):
                         os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
                     exit(0)
-                exp.plot(configs, 'test_occ_metric')
+                exp.plot(configs, 'train_occ_metric')
 
 
 def build_exp(base_config, **kwargs):

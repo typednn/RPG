@@ -172,11 +172,14 @@ class LargeMaze(Configurable):
 
     def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0,
                  rescale_before_embed=True,
-                 reward_mapping=None) -> None:
+                 reward_mapping=None, action_scale=None) -> None:
         super().__init__()
         self.screen = None
         self.isopen = True
         self.device = device
+
+        if action_scale is not None:
+            self.ACTION_SCALE = float(action_scale)
 
         self.reward_mapping = reward_mapping
         self.rescale_before_embed = rescale_before_embed

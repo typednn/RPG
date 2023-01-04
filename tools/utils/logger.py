@@ -596,11 +596,26 @@ class Logger(object):
         assert hasattr(val, "__float__")
         if hasattr(val, "requires_grad"):  # see "pytorch explainer" above
             val = val.detach()
+
+        import torch
+        import numpy as np
+        if isinstance(val, torch.Tensor):
+            val = val.detach().cpu().numpy()
         oldval, cnt = self.name2val[key], self.name2cnt[key]
 
-        self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
-        self.name2sqr[key] = (self.name2sqr[key] * cnt + (val * val)) / (cnt + 1)
-        self.name2cnt[key] = cnt + 1
+        if isinstance(val, np.ndarray):
+            val = val.reshape(-1)
+            ncnt = cnt + val.shape[0]
+
+            self.name2val[key] = oldval * cnt / ncnt + val.sum() / ncnt
+            self.name2sqr[key] = (self.name2sqr[key] * cnt + (val * val).sum()) / ncnt
+            self.name2cnt[key] = ncnt
+        # raise NotImplementedError("logkv_mean_std not implemented")
+
+        else:
+            self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
+            self.name2sqr[key] = (self.name2sqr[key] * cnt + (val * val)) / (cnt + 1)
+            self.name2cnt[key] = cnt + 1
         # raise NotImplementedError("logkv_mean_std not implemented")
 
     def dump_media(self, kvs):
