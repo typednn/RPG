@@ -64,4 +64,20 @@ if __name__ == '__main__':
         names=['rnd12_5', 'rnd12_10']
     )
 
+    exp.add_exps(
+        'blocktry',
+        dict(
+            steps_per_epoch=120, 
+            hidden=dict(
+                TYPE='Categorical',
+                n=[12, 1, 12, 1, 12, 1]
+            ),
+            env_cfg=dict(
+                n_block=[1, 1, 2, 2, 3, 3]
+            ),
+            info=dict(coef=0.05),
+        ),
+        base='block', default_env='BlockPush',
+    )
+
     exp.main()

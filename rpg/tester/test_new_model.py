@@ -4,8 +4,8 @@ from rpg.env_base import GymVecEnv, TorchEnv
 from rpg.soft_rpg import Trainer
 
 # max_grad_norm=1.
-#env = GymVecEnv('HalfCheetah-v3', 1, ignore_truncated_done=True)
-env = GymVecEnv('PixelCheetah', 1, ignore_truncated_done=True)
+env = GymVecEnv('HalfCheetah-v3', 1, ignore_truncated_done=True)
+# env = GymVecEnv('PixelCheetah', 1, ignore_truncated_done=True)
 trainer = Trainer.parse(
     env, 
     model=dict(qmode='value'),

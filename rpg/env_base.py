@@ -37,7 +37,7 @@ class GymVecEnv(VecEnv):
 
         import gym
         from rl.vec_envs import SubprocVectorEnv
-        if env_name.startswith('Ant'):
+        if env_name.startswith('Ant') or env_name.startswith('Block'):
             import multiprocessing as mp
             mp.set_start_method('spawn', force=True)
 

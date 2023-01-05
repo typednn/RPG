@@ -102,7 +102,6 @@ base_config = dict(
 
         ant_maxent = dict(_inherit='ant_explore', path='tmp/ant_maxent', head=dict(std_scale=1.0, std_mode='statewise'), pi_a=dict(ent=dict(coef=1., target_mode='none'))),
 
-        block=dict(_inherit='small', env_cfg=dict(n=1, obs_dim=0), env_name='BlockPush', path='tmp/block', save_video=1000),
         gaussian=dict(_inherit='small', env_cfg=dict(n=1),
             hidden=dict(TYPE='Gaussian', n=5), 
             info=dict(coef=0.001, weight=dict(TYPE='linear', min_value=1., end=8000)), path = 'tmp/gaussian_maze',
@@ -115,6 +114,7 @@ base_config = dict(
         ),
 
         antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross', steps_per_epoch=200),
+        block=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='BlockPush', path='tmp/block'),
     ),
 )
 

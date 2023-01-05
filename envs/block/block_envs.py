@@ -212,10 +212,11 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         # x, y = torch.meshgrid(x, y, indexing='ij')
         # anchor =  torch.stack([y, x], dim=-1).cuda()
-        import torch_scatter
 
         def discrete(pos):
-            pos = (pos - (-SIZE))/(gap * 2).long().clamp(0, N)
+            pos = torch.tensor(pos, device='cuda')
+            round = ((pos - (-SIZE))/(gap * 2)).long()
+            pos = round.clamp(0, N-1)
             return pos[..., 0] * N + pos[..., 1]
 
         outputs = {}
@@ -225,14 +226,16 @@ class BlockEnv(gym.Env, SimulatorBase):
         for i in range(self.n_block):
             total = total * (N*N)
         total_ind = 0
+        import torch_scatter
 
         for k, v in index.items():
+            assert v.max() < (N*N)
             outputs[k] = torch_scatter.scatter_add(torch.ones_like(v), v, dim=0, dim_size=N*N).view(N, N)
             if k != 'obs':
-                total_ind = total_ind * (N * N) + v
-        outputs['total'] = torch_scatter.scatter_add(torch.ones_like(total_ind), total_ind, dim=0, dim_size=total)
-        return outputs
+                total_ind = total_ind * (N*N) + v
 
+        outputs['total'] = torch_scatter.scatter_add(torch.ones_like(total_ind), total_ind, dim=0, dim_size=total)
+        return {k: v.detach().cpu().numpy() for k, v in outputs.items()}
 
 
     def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
@@ -243,21 +246,25 @@ class BlockEnv(gym.Env, SimulatorBase):
                 #occupancy += history['occ']
                 for k, v in occupancy.items():
                     occupancy[k] = v + history['occ'][k]
+            import copy
+            history = {'occ': copy.deepcopy(occupancy)}
             occ_total = occupancy.pop('total')
-            occ_total = (occ_total > 0).float().mean()
+            occ_total = (occ_total > 0).mean()
         else:
             occupancy = None
 
 
+        print(occupancy)
         output = {
             'state': obs,
             'background': {
                 'image':  None,
                 'xlim': [-self.world_size, self.world_size],
                 'ylim': [-self.world_size, self.world_size],
-            },
-            'image': {k: (occupancy[k] > 0.) * 1. for k in occupancy},
+                    },
+            'image': {k: np.float32(occupancy[k] > 0.) for k in occupancy},
             'metric': {'occ': occ_total},
+            'history': history, 
         }
         return output
 
