@@ -155,6 +155,7 @@ class GymVecEnv(VecEnv):
 
             for idx, k in zip(end_envs, self.vec_env.reset(end_envs, **self.kwargs)):
                 obs[idx] = k
+        self.obs = obs.copy()
 
         return {
             'obs': obs, # the current observation of the environment. 
@@ -294,6 +295,8 @@ class TorchEnv(VecEnv):
 
         if self.ignore_truncated_done:
             done[:] = False
+
+        self.obs = obs.clone()
         
         return {
             'obs': obs, # the current observation of the environment. 

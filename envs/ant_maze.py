@@ -8,8 +8,9 @@ from .maze import get_embedder
 
 class AntMaze(gym.Env):
     SIZE = 4
-    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5)) -> None:
+    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5), reset_loc=False) -> None:
         super().__init__()
+        self.reset_loc = reset_loc
         assert not reward
         self.reward = reward
         self.init_pos = init_pos
@@ -45,7 +46,13 @@ class AntMaze(gym.Env):
         return self.decorate_obs(self.low_obs.copy())
 
     def reset(self):
-        self.low_obs = self.ant_env.reset(player=list(self.init_pos))
+        if self.reset_loc:
+            init_pos = (np.random.randint(4), np.random.randint(4))
+        else:
+            init_pos = self.init_pos
+        self.low_obs = self.ant_env.reset(player=list(init_pos))
+        # print(self.reset_loc, init_pos, self.ant_env.loc)
+        # print('init pos', init_pos, self.ant_env.loc)
         return self.get_obs()
 
     def step(self, action):

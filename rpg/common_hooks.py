@@ -395,3 +395,38 @@ class plot_anchor(HookBase):
             plt.clf()
             plot_point_values(rnd, self.coord, s=2)
             logger.savefig('rnd.png')
+
+            
+            
+            
+@as_hook
+class accumulate_ant_traj(HookBase):
+    # just for test_offline_ant.sh
+    def __init__(self, n_epoch=10) -> None:
+        super().__init__()
+        #self.open = open
+        self.n_epoch = int(n_epoch)
+        self.n_succ = np.zeros((4, 4), dtype=np.int64)
+        self.n_total = np.zeros((4, 4), dtype=np.int64)
+
+    def on_epoch(self, trainer, traj, **locals_):
+        from .traj import Trajectory
+        traj: Trajectory = traj
+        obs = traj.get_tensor('obs')
+        assert obs.shape[1] == 1
+        _, truncated = traj.get_truncated_done()
+        grid = obs[:, 0, :2] * 100. * 4
+        s0 = grid[0]
+        x, y = int(s0[0]), int(s0[1])
+        import torch
+        reward = torch.logical_and((torch.abs(grid[..., 0] - 0.5) < 0.5), (torch.abs(grid[..., 1] - 3.5) < 0.5))[..., None]
+        success = float(reward.any())
+        self.n_total[x, y] += 1
+        self.n_succ[x, y] += int(success)
+        assert truncated[-1].all()
+        print(x, y, int(success), obs[0, 0, :2])
+
+        if trainer.epoch_id % self.n_epoch == 0:
+            success_rate = self.n_succ / self.n_total.clip(1, np.inf)
+            print(success_rate)
+            logger.savefig('success_rate.png', success_rate)
