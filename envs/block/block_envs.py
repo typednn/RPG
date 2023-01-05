@@ -54,7 +54,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         success_reward=0,
         reward=False,
 
-        obs_dim=0,
+        obs_dim=5,
     ):
 
         self.obs_dim = obs_dim
@@ -71,6 +71,9 @@ class BlockEnv(gym.Env, SimulatorBase):
 
         self.random_blocks = random_blocks
         self.random_goals = random_goals
+        if self.obs_dim > 0:
+            from ..maze import get_embedder
+            self.emebdder, _ = get_embedder(self.obs_dim)
 
         super(BlockEnv, self).__init__(dt, frameskip, gravity)
 
@@ -83,21 +86,12 @@ class BlockEnv(gym.Env, SimulatorBase):
         self.reward = reward
 
 
+
     def get_agent_pos(self):
         return self.agent.get_qpos()
 
     def get_agent_vel(self):
         return self.agent.get_qvel()
-
-    def _get_obs(self):
-        pos, vel, diff = [], [], []
-        for b, g in zip(self.blocks, self.goal_vis):
-            pos.append(b.get_qpos())
-            vel.append(b.get_qvel())
-            diff.append(g.get_pose().p[:2] - b.get_qpos())
-        assert len(self.get_agent_pos()) == 2
-        return np.concatenate(pos + vel + diff + [self.get_agent_pos(), self.get_agent_vel()])
-
 
     def step(self, action: np.ndarray):
         action = np.asarray(action)
@@ -207,19 +201,6 @@ class BlockEnv(gym.Env, SimulatorBase):
             self.ranges, "pusher", friction=0, damping=0, material=self.material)
         self.objects.append(self.agent)
 
-    def get_obs_from_traj(self, traj):
-        if isinstance(traj, dict):
-            obs = traj['next_obs']
-        else:
-            obs = traj.get_tensor('next_obs')
-        agent_pos = obs[..., -4:-2].reshape(-1, 2)
-        box_pos = obs[..., :6].reshape(-1, 3, 2)
-        return {
-            'obs': agent_pos.detach().cpu().numpy(),
-            'box0': box_pos[:, 0].detach().cpu().numpy(),
-            'box1': box_pos[:, 1].detach().cpu().numpy(),
-            'box2': box_pos[:, 2].detach().cpu().numpy(),
-        }
 
     def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
         obs = self.get_obs_from_traj(traj)
@@ -242,3 +223,46 @@ class BlockEnv(gym.Env, SimulatorBase):
             # 'metric': {'occ': (occupancy > occ_val).mean()},
         }
         return output
+
+
+    def get_obs_from_traj(self, traj):
+        if isinstance(traj, dict):
+            obs = traj['next_obs']
+        else:
+            obs = traj.get_tensor('next_obs')
+
+        if self.obs_dim > 0:
+            obs = obs[..., self.original_obs_length:] * 10
+
+        agent_pos = obs[..., -4:-2].reshape(-1, 2)
+        box_pos = obs[..., :6].reshape(-1, 3, 2)
+        return {
+            'obs': agent_pos.detach().cpu().numpy(),
+            'box0': box_pos[:, 0].detach().cpu().numpy(),
+            'box1': box_pos[:, 1].detach().cpu().numpy(),
+            'box2': box_pos[:, 2].detach().cpu().numpy(),
+        }
+
+    def _get_obs(self):
+        pos, vel, diff = [], [], []
+        for b, g in zip(self.blocks, self.goal_vis):
+            pos.append(b.get_qpos())
+            vel.append(b.get_qvel())
+            diff.append(g.get_pose().p[:2] - b.get_qpos())
+        assert len(self.get_agent_pos()) == 2
+        agent_pos = self.get_agent_pos()
+        obs =  np.concatenate(pos + vel + diff + [agent_pos, self.get_agent_vel()])
+        self.original_obs_length = len(obs)
+
+        if self.obs_dim > 0:
+            obs = obs * 0.1
+            pos = pos + [agent_pos]
+            out = []
+            for i in pos:
+                import torch
+                out.append(self.emebdder(torch.tensor(i/2)).detach().cpu().numpy())
+            out.append(obs)
+            obs = np.concatenate(out, axis=-1)
+
+        return obs
+

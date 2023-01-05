@@ -1,6 +1,6 @@
 from envs.block import BlockEnv
 
-env = BlockEnv()
+env = BlockEnv(n_block=2)
 env.reset()
 images = []
 
