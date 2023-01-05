@@ -202,15 +202,53 @@ class BlockEnv(gym.Env, SimulatorBase):
         self.objects.append(self.agent)
 
 
+    def count(self, obs):
+        import torch
+        SIZE = 1.8
+        N = 4
+        gap = (SIZE * 2 / N) / 2
+        # x = torch.linspace(-SIZE, SIZE, N, device=self.device)
+        # y = torch.linspace(-SIZE, SIZE, N, device=self.device)
+
+        # x, y = torch.meshgrid(x, y, indexing='ij')
+        # anchor =  torch.stack([y, x], dim=-1).cuda()
+        import torch_scatter
+
+        def discrete(pos):
+            pos = (pos - (-SIZE))/(gap * 2).long().clamp(0, N)
+            return pos[..., 0] * N + pos[..., 1]
+
+        outputs = {}
+        index = {k: discrete(v).reshape(-1) for k, v in obs.items()}
+
+        total = 1
+        for i in range(self.n_block):
+            total = total * (N*N)
+        total_ind = 0
+
+        for k, v in index.items():
+            outputs[k] = torch_scatter.scatter_add(torch.ones_like(v), v, dim=0, dim_size=N*N).view(N, N)
+            if k != 'obs':
+                total_ind = total_ind * (N * N) + v
+        outputs['total'] = torch_scatter.scatter_add(torch.ones_like(total_ind), total_ind, dim=0, dim_size=total)
+        return outputs
+
+
+
     def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
         obs = self.get_obs_from_traj(traj)
-        # if occ_val >= 0:
-        #     occupancy = self.counter(obs) 
-        #     if history is not None:
-        #         occupancy += history['occ']
-        # else:
-        #     occupancy = None
-        #obs = obs.detach().cpu().numpy()
+        if occ_val >= 0:
+            occupancy = self.count(obs) 
+            if history is not None:
+                #occupancy += history['occ']
+                for k, v in occupancy.items():
+                    occupancy[k] = v + history['occ'][k]
+            occ_total = occupancy.pop('total')
+            occ_total = (occ_total > 0).float().mean()
+        else:
+            occupancy = None
+
+
         output = {
             'state': obs,
             'background': {
@@ -218,9 +256,8 @@ class BlockEnv(gym.Env, SimulatorBase):
                 'xlim': [-self.world_size, self.world_size],
                 'ylim': [-self.world_size, self.world_size],
             },
-            # 'image': {'occupancy': occupancy / occupancy.max()},
-            # 'history': {'occ': occupancy},
-            # 'metric': {'occ': (occupancy > occ_val).mean()},
+            'image': {k: (occupancy[k] > 0.) * 1. for k in occupancy},
+            'metric': {'occ': occ_total},
         }
         return output
 
@@ -235,13 +272,19 @@ class BlockEnv(gym.Env, SimulatorBase):
             obs = obs[..., self.original_obs_length:] * 10
 
         agent_pos = obs[..., -4:-2].reshape(-1, 2)
-        box_pos = obs[..., :6].reshape(-1, 3, 2)
-        return {
-            'obs': agent_pos.detach().cpu().numpy(),
-            'box0': box_pos[:, 0].detach().cpu().numpy(),
-            'box1': box_pos[:, 1].detach().cpu().numpy(),
-            'box2': box_pos[:, 2].detach().cpu().numpy(),
-        }
+        start = -4 - self.n_block * 6
+        outputs = {}
+        outputs['obs'] = agent_pos.detach().cpu().numpy()
+        box_pos = obs[..., start:start + self.n_block*2].reshape(agent_pos.shape[0], self.n_block, 2)
+        for i in range(self.n_block):
+            outputs[f'box{i}'] = box_pos[:, i].detach().cpu().numpy()
+        return outputs
+        # return {
+        #     'obs': ,
+        #     'box0': box_pos[:, 0].detach().cpu().numpy(),
+        #     'box1': box_pos[:, 1].detach().cpu().numpy(),
+        #     'box2': box_pos[:, 2].detach().cpu().numpy(),
+        # }
 
     def _get_obs(self):
         pos, vel, diff = [], [], []
