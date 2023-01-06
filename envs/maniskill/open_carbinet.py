@@ -52,6 +52,7 @@ class OpenCabinetEnv(MS1BaseEnv):
 
     def _setup_cameras(self):
         super()._setup_cameras()
+        
         self.render_camera.set_local_pose(
             Pose(p=[-1.5, 0, 1.5], q=[0.9238795, 0, 0.3826834, 0])
         )

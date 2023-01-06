@@ -64,7 +64,7 @@ class Embedder:
         return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
 
 
-def get_embedder(multires, i=0):
+def get_embedder(multires, i=0, **kwargs):
     if i == -1:
         from torch import nn
         return nn.Identity(), 2
@@ -77,11 +77,11 @@ def get_embedder(multires, i=0):
                 'log_sampling' : True,
                 'periodic_fns' : [torch.sin, torch.cos],
     }
+    embed_kwargs.update(kwargs)
     
     embedder_obj = Embedder(**embed_kwargs)
     embed = lambda x, eo=embedder_obj : eo.embed(x)
     return embed, embedder_obj.out_dim
-
 
 
 
