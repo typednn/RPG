@@ -1,11 +1,12 @@
 from envs.maniskill_env import make
 
-env = make("Pour-v0")
+env = make()
 
 env.reset()
 images = []
 
 images.append(env.render('rgb_array'))
+print(env.action_space)
 
 for i in range(10):
     env.step(env.action_space.sample())

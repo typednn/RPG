@@ -115,6 +115,8 @@ base_config = dict(
 
         antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross', steps_per_epoch=200),
         block=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='BlockPush', path='tmp/block'),
+
+        cabinet=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='Cabinet', path='tmp/cabinet'),
     ),
 )
 

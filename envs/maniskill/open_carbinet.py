@@ -29,11 +29,25 @@ class OpenCabinetEnv(MS1BaseEnv):
     agent: MobilePandaSingleArm
     MAX_DOF = 8
 
-    def __init__(self, *args, fixed_target_link_idx: int = None, target_links=None, **kwargs):
+    def __init__(
+        self, *args, 
+        fixed_target_link_idx: int = None, 
+        target_links=None, 
+
+        # x, y, z, doors' dof, and contact distance?
+        obs_dim = 8,
+        reward=True,
+
+        **kwargs
+    ):
         # The index in target links (not all links)
         self._fixed_target_link_idx = fixed_target_link_idx
         self.my_target_links = target_links
         self._cache_bboxes = {}
+
+        self.obs_dim = obs_dim
+        self.reward = reward
+
         super().__init__(*args, **kwargs)
 
     def _setup_cameras(self):
@@ -168,7 +182,7 @@ class OpenCabinetEnv(MS1BaseEnv):
             bounds = self._compute_cabinet_bbox()
             self._cache_bboxes[self.model_id] = bounds
         self.cabinet.set_pose(Pose([0, 0, -bounds[0, 2]]))
-
+        
     def _initialize_robot(self):
         # Base position
         # The forward direction of cabinets is -x.

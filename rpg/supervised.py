@@ -189,5 +189,4 @@ class Trainer(Configurable):
 
 if __name__ == '__main__':
     trainer = Trainer.parse(dataset_name='twonormal')
-    #trainer.test_dataset()
     trainer.train()
