@@ -80,6 +80,8 @@ class Trainer(Configurable, RLAlgo):
 
         fix_buffer=None, # offline training .. 
         save_buffer_epoch=0,
+
+        cem=None,
     ):
         if seed is not None:
             from tools.utils import set_seed
