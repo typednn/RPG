@@ -45,14 +45,7 @@ class CEM(Configurable):
 
 
     def plan(self, obs, timesteps, z, eval_mode=False, step=None, **kwargs):
-        # copied from tdmpc
-        """
-        Plan next action using TD-MPC inference.
-        obs: raw input observation.
-        eval_mode: uniform sampling and action noise is disabled during evaluation.
-        step: current time step. determines e.g. planning horizon.
-        t0: whether current step is the first step of an episode.
-        """
+        # copied from tdmpc and make it support batch version.
         # Seed steps
         from tools.utils import totensor
 
