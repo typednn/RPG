@@ -70,7 +70,8 @@ class MazeEnvV2(gym.Env):
             if maze_type == 'cross':
                 pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+w], [-w/2, x+h+w], [-w/2, x+ 2*h + w]]
             else:
-                pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+h*2 + w], [-w/2, x+h+h*2 + w]]
+                pts = [[-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+h*2 + w], [-w/2, x+h+h*2 + w]]
+                pts = [[i[0], i[1] -  2*w]for i in pts]
 
             pts += [[-i[0], i[1]]for i in pts[::-1]]
             pts += [[i[1], i[0]]for i in pts[-2::-1]]
@@ -79,10 +80,11 @@ class MazeEnvV2(gym.Env):
             if maze_type == 'cross':
                 anchors = [[0, 2*x], [-w, 2*x], [-h, 2*x], [w, 2*x], [h, 2*x], [0, 2 * x + w], [0, 2*x + h], [0, 2 * x - w], [0, 2*x - h]]
             else:
-                anchors = [[0, w * 3 ], [0, w * 4]]
+                anchors = [[0, w * 1 ], [0, w * 2]]
                 for i in [-h, -w, 0, w, h]:
-                    for j in [-h, -w, 0, w, h]:
-                        anchors.append([i, j + w * 7])
+                   for j in [-h, -w, 0, w, h]:
+                       anchors.append([i, j + w * 5])
+                anchors.append([0., 0.])
 
             anchors += [[i[1], i[0]]for i in anchors]
             anchors += [[-i[1], -i[0]]for i in anchors]
@@ -101,13 +103,15 @@ class MazeEnvV2(gym.Env):
             # plt.savefig("test.png")
             # exit(0)
             
-            aa = np.array(anchors) / self.MAZE_SIZE_SCALING
-            import matplotlib.pyplot as plt
-            pp = np.array(pts) / self.MAZE_SIZE_SCALING
-            fig, ax = plt.subplots(figsize=(5, 5))
-            plt.plot([i[0] for i in pp], [i[1] for i in pp])
-            plt.scatter([i[0] for i in aa], [i[1] for i in aa])
-            plt.savefig("test.png")
+            # print('saving test.png ')
+            # aa = np.array(anchors) / self.MAZE_SIZE_SCALING
+            # import matplotlib.pyplot as plt
+            # pp = np.array(pts) / self.MAZE_SIZE_SCALING
+            # fig, ax = plt.subplots(figsize=(5, 5))
+            # plt.plot([i[0] for i in pp], [i[1] for i in pp])
+            # plt.scatter([i[0] for i in aa], [i[1] for i in aa])
+            # plt.savefig("test.png")
+            # exit(0)
 
             for i in range(len(pts)):
                 j = (i + 1) % len(pts)
@@ -136,10 +140,10 @@ class MazeEnvV2(gym.Env):
         pos = "%f %f %f" % (mid[0], mid[1], self.MAZE_HEIGHT / 2 * scale)
 
         width = height = self.wall_size * scale
-        if p1[0] == p2[0]:
+        if np.allclose(p1[0], p2[0]):
             assert p2[1] != p1[1]
             height += abs(p2[1] - p1[1]) / 2
-        elif p1[1] == p2[1]:
+        elif np.allclose(p1[1], p2[1]):
             assert p2[0] != p1[0]
             width += abs(p2[0] - p1[0]) / 2
         else:

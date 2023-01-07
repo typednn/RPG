@@ -117,7 +117,8 @@ base_config = dict(
         block=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='BlockPush', path='tmp/block'),
 
         arm=dict(steps_per_epoch=60, _inherit='ant_squash', reward_scale=0., env_cfg=dict(n=1, obs_dim=6), env_name='FixArm', path='tmp/arm'),
-        arm_rew = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.), hidden=dict(n=10), env_cfg=dict(reward=True), path='tmp/arm_reward'),
+        arm_rew = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.), hidden=dict(n=6), env_cfg=dict(reward_type='dense', reward=True), path='tmp/arm_reward'),
+        arm_sparse = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.), hidden=dict(n=6), env_cfg=dict(reward_type='sparse', reward=True), path='tmp/arm_sparse'),
         cabinet=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='Cabinet', path='tmp/cabinet'),
     ),
 )

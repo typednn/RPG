@@ -37,6 +37,7 @@ class OpenCabinetEnv(MS1BaseEnv):
         # x, y, z, doors' dof, and contact distance?
         obs_dim = 8,
         reward=True,
+        reward_type='dense',
 
         **kwargs
     ):
@@ -46,7 +47,7 @@ class OpenCabinetEnv(MS1BaseEnv):
         self._cache_bboxes = {}
 
         self.obs_dim = obs_dim
-        self.reward = reward
+        self.reward = reward_type
 
         super().__init__(*args, **kwargs)
 
@@ -330,7 +331,10 @@ class OpenCabinetEnv(MS1BaseEnv):
 
 
         info.update(success=total_success)
-        return np.sum(reward_open) - np.min(ee_to_handles)
+        if self.reward == 'dense':
+            return np.sum(reward_open) - np.min(ee_to_handles)
+        else:
+            return np.sum(reward_open)
 
     # -------------------------------------------------------------------------- #
     # Observations

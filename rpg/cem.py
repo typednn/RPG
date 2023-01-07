@@ -57,8 +57,8 @@ class CEM(Configurable):
         # Sample policy trajectories
         #obs = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
         
-        horizon = int(min(self.horizon, linear_schedule(self.horizon_schedule, step)))
-        horizon = 3 # TODO: remove this
+        #horizon = int(min(self.horizon, linear_schedule(self.horizon_schedule, step)))
+        horizon = self.horizon
         num_pi_trajs = int(self.cfg.mixture_coef * self.cfg.num_samples)
 
         batch_size = obs.shape[0]
@@ -67,6 +67,8 @@ class CEM(Configurable):
             data = self.worldmodel.inference(_obs, _z, _t, step=horizon, **kwargs)
             pi_actions = einops.rearrange(data['a'], 't (n b) ... -> t n b ...', n=num_pi_trajs) # ((b n) n)
 
+        if self.cfg.iterations == 0:
+            return pi_actions[0, 0]
         # Initialize state and parameters
         device = pi_actions.device
         mean = torch.zeros(horizon, batch_size, action_dim, device=device)
@@ -77,7 +79,9 @@ class CEM(Configurable):
             mean[:, t0, :-1] = self._prev_mean[:, t0, 1:]
 
         # Iterate CEM
-        obs, z, timesteps = [einops.repeat(x, 'b ... -> (n b) ...', n=num_pi_trajs + self.cfg.num_samples) 
+        total_samples = self.cfg.num_samples + num_pi_trajs
+        old_obs = obs
+        obs, z, timesteps = [einops.repeat(x, 'b ... -> (n b) ...', n=total_samples, b=batch_size) 
                        for x in [obs, z, timesteps]]
 
         for i in range(self.cfg.iterations):
@@ -87,15 +91,15 @@ class CEM(Configurable):
             if num_pi_trajs > 0:
                 actions = torch.cat([actions, pi_actions], dim=1) # T, n, b, action_dim
 
-            a_seq = einops.rearrange(actions, 't n b ... -> t (n b)  ...')
+            a_seq = einops.rearrange(actions, 't n b ... -> t (n b)  ...', b=batch_size, t=horizon, n=total_samples)
             value = self.worldmodel.inference(obs, z, timesteps, horizon, a_seq=a_seq, **kwargs)['value']
-            value = einops.rearrange(value, '(n b) ... -> n b ...', b=batch_size)
+            value = einops.rearrange(value, '(n b) ... -> n b ...', b=batch_size, n=total_samples)
 
             elite_idxs = torch.topk(value[..., 0], self.cfg.num_elites, dim=0).indices # K, b
             elite_value = torch.gather(value, 0, elite_idxs.unsqueeze(-1)) # K, b, 1
             elite_actions = torch.gather(actions, 1, elite_idxs.unsqueeze(0).unsqueeze(-1).expand(horizon, -1, -1, action_dim))
 
-            assert torch.allclose(elite_actions[:, 10, 2], actions[:, elite_idxs[10, 2], 2])
+            #assert torch.allclose(elite_actions[:, 10, 2], actions[:, elite_idxs[10, 2], 2])
             # T, K, b, action_dim
             #print(elite_value.shape, elite_actions.shape)
 
@@ -104,11 +108,10 @@ class CEM(Configurable):
             # Update parameters
             max_value = elite_value.max(0)[0] # b, 1
             score = torch.exp(self.cfg.temperature*(elite_value - max_value))
-            score_sum = score.sum(0, keepdim=True) # 1, b, 1
             score /= score.sum(0, keepdim=True) # K, b, 1
             #print(score.shape, score_sum.shape, elite_actions.shape)
-            _mean = torch.sum(score[None, :] * elite_actions, dim=1) / (score_sum + 1e-9)
-            _std = torch.sqrt(torch.sum(score[None,:] * (elite_actions - _mean[:, None,:]) ** 2, dim=1) / (score_sum + 1e-9))
+            _mean = torch.sum(score[None, :] * elite_actions, dim=1) / (score.sum(0, keepdim=True) + 1e-9)
+            _std = torch.sqrt(torch.sum(score[None,:] * (elite_actions - _mean[:, None,:]) ** 2, dim=1) / (score.sum(0, keepdim=True) + 1e-9))
             _std = _std.clamp_(self._cfg.min_std, 2) #TODO: change std
             mean, std = self.cfg.momentum * mean + (1 - self.cfg.momentum) * _mean, _std
 
@@ -126,3 +129,29 @@ class CEM(Configurable):
         if not eval_mode:
             a += std * torch.randn(action_dim, device=std.device)
         return a
+
+
+if __name__ == '__main__':
+    class FakeInference:
+        def __init__(self, action_dim):
+            self.action_dim = action_dim
+
+        def inference(self, obs, z, timesteps, step, a_seq=None, **kwargs):
+            
+            if a_seq is None:
+                a_seq = torch.randn(step, len(obs), self.action_dim).cuda().clamp(-1., 1.)
+            assert len(a_seq) == step
+            #print('within inference', a_seq.sum(axis=0)[0], obs[0])
+            value = -((a_seq.sum(axis=0) - obs)**2).sum(axis=-1, keepdim=True)
+            
+            #print(value[0])
+            return {'a': a_seq, 'value': value}
+
+    inference = FakeInference(2)
+    cem = CEM(inference, horizon=4, action_dim=2)
+    
+
+    obs = torch.tensor(
+        [[1., 0.], [0., 1.], [-1., 0.], [1., 0.]],
+    ).cuda()
+    print(cem.plan(obs, torch.zeros(4).long(), torch.zeros(4).float(), step=50000))
