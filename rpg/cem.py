@@ -22,12 +22,12 @@ def linear_schedule(schdl, step):
 
 
 class CEM(Configurable):
-    def __init__(self, trainer, horizon, cfg=None, seed_steps=1000,
+    def __init__(self, worldmodel: HiddenDynamicNet, horizon, cfg=None, seed_steps=1000,
                 num_samples=512,
                 iterations=6,
                 mixture_coef=0.05,
-                min_std = 0.05,
-                temperature= 0.5
+                min_std = 0.02,
+                temperature= 0.5,
                 momentum= 0.1,
                 num_elites=64,
         ) -> None:
@@ -36,7 +36,7 @@ class CEM(Configurable):
         trainer: Trainer = trainer
         self.cfg = cfg
         self.horizon = horizon
-        self.worldmodel: HiddenDynamicNet = trainer.dynamics_net
+        self.worldmodel: HiddenDynamicNet = worldmodel
         self.horizon_schedule = f'linear(1, {horizon}, 25000)'
 
 
@@ -90,20 +90,24 @@ class CEM(Configurable):
             # Compute elite actions
             #value = self.estimate_value(z, actions, horizon).nan_to_num_(0)
 
-            # (b n) 1
             value = self.worldmodel.inference(obs, z, timesteps, horizon, a_seq=actions)['value']
             value = einops.rearrange(value, '(n b) ... -> n b ...', b=batch_size)
 
             elite_idxs = torch.topk(value[..., 0], self.cfg.num_elites, dim=0).indices # K, b
-            elite_value, elite_actions = value[elite_idxs], actions[:, elite_idxs]
+            elite_value = torch.gather(value, 0, elite_idxs.unsqueeze(-1)) # K, b, 1
+            elite_actions = torch.gather(actions, 1, elite_idxs.unsqueeze(0).unsqueeze(-1).expand(horizon, -1, -1, action_dim))
+            # T, K, b, action_dim
+
+            # elite_value, elite_actions = value[elite_idxs], actions[:, elite_idxs]
 
             # Update parameters
-            max_value = elite_value.max(0)[0]
+            max_value = elite_value.max(0)[0] # b, 1
             score = torch.exp(self.cfg.temperature*(elite_value - max_value))
-            score /= score.sum(0)
-            _mean = torch.sum(score.unsqueeze(0) * elite_actions, dim=1) / (score.sum(0) + 1e-9)
-            _std = torch.sqrt(torch.sum(score.unsqueeze(0) * (elite_actions - _mean.unsqueeze(1)) ** 2, dim=1) / (score.sum(0) + 1e-9))
-            _std = _std.clamp_(self.std, 2)
+            score_sum = score.sum(0, keepdim=True) # 1, b, 1
+            score /= score.sum(0, keepdim=True) # K, b, 1
+            _mean = torch.sum(score[None, :] * elite_actions, dim=1) / (score_sum[None, :, None] + 1e-9)
+            _std = torch.sqrt(torch.sum(score[None,:] * (elite_actions - _mean[:, None,:]) ** 2, dim=1) / (score_sum[None, :, None] + 1e-9))
+            _std = _std.clamp_(self._cfg.min_std, 2) #TODO: change std
             mean, std = self.cfg.momentum * mean + (1 - self.cfg.momentum) * _mean, _std
 
         # Outputs

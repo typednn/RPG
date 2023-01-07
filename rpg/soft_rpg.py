@@ -166,6 +166,15 @@ class Trainer(Configurable, RLAlgo):
         else:
             self.reward_relabel = None
 
+            
+
+        # CEM part
+        if cem is not None:
+            from .cem import CEM
+            self.cem = CEM(self.dynamics_net, horizon=horizon, cfg=cem)
+        else:
+            self.cem = None
+
 
     def make_rnd(self):
         rnd = self._cfg.rnd
