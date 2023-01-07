@@ -36,7 +36,7 @@ class FixArm(OpenCabinetDoorEnv):
     def _initialize_robot(self):
         # Base position
         # The forward direction of cabinets is -x.
-        center = np.array([1, 0.0])
+        center = np.array([1 - 0.5, 0.0])
         #dist = self._episode_rng.uniform(1.6, 1.8)
         #theta = self._episode_rng.uniform(0.9 * np.pi, 1.1 * np.pi)
         dist = 1.6

@@ -64,6 +64,10 @@ class GymVecEnv(VecEnv):
                 from envs.ant_maze import AntCross
                 return TimeLimit(AntCross(**kwargs), 200)
 
+            elif env_name == 'AntFork':
+                from envs.ant_maze import AntFork
+                return TimeLimit(AntFork(**kwargs), 200)
+
             elif env_name == 'BlockPush':
                 import os
                 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
