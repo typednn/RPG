@@ -171,7 +171,7 @@ class Trainer(Configurable, RLAlgo):
         # CEM part
         if cem is not None:
             from .cem import CEM
-            self.cem = CEM(self.dynamics_net, horizon=horizon, cfg=cem)
+            self.cem = CEM(self.dynamics_net, horizon=horizon, action_dim=env.action_space.shape[-1], cfg=cem)
         else:
             self.cem = None
 
@@ -316,7 +316,11 @@ class Trainer(Configurable, RLAlgo):
         timestep = totensor(timestep, self.device, dtype=None)
         s = self.dynamics_net.enc_s(obs)
         z = self.pi_z(s, prevz, prev_action=prevz, timestep=timestep).a
-        a = self.pi_a(s, z, timestep=timestep).a
+        if self.cem is None:
+            a = self.pi_a(s, z, timestep=timestep).a
+        else:
+            a = self.cem.plan(obs, timestep, z,  step=self.total, 
+                              pi_a=self.pi_a, pi_z=self.pi_z, intrinsic_reward=self.intrinsic_reward)
         return a, z.detach().cpu().numpy()
 
     def inference(self, n_step, mode='training'):

@@ -131,4 +131,6 @@ class PolicyLearner(LossOptimizer):
         with torch.no_grad():
             alpha = self.ent.alpha
         name = 'ent_{}'.format(self.name)
+        if name not in rollout:
+            return None, None
         return name, rollout[name] * alpha
