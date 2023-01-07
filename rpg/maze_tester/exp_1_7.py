@@ -4,7 +4,7 @@ if __name__ == '__main__':
     exp = build_exp(base_config)
 
     exp.add_exps(
-        'antfork',
+        'antfork2',
         dict(
             reward_scale=0.,
             rnd=dict(
