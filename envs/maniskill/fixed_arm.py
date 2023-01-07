@@ -104,11 +104,11 @@ class FixArm(OpenCabinetDoorEnv):
         if isinstance(traj, dict):
             obs = traj['next_obs']
         else:
-            obs = traj.get_tensor('next_obs')
+            obs = traj.get_tensor('next_obs', device='cpu')
         return obs
 
     def _render_traj_rgb(self, traj, occ_val=False, history=None, **kwargs):
-        obs = self.get_obs_from_traj(traj)
+        obs = self.get_obs_from_traj(traj).detach().cpu().numpy()
 
         qpos = self.obs2qpos(obs)
         qpos = qpos.reshape(-1, qpos.shape[-1])[..., 4:-2]
@@ -133,7 +133,7 @@ class FixArm(OpenCabinetDoorEnv):
         img = plt_save_fig_array()
             
         output = {
-            'state': obs,
+            # 'state': obs,
             'background': {},
 
             'image': {'hist': img},

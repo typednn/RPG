@@ -1,9 +1,9 @@
 #from envs.pacman import AntManEnv
-from envs.ant_maze import AntMaze, AntCross
+from envs.ant_maze import AntMaze, AntCross, AntFork
 
 
-#env = AntCross(init_pos=(0, 3), maze_id=4)
-env = AntMaze(init_pos=(0, 3), maze_id=4, reset_loc=True)
+env = AntFork()
+#env = AntMaze(init_pos=(0, 3), maze_id=4, reset_loc=True)
 images = []
 
 env.reset()

@@ -62,16 +62,28 @@ class MazeEnvV2(gym.Env):
                         self.add_wall(worldbody, f"wall_{i}_{j}_h", i, j, 0)
                     if j != height:
                         self.add_wall(worldbody, f"wall_{i}_{j}_v", i, j, 1)
-        elif maze_type == 'cross':
+        elif maze_type.startswith('cross'):
             w = self.MAZE_SIZE_SCALING
             h = self.MAZE_SIZE_SCALING * 2
             x = h + w/2
-            pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+w], [-w/2, x+h+w], [-w/2, x+ 2*h + w]]
+
+            if maze_type == 'cross':
+                pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+w], [-w/2, x+h+w], [-w/2, x+ 2*h + w]]
+            else:
+                pts = [[-x, x], [-w/2, x] , [-w/2, x + h], [-x, x + h], [-x, x+h+h*2 + w], [-w/2, x+h+h*2 + w]]
+
             pts += [[-i[0], i[1]]for i in pts[::-1]]
             pts += [[i[1], i[0]]for i in pts[-2::-1]]
             pts += [[-i[1], -i[0]]for i in pts[-2:0:-1]]
 
-            anchors = [[0, 2*x], [-w, 2*x], [-h, 2*x], [w, 2*x], [h, 2*x], [0, 2 * x + w], [0, 2*x + h], [0, 2 * x - w], [0, 2*x - h]]
+            if maze_type == 'cross':
+                anchors = [[0, 2*x], [-w, 2*x], [-h, 2*x], [w, 2*x], [h, 2*x], [0, 2 * x + w], [0, 2*x + h], [0, 2 * x - w], [0, 2*x - h]]
+            else:
+                anchors = [[0, w * 3 ], [0, w * 4]]
+                for i in [-h, -w, 0, w, h]:
+                    for j in [-h, -w, 0, w, h]:
+                        anchors.append([i, j + w * 7])
+
             anchors += [[i[1], i[0]]for i in anchors]
             anchors += [[-i[1], -i[0]]for i in anchors]
             
@@ -89,13 +101,13 @@ class MazeEnvV2(gym.Env):
             # plt.savefig("test.png")
             # exit(0)
             
-            # aa = np.array(anchors) / self.MAZE_SIZE_SCALING
-            # print(max(self.anchors))
-            # import matplotlib.pyplot as plt
-            # pp = np.array(pts) / self.MAZE_SIZE_SCALING
-            # plt.plot([i[0] for i in pp], [i[1] for i in pp])
-            # plt.scatter([i[0] for i in aa], [i[1] for i in aa])
-            # plt.savefig("test.png")
+            aa = np.array(anchors) / self.MAZE_SIZE_SCALING
+            import matplotlib.pyplot as plt
+            pp = np.array(pts) / self.MAZE_SIZE_SCALING
+            fig, ax = plt.subplots(figsize=(5, 5))
+            plt.plot([i[0] for i in pp], [i[1] for i in pp])
+            plt.scatter([i[0] for i in aa], [i[1] for i in aa])
+            plt.savefig("test.png")
 
             for i in range(len(pts)):
                 j = (i + 1) % len(pts)

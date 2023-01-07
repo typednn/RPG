@@ -186,3 +186,8 @@ class AntCross(AntMaze):
         reached = torch.logical_and(reached[..., 0] < 0.5, reached[..., 1] < 0.5)
         
         return reached.sum(axis=-1).float().detach().cpu().numpy()
+
+
+class AntFork(AntCross):
+    def __init__(self, obs_dim=8, reward=False, maze_type='cross2') -> None:
+        super().__init__(maze_type=maze_type)

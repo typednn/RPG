@@ -273,16 +273,17 @@ class save_traj(HookBase):
             if z.dtype == torch.int64:
                 print('zbin', torch.bincount(z.long().flatten()))
 
-            if not isinstance(data['state'], dict):
-                print('z.shape', z.shape, 'data state shape', data['state'].shape)
-                drawer.clear()
-                plot_colored_embedding(z, data['state'], s=2)
-                drawer.get('latent')
-            else:
-                for k, v in data['state'].items():
+            if 'state' in data:
+                if not isinstance(data['state'], dict):
+                    print('z.shape', z.shape, 'data state shape', data['state'].shape)
                     drawer.clear()
-                    plot_colored_embedding(z, v, s=2)
-                    drawer.get(k)
+                    plot_colored_embedding(z, data['state'], s=2)
+                    drawer.get('latent')
+                else:
+                    for k, v in data['state'].items():
+                        drawer.clear()
+                        plot_colored_embedding(z, v, s=2)
+                        drawer.get(k)
 
             if 'actions' in data:
                 drawer.clear(use_bg=False)
@@ -306,7 +307,7 @@ class save_traj(HookBase):
 
                 
             # traj _attrs, record 
-            if '_attrs' in traj.traj[0] and not isinstance(data['state'], dict):
+            if '_attrs' in traj.traj[0] and ('state' in data and not isinstance(data['state'], dict)):
                 others = []
                 for k in traj.traj[0]['_attrs']:
                     v = [i['_attrs'][k] for i in traj.traj]
