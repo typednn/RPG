@@ -25,3 +25,6 @@ if __name__ == '__main__':
         base='antcross', default_env='AntFork',
         names=['rnd', 'rl', 'rndx5']
     )
+
+
+    exp.main()
