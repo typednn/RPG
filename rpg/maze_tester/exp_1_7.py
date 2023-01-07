@@ -20,6 +20,7 @@ if __name__ == '__main__':
             ),
             info=dict(coef=[0.03, 0.0, 0.03]),
             env_cfg=dict(n=[1, 1, 5]),
+            eval_episode=1,
         ),
         base='antcross', default_env='AntFork',
         names=['rnd', 'rl', 'rndx5']
