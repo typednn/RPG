@@ -16,12 +16,13 @@ if __name__ == '__main__':
             ),
             hidden=dict(
                 TYPE='Categorical',
-                n=[12, 1]
+                n=[12, 1, 12]
             ),
-            info=dict(coef=[0.03, 0.0]),
+            info=dict(coef=[0.03, 0.0, 0.03]),
+            env_cfg=dict(n=[1, 1, 5]),
         ),
         base='antcross', default_env='AntFork',
-        names=['rnd', 'rl']
+        names=['rnd', 'rl', 'rndx5']
     )
 
     # exp.add_exps(
