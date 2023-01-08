@@ -133,7 +133,7 @@ def plot_point_values(v, points, **kwargs):
 
 
 from tools.utils import tonumpy
-def plot_grid_point_values(anchors, values):
+def plot_grid_point_values(anchors, values, normalize=True):
     plt.clf()
     anchors = tonumpy(anchors)
     values = tonumpy(values)
@@ -149,10 +149,13 @@ def plot_grid_point_values(anchors, values):
     vmax = values.max()
     import matplotlib
     cm = plt.cm.get_cmap('RdYlBu')
-    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    if not normalize:
+        vmin = 0.
+        vmax = 1.
 
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     maps = np.zeros((max_x - min_x, max_y - min_y, 3))
-    values = cm((values - vmin) / (vmax - vmin))
+    values = cm((values - vmin) / (vmax - vmin + 1e-9))
     for i in range(len(anchors)):
         maps[x[i] - min_x, y[i] - min_y] = values[i][:3]
     ax = plt.imshow(maps) 

@@ -175,7 +175,7 @@ class AntCross(AntMaze):
         anchors = anchors.astype(np.int64)
         from solver.draw_utils import plot_grid_point_values
         from tools.utils import plt_save_fig_array
-        plot_grid_point_values(anchors, occupancy > 0.)
+        plot_grid_point_values(anchors, np.float32(occupancy > 0.))
         return plt_save_fig_array()
 
     def counter(self, obs):
