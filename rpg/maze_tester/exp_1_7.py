@@ -16,14 +16,14 @@ if __name__ == '__main__':
             ),
             hidden=dict(
                 TYPE='Categorical',
-                n=[12, 1, 12, 12, 12]
+                n=[12, 1, 12, 12, 12, 12]
             ),
-            info=dict(coef=[0.03, 0.0, 0.03, 0.01, 0.005]),
-            env_cfg=dict(n=[1, 1, 5, 1, 1]),
+            info=dict(coef=[0.03, 0.0, 0.03, 0.01, 0.005, 0.1]),
+            env_cfg=dict(n=[1, 1, 5, 1, 1, 1]),
             #save_video=100,
         ),
         base='antcross', default_env='AntFork',
-        names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005']
+        names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01']
     )
 
 
