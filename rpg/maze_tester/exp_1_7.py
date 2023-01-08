@@ -15,15 +15,15 @@ if __name__ == '__main__':
                 scale = 0.1,
             ),
             hidden=dict(
-                TYPE='Categorical',
-                n=[12, 1, 12, 12, 12, 12]
+                TYPE=['Categorical'] * 6 + ['Gaussian'] * 6,
+                n=[12, 1, 12, 12, 12, 12] + [12] * 6
             ),
-            info=dict(coef=[0.03, 0.0, 0.03, 0.01, 0.005, 0.1]),
-            env_cfg=dict(n=[1, 1, 5, 1, 1, 1]),
+            info=dict(coef=[0.03, 0.0, 0.03, 0.01, 0.005, 0.1, 0.0005, 0.005, 0.001, 0.01, 0.05, 0.1]),
+            env_cfg=dict(n=[1, 1, 5, 1, 1, 1] + [1] * 6),
             #save_video=100,
         ),
         base='antcross', default_env='AntFork',
-        names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01']
+        names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
     )
 
 
