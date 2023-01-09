@@ -15,7 +15,7 @@ plt.savefig('arm.png')
 images = []
 trajs = []
 history = None
-for i in tqdm.trange(10000):
+for i in tqdm.trange(30000):
     obs = env.step(env.action_space.sample())[0]
     #images.append(env.render('rgb_array'))
     #print(env.agent.base_pose)

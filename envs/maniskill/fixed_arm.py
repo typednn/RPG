@@ -6,6 +6,7 @@ from typing import Dict, Union
 
 class FixArm(OpenCabinetDoorEnv): 
     # return information about the environment
+    EMBED_INPUT_DIM=7
 
     def __init__(self, *args, obs_dim=8, **kwargs):
         config = {
@@ -17,7 +18,7 @@ class FixArm(OpenCabinetDoorEnv):
         self.obs_dim = obs_dim
         if self.obs_dim > 0:
             from ..maze import get_embedder
-            self.embedder, _ = get_embedder(self.obs_dim, input_dims=7)
+            self.embedder, _ = get_embedder(self.obs_dim, input_dims=self.EMBED_INPUT_DIM)
 
         super().__init__(*args, obs_dim=obs_dim, **config)
 
@@ -68,12 +69,11 @@ class FixArm(OpenCabinetDoorEnv):
 
         return obs
 
-    def decode_obs(self, obs):
+    def decode_obs_to_qpos(self, obs):
+        qpos = self.obs2qpos(obs)
         if self.obs_dim > 0:
-            obs = self.obs2qpos(obs) / 0.05
-        else:
-            obs = obs
-        return obs
+            qpos = qpos / 0.05
+        return qpos
 
     def sample_anchor_points(self, N=10000):
         state = np.random.get_state()
@@ -108,9 +108,12 @@ class FixArm(OpenCabinetDoorEnv):
         return obs
 
     def _render_traj_rgb(self, traj, occ_val=False, history=None, **kwargs):
-        obs = self.get_obs_from_traj(traj).detach().cpu().numpy()
+        import torch
+        obs = self.get_obs_from_traj(traj)
+        if isinstance(obs, torch.Tensor):
+            obs = obs.detach().cpu().numpy()
 
-        qpos = self.obs2qpos(obs)
+        qpos = self.decode_obs_to_qpos(obs)
         qpos = qpos.reshape(-1, qpos.shape[-1])[..., 4:-2]
 
         anchor_pos = self.anchors[..., 4:-2]

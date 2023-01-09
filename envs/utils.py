@@ -1,0 +1,131 @@
+import numpy as np
+
+
+def float2array(x, dim):
+    if isinstance(x, np.ndarray) or isinstance(x, list):
+        x = np.asarray(x)
+        assert x.shape == dim
+        return x
+    else:
+        return np.zeros(dim) + x
+
+
+def count_occupancy(state, low, high, gap=None, n_bin=None):
+    dim = state.shape[-1]
+    assert gap is None or n_bin is None
+
+    low = float2array(low, dim)
+    high = float2array(high, dim)
+
+    if gap is not None:
+        gap = float2array(gap, dim)
+        n_bin = np.int32(np.ceil((high - low) / gap))
+    else:
+        n_bin = np.int32(float2array(n_bin, dim))
+        gap = (high - low) / n_bin
+
+
+    state = state.reshape(-1, dim)
+    index = np.int32(np.round((((state - low) / (high - low)) * n_bin).clip(0, n_bin-1)))
+
+    #index = np.prod(index, -1)
+    total = np.prod(n_bin)
+    ind = 0
+    for i in range(dim):
+        ind = ind * n_bin[i] + index[..., i]
+
+    out = np.zeros(total, dtype=np.int32)
+    unique, cc = np.unique(ind, return_counts=True)
+    out[unique] = cc
+    return out
+
+def test_count_occupancy():
+    x = np.array([
+        [0.1, 0.3, 0.5],
+        [0.7, 0.8, 0.5],
+        [0.13, 0.8, 0.2],
+        [0.8, 0.3, 0.2],
+    ])
+
+    print(count_occupancy(x, 0, 1, 0.1))
+
+
+class Embedder:
+    # https://github.com/yenchenlin/nerf-pytorch/blob/master/run_nerf_helpers.py
+    def __init__(self, **kwargs):
+        import torch
+        self.kwargs = kwargs
+
+        embed_fns = []
+        d = self.kwargs['input_dims']
+        out_dim = 0
+        if self.kwargs['include_input']:
+            embed_fns.append(lambda x : x)
+            out_dim += d
+            
+        max_freq = self.kwargs['max_freq_log2']
+        N_freqs = self.kwargs['num_freqs']
+        
+        if self.kwargs['log_sampling']:
+            freq_bands = 2.**torch.linspace(0., max_freq, steps=N_freqs)
+        else:
+            freq_bands = torch.linspace(2.**0., 2.**max_freq, steps=N_freqs)
+            
+        for freq in freq_bands:
+            for p_fn in self.kwargs['periodic_fns']:
+                embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
+                out_dim += d
+                    
+        self.embed_fns = embed_fns
+        self.out_dim = out_dim
+        
+    def embed(self, inputs):
+        import torch
+        return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
+
+
+def get_embedder(multires, i=0, **kwargs):
+    if i == -1:
+        from torch import nn
+        return nn.Identity(), 2
+    import torch
+    
+    embed_kwargs = {
+                'include_input' : True,
+                'input_dims' : 2,
+                'max_freq_log2' : multires-1,
+                'num_freqs' : multires,
+                'log_sampling' : True,
+                'periodic_fns' : [torch.sin, torch.cos],
+    }
+    embed_kwargs.update(kwargs)
+    
+    embedder_obj = Embedder(**embed_kwargs)
+    embed = lambda x, eo=embedder_obj : eo.embed(x)
+    return embed, embedder_obj.out_dim
+
+
+class EmbedderNP:
+    def __init__(self, inp_dim, multires) -> None:
+        max_freq = multires - 1
+        N_freqs = multires
+        self.freq_bands = 2. ** np.linspace(0., max_freq, steps=N_freqs)
+        self.out_dim = inp_dim (1 + multires * 2)
+
+    def __call__(self, x):
+        inp = x
+        x = inp[..., None, :] * self.freq_bands[..., :, None] # freq, d
+        x = np.stack((np.sin(x), np.cos(x)), -2)
+        assert x.shape[-2] == 2
+        x = x.reshape(x.shape[:-3] + (-1,)) # freq, (sin, cos), d
+        return np.concatenate((inp, x), -1)
+
+
+def get_embeder_np(multires, dim):
+    emebeder = Emebeder()
+    return emebeder, emebeder.out_dim
+
+
+    
+if __name__ == '__main__':
+    test_count_occupancy()
