@@ -33,14 +33,13 @@ if __name__ == '__main__':
             hooks=dict(save_traj=dict(n_epoch=20)),
             env_cfg=dict(
                 n_block=3,
-                env_cfg=dict(n=[1] * 5 + [5]),
+                n=[1] * 5 + [5, 5],
             ),
             hidden=dict(
-                n=12,
-                TYPE=['Categorical', 'Gaussian', 'Gaussian', 'Gaussian', 'Gaussian', 'Gaussian'],
+                n=[12] * 6 + [1],
+                TYPE=['Categorical', 'Gaussian', 'Gaussian', 'Gaussian', 'Gaussian', 'Gaussian', 'Categorical'],
             ),
-            info=dict(coef=[0.01, 0.005, 0.001, 0.01, 0.05, 0.001]),
-            save_video=60,
+            info=dict(coef=[0.01, 0.005, 0.001, 0.01, 0.05, 0.001, 0.0]),
         ),
         base='block', default_env='BlockPush',
     )

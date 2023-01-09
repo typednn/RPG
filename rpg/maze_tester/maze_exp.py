@@ -331,10 +331,15 @@ class Experiment(Configurable):
                 else:
                     seeds = args.seed.split(',')
 
+                ids = list(range(len(configs)))
+                if args.ids is not None:
+                    ids = [int(i) for i in args.ids.split(',')]
                 for seed in seeds:
 
                     if args.runall == 'local':
                         for i in range(len(configs)):
+                            if i not in ids:
+                                continue
                             cmd = 'python3 '+ make_base(configs[i], seed) + ' --id '+str(i)
                             print('running ', cmd, 'yes/no?')
                             x = input()
@@ -342,6 +347,8 @@ class Experiment(Configurable):
                                 os.system(cmd)
                     else:
                         for i in range(len(configs)):
+                            if i not in ids:
+                                continue
                             base = make_base(configs[i], seed)
                             silent = ' --silent ' if args.silent else ''
                             seed_info = '-seed-' + str(seed) if seed is not None else ''
@@ -377,6 +384,7 @@ def build_exp(base_config, **kwargs):
     parser.add_argument('--exp', default=kwargs.get('exp', 'zdim'), type=str, help='experiment to run')
 
     parser.add_argument('--id', default=None, type=int, help='id')
+    parser.add_argument('--ids', default=None, type=str, help='ids')
     parser.add_argument('--runall', default=None, type=str)
     parser.add_argument('--download', action='store_true', help='download data')
     parser.add_argument('--silent', action='store_true', help='silent')

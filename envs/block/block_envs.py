@@ -262,7 +262,7 @@ class BlockEnv(gym.Env, SimulatorBase):
                 'xlim': [-self.world_size, self.world_size],
                 'ylim': [-self.world_size, self.world_size],
                     },
-            'image': {k: np.float32(occupancy[k] > 0.) for k in occupancy},
+            'image': {k: np.uint8(np.float32(occupancy[k] > 0.) * 255) for k in occupancy},
             'metric': {'occ': occ_total},
             'history': history, 
         }
