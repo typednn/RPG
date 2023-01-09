@@ -109,8 +109,8 @@ class EmbedderNP:
     def __init__(self, inp_dim, multires) -> None:
         max_freq = multires - 1
         N_freqs = multires
-        self.freq_bands = 2. ** np.linspace(0., max_freq, steps=N_freqs)
-        self.out_dim = inp_dim (1 + multires * 2)
+        self.freq_bands = 2. ** np.linspace(0., max_freq, num=N_freqs)
+        self.out_dim = inp_dim * (1 + multires * 2)
 
     def __call__(self, x):
         inp = x
@@ -122,10 +122,22 @@ class EmbedderNP:
 
 
 def get_embeder_np(multires, dim):
-    emebeder = Emebeder()
-    return emebeder, emebeder.out_dim
+    embeder = EmbedderNP(dim, multires)
+    return embeder, embeder.out_dim
 
+def test_embedder_np():
+    import torch
+    e1, d1 = get_embedder(10, input_dims=3)
+    e2, d2 = get_embeder_np(10, 3)
+    #assert d2 == d1
+
+    data = torch.randn(100, 3)
+
+    out1 = e1(data)
+    out2 = torch.tensor(e2(data.detach().cpu().numpy())).float()
+    assert torch.allclose(out1, out2)
 
     
 if __name__ == '__main__':
-    test_count_occupancy()
+    #test_count_occupancy()
+    test_embedder_np()
