@@ -7,6 +7,9 @@ from envs.maniskill.fixed_arm import FixArm
 env = FixArm()
 env.reset()
 print(env.action_space.shape)
+# while True:
+#     env.step(env.action_space.sample())
+
 
 img = env.render('rgb_array')
 plt.imshow(img)

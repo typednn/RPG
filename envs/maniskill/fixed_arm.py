@@ -17,8 +17,9 @@ class FixArm(OpenCabinetDoorEnv):
 
         self.obs_dim = obs_dim
         if self.obs_dim > 0:
-            from ..maze import get_embedder
-            self.embedder, _ = get_embedder(self.obs_dim, input_dims=self.EMBED_INPUT_DIM)
+            #from ..maze import get_embedder
+            from ..utils import get_embeder_np
+            self.embedder, _ = get_embeder_np(self.obs_dim, self.EMBED_INPUT_DIM)
 
         super().__init__(*args, obs_dim=obs_dim, **config)
 
@@ -60,10 +61,9 @@ class FixArm(OpenCabinetDoorEnv):
         
     def wrap_obs(self, obs):
         if self.obs_dim > 0:
-            import torch
             qpos = self.obs2qpos(obs)
             qpos = qpos[4:-2] # remove the first 4 x, y, ori, height, and the last two fingers dim..
-            obs = np.concatenate((obs*0.05, self.embedder(torch.tensor(qpos)).numpy()))
+            obs = np.concatenate((obs*0.05, self.embedder(qpos)))
         else:
             obs = obs
 
@@ -103,16 +103,15 @@ class FixArm(OpenCabinetDoorEnv):
     def get_obs_from_traj(self, traj):
         if isinstance(traj, dict):
             obs = traj['next_obs']
+            import torch
+            if isinstance(obs, torch.Tensor):
+                obs = obs.detach().cpu().numpy()
         else:
-            obs = traj.get_tensor('next_obs', device='cpu')
+            obs = traj.get_tensor('next_obs', device='numpy')
         return obs
 
     def _render_traj_rgb(self, traj, occ_val=False, history=None, **kwargs):
-        import torch
         obs = self.get_obs_from_traj(traj)
-        if isinstance(obs, torch.Tensor):
-            obs = obs.detach().cpu().numpy()
-
         qpos = self.decode_obs_to_qpos(obs)
         qpos = qpos.reshape(-1, qpos.shape[-1])[..., 4:-2]
 

@@ -1,7 +1,7 @@
 import torch
 from tools import Configurable
 from tools.utils import totensor, tonumpy
-from .buffer import ReplayBuffer
+from .buffer import ReplayBuffer, BufferItem
 from collections import deque
 import numpy as np
 from tools.utils import RunningMeanStd
@@ -47,7 +47,10 @@ class ExplorationBonus(Configurable):
 
 
         self.step = 0
-        self.buffer = deque(maxlen=buffer_size)
+        # self.buffer = deque(maxlen=buffer_size)
+        # self.bufferz = deque(maxlen=buffer_size)
+        self.buffer = BufferItem(buffer_size, {'_shape': obs_space.shape}) #deque(maxlen=buffer_size)
+        #self.bufferz = BufferItem(buffer_size, {'_shape': z_space})
         self.bufferz = deque(maxlen=buffer_size)
 
         self.batch_size = batch_size
@@ -93,15 +96,14 @@ class ExplorationBonus(Configurable):
         if not self.training_on_rollout:
             with torch.no_grad():
                 for i, z in zip(data, prevz):
-                    self.buffer.append(i)
+                    self.buffer.append(totensor(i, device='cuda:0'))
                     self.bufferz.append(z)
 
             self.step += 1
             if self.step % self.update_freq == 0 and len(self.buffer) > self.batch_size:
                 for _ in range(self.update_step):
+                    data = self.sample_data()
                     self.update(*self.sample_data())
-                    #if self.normalizer is not None:
-                    #    self.normalizer.update(bonus)
 
     def process_obs(self, obs):
         if self.obs_mode == 'state':
@@ -113,9 +115,12 @@ class ExplorationBonus(Configurable):
         #pass
         assert not self.training_on_rollout
         index = np.random.choice(len(self.buffer), self.batch_size)
-        obs = totensor([self.buffer[i] for i in index], device='cuda:0')
+        #obs = [self.buffer[i] for i in index]
+        #obs = totensor(obs, device='cuda:0')
+        obs = self.buffer[totensor(index, device='cuda:0', dtype=None)]
         if self.include_latent:
-            latent = totensor([self.bufferz[i] for i in index], device='cuda:0', dtype=None)
+            latent = [self.bufferz[i] for i in index]
+            latent = totensor(latent, device='cuda:0', dtype=None)
         else:
             latent = None
         obs = self.process_obs(obs)

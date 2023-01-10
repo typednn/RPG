@@ -70,7 +70,10 @@ class Trajectory:
                 out[k] = totensor(value, device='cpu', dtype=dtype)
             return out
         else:
-            return totensor([i[key] for i in self.traj], device=device, dtype=dtype)
+            array = [i[key] for i in self.traj]
+            if device == 'numpy':
+                return np.array(array)
+            return totensor(array, device=device, dtype=dtype)
 
     def get_truncated_done(self, device='cuda:0'):
         # done means that we should ignore the next_value in the end
