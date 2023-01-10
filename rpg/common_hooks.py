@@ -182,7 +182,8 @@ class save_train_occupancy(HookBase):
 
             self.history = data['history']
             
-            logger.logkv_mean('train_occ_metric', data['metric']['occ'])
+            for k, v in data['metric'].items():
+                logger.logkv_mean('train_{}_metric'.format(k), v)
             self.obs = []
 
 
@@ -325,7 +326,7 @@ class save_traj(HookBase):
                 logger.savefig(k + '.png', v)
 
             #logger.savefig(self.traj_name + '.png', img)
-            if self.save_gif_epochs > 0:
+            if self.save_gif_epochs > 0 and len(drawer.images) > 0:
                 img = np.concatenate([v for k, v in drawer.images.items()], axis=1)
                 self.imgs.append(img)
                 if len(self.imgs) % self.save_gif_epochs == 0:

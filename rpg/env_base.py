@@ -37,7 +37,7 @@ class GymVecEnv(VecEnv):
 
         import gym
         from rl.vec_envs import SubprocVectorEnv
-        if env_name.startswith('Ant') or env_name.startswith('Block') or env_name.startswith('FixArm'):
+        if env_name.startswith('Ant') or env_name.startswith('Block') or env_name.startswith('FixArm') or 'Arm' in env_name:
             import multiprocessing as mp
             mp.set_start_method('spawn', force=True)
 
@@ -88,6 +88,10 @@ class GymVecEnv(VecEnv):
             elif env_name == 'FixArm':
                 from envs.maniskill.fixed_arm import FixArm
                 return TimeLimit(FixArm(**kwargs), 60)
+
+            elif env_name == 'EEArm':
+                from envs.maniskill.ee_arm import EEArm
+                return TimeLimit(EEArm(**kwargs), 60)
 
             elif env_name == 'Rope':
                 from envs.softbody.plb_envs import RopeEnv

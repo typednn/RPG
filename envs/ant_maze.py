@@ -83,7 +83,7 @@ class AntMaze(gym.Env):
             'ylim': [0, self.grid_size * 4],
         }
 
-    def _render_traj_rgb(self, traj, z=None, occ_val=False, history=None, **kwargs):
+    def _render_traj_rgb(self, traj, z=None, occ_val=False, verbose=True, history=None, **kwargs):
         obs = self.get_obs_from_traj(traj)
 
         if occ_val >= 0:
@@ -93,6 +93,10 @@ class AntMaze(gym.Env):
         else:
             occupancy = None
 
+        images = {}
+        if verbose:
+            images = {'occupancy': self.get_occupancy_image(occupancy)}
+
         obs = obs.detach().cpu().numpy()
         output = {
             'state': obs,
@@ -100,7 +104,7 @@ class AntMaze(gym.Env):
                 'image':  None,
                 **self.get_xlims(),
             },
-            'image': {'occupancy': self.get_occupancy_image(occupancy)},
+            'image': images,
             'history': {'occ': occupancy},
             'metric': {'occ': (occupancy > occ_val).mean()},
         }

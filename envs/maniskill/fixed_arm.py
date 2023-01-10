@@ -110,7 +110,7 @@ class FixArm(OpenCabinetDoorEnv):
             obs = traj.get_tensor('next_obs', device='numpy')
         return obs
 
-    def _render_traj_rgb(self, traj, occ_val=False, history=None, **kwargs):
+    def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
         obs = self.get_obs_from_traj(traj)
         qpos = self.decode_obs_to_qpos(obs)
         qpos = qpos.reshape(-1, qpos.shape[-1])[..., 4:-2]
@@ -128,17 +128,20 @@ class FixArm(OpenCabinetDoorEnv):
         else:
             occupancy = None
 
-        import matplotlib.pyplot as plt
-        from tools.utils import plt_save_fig_array
-        plt.clf()
-        plt.hist(occupancy, bins=100)
-        img = plt_save_fig_array()
+        if verbose:
+            import matplotlib.pyplot as plt
+            from tools.utils import plt_save_fig_array
+            plt.clf()
+            plt.hist(occupancy, bins=100)
+            img = {'hist': plt_save_fig_array()}
+        else:
+            img = {}
             
         output = {
             # 'state': obs,
             'background': {},
 
-            'image': {'hist': img},
+            'image': img,
             'history': {
                 'occ': occupancy,
             },
