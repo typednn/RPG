@@ -94,9 +94,10 @@ class ExplorationBonus(Configurable):
 
     def add_data(self, data, prevz):
         if not self.training_on_rollout:
+            self.buffer.append(totensor(data, device='cuda:0'))
             with torch.no_grad():
-                for i, z in zip(data, prevz):
-                    self.buffer.append(totensor(i, device='cuda:0'))
+                for z in prevz:
+                    #self.buffer.append(totensor(i, device='cuda:0'))
                     self.bufferz.append(z)
 
             self.step += 1

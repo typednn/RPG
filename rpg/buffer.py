@@ -25,8 +25,10 @@ class BufferItem:
             for k, v in data.items():
                 self._data[k].append(v)
         else:
+            assert len(data.shape) > 1
             horizon = len(data)
             end = min(self.idx + horizon, self._capacity)
+            # print(self._data.shape, data.shape, end, self.idx, self._capacity)
             self._data[self.idx:end] = data[:end-self.idx]
 
             new_idx = (self.idx + horizon) % self._capacity

@@ -4,7 +4,7 @@ import numpy as np
 def float2array(x, dim):
     if isinstance(x, np.ndarray) or isinstance(x, list):
         x = np.asarray(x)
-        assert x.shape == dim
+        assert x.shape[-1] == dim
         return x
     else:
         return np.zeros(dim) + x
@@ -23,6 +23,7 @@ def count_occupancy(state, low, high, gap=None, n_bin=None):
     else:
         n_bin = np.int32(float2array(n_bin, dim))
         gap = (high - low) / n_bin
+        raise NotImplementedError
 
 
     state = state.reshape(-1, dim)
@@ -136,6 +137,21 @@ def test_embedder_np():
     out1 = e1(data)
     out2 = torch.tensor(e2(data.detach().cpu().numpy())).float()
     assert torch.allclose(out1, out2)
+
+    
+def update_occupancy_with_history(occ, history, method='sum'):
+    if isinstance(occ, dict):
+        return {
+            k: update_occupancy_with_history(v, history[k] if history is not None else None) 
+            for k, v in occ.items()
+        }
+    if history is None:
+        out = occ 
+    elif method == 'sum':
+        out = occ + history
+    else:
+        raise NotImplementedError
+    return out 
 
     
 if __name__ == '__main__':
