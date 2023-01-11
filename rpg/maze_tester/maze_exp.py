@@ -11,7 +11,8 @@ base_config = dict(
     max_epoch=2000, # 200 * 5 * 2000
     steps_per_epoch=200,
     env_name='SmallMaze',
-    env_cfg=dict(n=5, ignore_truncated_done=True, reward=False),
+    env_cfg=dict(n=5, ignore_truncated_done=True),
+    reward_scale=0.,
     buffer=dict(max_episode_num=100000),
     #z_dim=6,
     #z_cont_dim=0,
@@ -65,7 +66,7 @@ base_config = dict(
             obs_mode='obs',
             scale=0.1,
         ),
-        env_cfg=dict(obs_dim=5),
+        env_cfg=dict(obs_dim=8),
         path='tmp/rndreward'),
 
         small=dict(_inherit='rndreward', env_cfg=dict(n=5), path='tmp/small2'),
@@ -116,7 +117,7 @@ base_config = dict(
         antcross = dict(_inherit='ant_squash', env_name='AntMaze3', path='tmp/antcross', steps_per_epoch=200),
         block=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='BlockPush', path='tmp/block'),
 
-        arm=dict(steps_per_epoch=60, _inherit='ant_squash', reward_scale=0., env_cfg=dict(n=1, obs_dim=6), env_name='FixArm', path='tmp/arm'),
+        arm=dict(steps_per_epoch=None, _inherit='ant_squash', reward_scale=0., env_cfg=dict(n=1, obs_dim=6), env_name='FixArm', path='tmp/arm'),
         eearm=dict(_inherit='arm', env_name='EEArm', path='tmp/eearm'),
         eearm_gaussian=dict(_inherit='eearm', hidden=dict(TYPE='Gaussian', n=12), env_cfg=dict(n=5), info=dict(coef=0.0008), path='tmp/eearm_guassian'),
         eearm_rew=dict(_inherit='eearm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense', reward=True), path='tmp/eearm_reward'),

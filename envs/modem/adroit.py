@@ -11,10 +11,10 @@ import envs.modem.mj_envs.envs.hand_manipulation_suite
 
 
 class AdroitWrapper(gym.Wrapper):
-    def __init__(self, env, cfg):
+    def __init__(self, env, cfg, obs_dim):
         super().__init__(env)
         from envs.utils import get_embeder_np
-        self.embedder, d = get_embeder_np(8, 9)
+        self.embedder, d = get_embeder_np(obs_dim, 9)
         
         self.env = env
         self.cfg = cfg
@@ -27,7 +27,7 @@ class AdroitWrapper(gym.Wrapper):
         #     shape=(self._num_frames * 3, img_size, img_size),
         #     dtype=np.uint8,
         # )
-        self.observation_space = gym.spaces.Box(-1, 1, (208,))
+        self.observation_space = gym.spaces.Box(-1, 1, self.reset().shape)
         self.action_space = self.env.action_space
         self.camera_name = cfg.get("camera_view", "view_1")
 
@@ -89,9 +89,9 @@ class AdroitWrapper(gym.Wrapper):
     def reset(self):
         obs = self.env.reset()
         self._state_obs = self._get_state_obs(obs)
-        obs = self._get_pixel_obs()
-        for _ in range(self._num_frames):
-            self._frames.append(obs)
+        #obs = self._get_pixel_obs()
+        #for _ in range(self._num_frames):
+        #    self._frames.append(obs)
         #return self._stacked_obs()
         return self._state_obs.copy()
 
@@ -101,8 +101,8 @@ class AdroitWrapper(gym.Wrapper):
             obs, r, _, info = self.env.step(action)
             reward += r
         self._state_obs = self._get_state_obs(obs)
-        obs = self._get_pixel_obs()
-        self._frames.append(obs)
+        #obs = self._get_pixel_obs()
+        #self._frames.append(obs)
         info["success"] = info["goal_achieved"]
         # reward = float(info["success"]) - 1.0
         # return self._stacked_obs(), reward, False, info
@@ -145,18 +145,18 @@ class AdroitWrapper(gym.Wrapper):
 
 
 
-def make_adroit_env(cfg):
-    env_id = cfg.task.split("-", 1)[-1] + "-v0"
-    env = gym.make(env_id)
-    env = AdroitWrapper(env, cfg)
-    env = TimeLimit(env, max_episode_steps=cfg.episode_length)
-    env.reset()
-    cfg.state_dim = env.state.shape[0]
-    return env
+# def make_adroit_env(cfg):
+#     env_id = cfg.task.split("-", 1)[-1] + "-v0"
+#     env = gym.make(env_id)
+#     env = AdroitWrapper(env, cfg)
+#     env = TimeLimit(env, max_episode_steps=cfg.episode_length)
+#     env.reset()
+#     cfg.state_dim = env.state.shape[0]
+#     return env
 
-def make_adroit_env(env_name, reward_type='sprase'):
-    env = gym.make("hammer-v0", reward_type=reward_type)
-    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2})
+def make_adroit_env(env_name, reward_type='sprase', obs_dim=6):
+    env = gym.make(env_name, reward_type=reward_type)
+    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2}, obs_dim=obs_dim)
     return env
 
 if __name__ == '__main__':
