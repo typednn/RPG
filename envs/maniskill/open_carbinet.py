@@ -36,7 +36,6 @@ class OpenCabinetEnv(MS1BaseEnv):
 
         # x, y, z, doors' dof, and contact distance?
         obs_dim = 8,
-        reward=True,
         reward_type='dense',
 
         **kwargs

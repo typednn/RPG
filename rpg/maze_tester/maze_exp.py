@@ -126,10 +126,10 @@ base_config = dict(
         arm=dict(steps_per_epoch=None, _inherit='ant_squash', reward_scale=0., env_cfg=dict(n=1, obs_dim=6), env_name='FixArm', path='tmp/arm'),
         eearm=dict(_inherit='arm', env_name='EEArm', path='tmp/eearm'),
         eearm_gaussian=dict(_inherit='eearm', hidden=dict(TYPE='Gaussian', n=12), env_cfg=dict(n=5), info=dict(coef=0.0008), path='tmp/eearm_guassian'),
-        eearm_rew=dict(_inherit='eearm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense', reward=True), path='tmp/eearm_reward'),
+        eearm_rew=dict(_inherit='eearm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense'), path='tmp/eearm_reward'),
 
-        arm_rew = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense', reward=True), path='tmp/arm_reward'),
-        arm_sparse = dict(_inherit='arm', reward_scale=0.01, rnd=dict(scale=0.1), hidden=dict(n=6), env_cfg=dict(reward_type='sparse', reward=True), path='tmp/arm_sparse'),
+        arm_rew = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense',), path='tmp/arm_reward'),
+        arm_sparse = dict(_inherit='arm', reward_scale=0.01, rnd=dict(scale=0.1), hidden=dict(n=6), env_cfg=dict(reward_type='sparse'), path='tmp/arm_sparse'),
         cabinet=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='Cabinet', path='tmp/cabinet'),
 
         
