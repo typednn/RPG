@@ -1,5 +1,5 @@
-*.jpg
-*.png
+#*.jpg
+#*.png
 data
 *.avi
 *feh_*
@@ -47,7 +47,7 @@ solver/data
 *.npz*
 *.mp4
 *.webm
-*.png
+# *.png
 *.json
 *partnet-mobility-dataset*
 *.pt
