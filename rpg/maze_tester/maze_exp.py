@@ -11,7 +11,7 @@ sac_head = dict(
     head=dict(std_scale=1., std_mode='statewise', squash=True),
     pi_a=dict(ent=dict(coef=1., target_mode='auto'))
 )
-trainer_weights = dict(trainer=dict(weights=dict(reward=10., q_value=1.,)), reward_scale=5.) # sparse reward
+trainer_weights = dict(trainer=dict(weights=dict(reward=10., q_value=1., state=10000.,)), reward_scale=5., actor_delay=2) # sparse reward
 
 base_config = dict(
     max_epoch=2000, # 200 * 5 * 2000
@@ -298,7 +298,7 @@ class Experiment(Configurable):
 
             var_cfg.set_new_allowed(True)
             if self.wandb:
-                var_cfg.wandb = CN({'project': self.path, 'name': cfg_name, 'group': expname})
+                var_cfg.wandb = CN({'project': self.path, 'name': cfg_name, 'group': cfg_name})
             else:
                 var_cfg.path = os.path.join(self.path, expname, cfg_name)
                 if 'MODEL_PATH' in os.environ:

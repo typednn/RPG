@@ -12,6 +12,17 @@ if __name__ == '__main__':
         base=None, default_env='AdroitHammer',
         #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
     )
+    # python3 maze_tester/exp_1_11.py --exp hammer2 --runall remote --wandb True  --seed 1,2,3 --cpu 5 --silent
+    # also test group
+    exp.add_exps(
+        'hammer2',
+        dict(
+            _base=['rpgnormal1', 'mbsacrnd'],
+            env_cfg=dict(reward_type='sparse'),
+        ),
+        base=None, default_env='AdroitHammer',
+        #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
+    )
 
 
     exp.main()
