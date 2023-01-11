@@ -1,5 +1,5 @@
-#*.jpg
-#*.png
+*.jpg
+*.png
 data
 *.avi
 *feh_*
