@@ -273,17 +273,17 @@ class Experiment(Configurable):
             env_cfg = self.env_configs[env_name]
 
         for name, k in zip(names, variants):
-            k =CN(k)
             
-            if hasattr(k, '_base'):
+            if '_base' in k:
                 var_cfg = self.base_config.clone()
                 var_cfg.defrost()
-                var = extract_variant(k._base, self.get_variants())
+                var = extract_variant(k.pop('_base'), self.get_variants())
                 var_cfg.set_new_allowed(True)
                 merge_a_into_b(var, var_cfg)
             else:
                 var_cfg = cfg.clone()
 
+            k = CN(k)
             kws = dict(env_name=env_name)
             if env_cfg is not None:
                 kws['env_cfg'] = env_cfg
@@ -385,6 +385,8 @@ class Experiment(Configurable):
                             silent = ' --silent ' if args.silent else ''
                             seed_info = '-seed-' + str(seed) if seed is not None else ''
                             cmd = 'remote.py --go ' + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
+                            if args.cpu is not None:
+                                cmd = cmd + ' --cpu ' + str(args.cpu)
                             os.system(cmd)
                     
         else:
@@ -420,6 +422,7 @@ def build_exp(base_config, **kwargs):
     parser.add_argument('--runall', default=None, type=str)
     parser.add_argument('--download', action='store_true', help='download data')
     parser.add_argument('--silent', action='store_true', help='silent')
+    parser.add_argument('--cpu', default=1, type=int)
 
     parser.add_argument('--seed', default=None)
 
