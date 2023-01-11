@@ -10,9 +10,10 @@ from gym.wrappers import TimeLimit
 import envs.modem.mj_envs.envs.hand_manipulation_suite
 
 
-class AdroitWrapper(gym.Wrapper):
+class AdroitWrapper(gym.Env):
     def __init__(self, env, cfg, obs_dim):
-        super().__init__(env)
+        super().__init__()
+        self.env = env
         from envs.utils import get_embeder_np
         self.embedder, d = get_embeder_np(obs_dim, 9)
         

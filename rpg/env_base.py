@@ -37,9 +37,9 @@ class GymVecEnv(VecEnv):
 
         import gym
         from rl.vec_envs import SubprocVectorEnv
-        if env_name.startswith('Ant') or env_name.startswith('Block') or env_name.startswith('FixArm') or 'Arm' in env_name:
-            import multiprocessing as mp
-            mp.set_start_method('spawn', force=True)
+        # if env_name.startswith('Ant') or env_name.startswith('Block') or env_name.startswith('FixArm') or 'Arm' in env_name or 'Adroit' in env_name:
+        import multiprocessing as mp
+        mp.set_start_method('spawn', force=True)
 
         def make_env():
             from gym.wrappers import TimeLimit

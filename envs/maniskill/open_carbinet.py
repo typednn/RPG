@@ -333,8 +333,12 @@ class OpenCabinetEnv(MS1BaseEnv):
         info.update(success=total_success)
         if self.reward == 'dense':
             return np.sum(reward_open) - np.min(ee_to_handles)
-        else:
+        elif self.reward == 'sparse':
+            return int(np.sum(reward_open) > 0)
+        elif self.reward == 'partial':
             return np.sum(reward_open)
+        else:
+            raise NotImplementedError
 
     # -------------------------------------------------------------------------- #
     # Observations

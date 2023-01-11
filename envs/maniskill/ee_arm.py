@@ -79,8 +79,6 @@ class EEArm(FixArm):
             images['traj'] = plt_save_fig_array(fig)
 
 
-        
-            
         output = {
             'background': {},
             'history': history,

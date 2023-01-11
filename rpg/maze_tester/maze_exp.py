@@ -7,6 +7,11 @@ from tools.config import Configurable, CN, merge_a_into_b, extract_variant
 import matplotlib.pyplot as plt
 
 
+sac_head = dict(
+    head=dict(std_scale=0.3, std_mode='statewise', squash=True),
+    pi_a=dict(ent=dict(coef=1., target_mode='auto'))
+)
+
 base_config = dict(
     max_epoch=2000, # 200 * 5 * 2000
     steps_per_epoch=200,
@@ -40,7 +45,7 @@ base_config = dict(
     # info=dict(mutual_info_weight=0.03, action_weight=1., obs_weight=1., epsilon=0.01, std_mode='fix_no_grad'),
 
     _variants=dict(
-        sac=dict(model=dict(qmode='Q'), horizon=1, trainer=dict(weights=dict(state=0.))),
+        #sac=dict(model=dict(qmode='Q'), horizon=1, trainer=dict(weights=dict(state=0.))),
         value=dict(model=dict(qmode='value'), horizon=1),
         sac3=dict(model=dict(qmode='Q'), horizon=3),
         value3=dict(model=dict(qmode='value'), horizon=3, hidden=dict(n=1), head=dict(std_scale=0.2)),
@@ -128,6 +133,14 @@ base_config = dict(
 
         
         # method base, to test on different algorithms
+        mbsac=dict(
+            _inherit='eearm_rew', rnd=dict(scale=0.), info=dict(coef=0.), 
+            hidden=dict(n=1, TYPE='Categorical'), path=None,
+            **sac_head,
+        ),
+        mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
+        rpgnormal=dict(_inherit='eearm_guassian', reward_scale=1., rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
+        rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
     ),
 )
 
