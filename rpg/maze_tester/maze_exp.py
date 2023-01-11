@@ -124,6 +124,9 @@ base_config = dict(
         arm_rew = dict(_inherit='arm', reward_scale=1., rnd=dict(scale=0.0), hidden=dict(n=1), env_cfg=dict(reward_type='dense', reward=True), path='tmp/arm_reward'),
         arm_sparse = dict(_inherit='arm', reward_scale=0.01, rnd=dict(scale=0.1), hidden=dict(n=6), env_cfg=dict(reward_type='sparse', reward=True), path='tmp/arm_sparse'),
         cabinet=dict(_inherit='ant_squash', env_cfg=dict(n=1, obs_dim=5), env_name='Cabinet', path='tmp/cabinet'),
+
+        
+        # method base, to test on different algorithms
     ),
 )
 
