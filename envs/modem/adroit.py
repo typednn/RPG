@@ -84,7 +84,8 @@ class AdroitWrapper(gym.Wrapper):
         obs = self._get_pixel_obs()
         for _ in range(self._num_frames):
             self._frames.append(obs)
-        return self._stacked_obs()
+        #return self._stacked_obs()
+        return self._state_obs.copy()
 
     def step(self, action):
         reward = 0
@@ -95,8 +96,9 @@ class AdroitWrapper(gym.Wrapper):
         obs = self._get_pixel_obs()
         self._frames.append(obs)
         info["success"] = info["goal_achieved"]
-        reward = float(info["success"]) - 1.0
-        return self._stacked_obs(), reward, False, info
+        # reward = float(info["success"]) - 1.0
+        # return self._stacked_obs(), reward, False, info
+        return self._state_obs.copy(), reward, False, info
 
     def render(self, mode="rgb_array", width=None, height=None, camera_id=None):
         img_size = self.cfg.get('img_size', 84)
@@ -133,14 +135,16 @@ def make_adroit_env(cfg):
 
 
 if __name__ == '__main__':
+    # episode length 125
     from tools.utils import animate
-    env = gym.make("hammer-v0")
+    env = gym.make("hammer-v0", reward_type='dense')
     env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2})
     env.reset()
 
     images = []
     for i in range(100):
-        env.step(env.action_space.sample())
+        r = env.step(env.action_space.sample())[1]
+        print(r)
         img = env.render('rgb_array')
         images.append(img)
 

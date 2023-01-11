@@ -9,12 +9,13 @@ ADD_BONUS_REWARDS = True
 
 
 class HammerEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self):
+    def __init__(self, reward_type='sparse'):
         self.target_obj_sid = -1
         self.S_grasp_sid = -1
         self.obj_bid = -1
         self.tool_sid = -1
         self.goal_sid = -1
+        self.reward_type = reward_type
         curr_dir = os.path.dirname(os.path.abspath(__file__))
         mujoco_env.MujocoEnv.__init__(self, curr_dir + "/assets/DAPG_hammer.xml", 5)
         utils.EzPickle.__init__(self)
@@ -76,28 +77,29 @@ class HammerEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
         target_pos = self.data.site_xpos[self.target_obj_sid].ravel()
         goal_pos = self.data.site_xpos[self.goal_sid].ravel()
 
-        # get to hammer
-        # reward = - 0.1 * np.linalg.norm(palm_pos - obj_pos)
-        # # take hammer head to nail
-        # reward -= np.linalg.norm((tool_pos - target_pos))
-        # # make nail go inside
-        # reward -= 10 * np.linalg.norm(target_pos - goal_pos)
-        # # velocity penalty
-        # reward -= 1e-2 * np.linalg.norm(self.data.qvel.ravel())
+        if self.reward_type == 'dense':
+            # get to hammer
+            reward = - 0.1 * np.linalg.norm(palm_pos - obj_pos)
+            # take hammer head to nail
+            reward -= np.linalg.norm((tool_pos - target_pos))
+            # make nail go inside
+            reward -= 10 * np.linalg.norm(target_pos - goal_pos)
+            # velocity penalty
+            reward -= 1e-2 * np.linalg.norm(self.data.qvel.ravel())
 
-        # if ADD_BONUS_REWARDS:
-        #     # bonus for lifting up the hammer
-        #     if obj_pos[2] > 0.04 and tool_pos[2] > 0.04:
-        #         reward += 2
+            if ADD_BONUS_REWARDS:
+                # bonus for lifting up the hammer
+                if obj_pos[2] > 0.04 and tool_pos[2] > 0.04:
+                    reward += 2
 
-        #     # bonus for hammering the nail
-        #     if (np.linalg.norm(target_pos - goal_pos) < 0.020):
-        #         reward += 25
-        #     if (np.linalg.norm(target_pos - goal_pos) < 0.010):
-        #         reward += 75
-
-        # sparse reward (undefined in awac paper)
-        reward = float(np.linalg.norm(target_pos - goal_pos) <= 0.020) - 1.0
+                # bonus for hammering the nail
+                if (np.linalg.norm(target_pos - goal_pos) < 0.020):
+                    reward += 25
+                if (np.linalg.norm(target_pos - goal_pos) < 0.010):
+                    reward += 75
+        else:
+            # sparse reward (undefined in awac paper)
+            reward = float(np.linalg.norm(target_pos - goal_pos) <= 0.020) - 1.0
 
         goal_achieved = (
             True if np.linalg.norm(target_pos - goal_pos) <= 0.020 else False
