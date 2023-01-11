@@ -6,7 +6,7 @@ if __name__ == '__main__':
     exp.add_exps(
         'hammer',
         dict(
-            _base=['mbsac', 'mbsacrnd', 'rpgnormal', 'rpgdiscrete'],
+            _base=['mbsac', 'mbsacrnd', 'rpgnormal', 'rpgdiscrete', 'mbsacrnd5', 'rpgnormal1', 'rpgdiscrete1'],
             env_cfg=dict(reward_type='sparse'),
         ),
         base=None, default_env='AdroitHammer',

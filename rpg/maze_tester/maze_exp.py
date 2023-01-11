@@ -141,8 +141,11 @@ base_config = dict(
             **trainer_weights,
         ),
         mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
+        mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
         rpgnormal=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
         rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
+        rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
+        rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
     ),
 )
 
