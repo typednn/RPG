@@ -385,8 +385,7 @@ class Experiment(Configurable):
                             silent = ' --silent ' if args.silent else ''
                             seed_info = '-seed-' + str(seed) if seed is not None else ''
                             cmd = 'remote.py --go '
-                            if args.cpu is not None:
-                                cmd = cmd + ' --cpu ' + str(args.cpu) + ' '
+                            cmd = cmd + ' --cpu ' + str(args.cpu) + ' '
                             cmd =  cmd + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
                             os.system(cmd)
                     
@@ -423,7 +422,7 @@ def build_exp(base_config, **kwargs):
     parser.add_argument('--runall', default=None, type=str)
     parser.add_argument('--download', action='store_true', help='download data')
     parser.add_argument('--silent', action='store_true', help='silent')
-    parser.add_argument('--cpu', default=1, type=int)
+    parser.add_argument('--cpu', default=2, type=int)
 
     parser.add_argument('--seed', default=None)
 
