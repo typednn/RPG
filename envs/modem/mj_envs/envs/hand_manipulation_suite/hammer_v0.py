@@ -62,6 +62,14 @@ class HammerEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_space.high = np.ones_like(self.model.actuator_ctrlrange[:, 1])
         self.action_space.low = -1.0 * np.ones_like(self.model.actuator_ctrlrange[:, 0])
 
+    def get_object_poses(self):
+        return dict(
+            palm_pos = self.data.site_xpos[self.S_grasp_sid].ravel(),
+            tool_pos = self.data.site_xpos[self.tool_sid].ravel(),
+            target_pos = self.data.site_xpos[self.target_obj_sid].ravel(),
+        )
+
+
     def step(self, a):
         env_state = self.get_env_state()
         a = np.clip(a, -1.0, 1.0)
@@ -97,6 +105,8 @@ class HammerEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
                     reward += 25
                 if (np.linalg.norm(target_pos - goal_pos) < 0.010):
                     reward += 75
+
+            reward = reward * 0.05 # don't be too large ..
         else:
             # sparse reward (undefined in awac paper)
             reward = float(np.linalg.norm(target_pos - goal_pos) <= 0.020) - 1.0

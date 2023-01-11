@@ -13,17 +13,21 @@ import envs.modem.mj_envs.envs.hand_manipulation_suite
 class AdroitWrapper(gym.Wrapper):
     def __init__(self, env, cfg):
         super().__init__(env)
+        from envs.utils import get_embeder_np
+        self.embedder, d = get_embeder_np(8, 9)
+        
         self.env = env
         self.cfg = cfg
         self._num_frames = cfg.get("frame_stack", 1)
         self._frames = deque([], maxlen=self._num_frames)
         img_size = cfg.get('img_size', 84)
-        self.observation_space = gym.spaces.Box(
-            low=0,
-            high=255,
-            shape=(self._num_frames * 3, img_size, img_size),
-            dtype=np.uint8,
-        )
+        # self.observation_space = gym.spaces.Box(
+        #     low=0,
+        #     high=255,
+        #     shape=(self._num_frames * 3, img_size, img_size),
+        #     dtype=np.uint8,
+        # )
+        self.observation_space = gym.spaces.Box(-1, 1, (208,))
         self.action_space = self.env.action_space
         self.camera_name = cfg.get("camera_view", "view_1")
 
@@ -45,8 +49,12 @@ class AdroitWrapper(gym.Wrapper):
             qv = np.clip(self.env.data.qvel.ravel(), -1.0, 1.0)
             palm_pos = self.env.data.site_xpos[self.env.S_grasp_sid].ravel()
             manual = np.concatenate([qp[:-6], qv[-6:], palm_pos])
-            obs = obs[:36]
-            assert np.isclose(obs, manual).all()
+            #obs = obs[:36]
+            assert np.isclose(obs[:36], manual).all()
+
+            poses = self.env.get_object_poses()
+            inp = np.concatenate([poses[i] for i in ['palm_pos', 'tool_pos', 'target_pos']])
+            obs = np.concatenate((inp * 0.05, obs * 0.05, self.embedder(inp)))
             return obs
         elif task == "adroit-pen":
             qp = self.env.data.qpos.ravel()
@@ -98,10 +106,11 @@ class AdroitWrapper(gym.Wrapper):
         info["success"] = info["goal_achieved"]
         # reward = float(info["success"]) - 1.0
         # return self._stacked_obs(), reward, False, info
-        return self._state_obs.copy(), reward, False, info
+        # 1 for sparse reward ..
+        return self._state_obs.copy(), reward/2 + 1, False, info
 
     def render(self, mode="rgb_array", width=None, height=None, camera_id=None):
-        img_size = self.cfg.get('img_size', 84)
+        img_size = self.cfg.get('img_size', 224)
         width = width or img_size
         height = height or img_size
         return np.flip(
@@ -124,6 +133,18 @@ class AdroitWrapper(gym.Wrapper):
         return getattr(self._env, name)
 
 
+    def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
+        # don't count occupancy now ..
+        output = {
+            'background': {},
+            'history': None,
+            'image': {},
+            'metric': {}
+        }
+        return output
+
+
+
 def make_adroit_env(cfg):
     env_id = cfg.task.split("-", 1)[-1] + "-v0"
     env = gym.make(env_id)
@@ -133,11 +154,15 @@ def make_adroit_env(cfg):
     cfg.state_dim = env.state.shape[0]
     return env
 
+def make_adroit_env(env_name, reward_type='sprase'):
+    env = gym.make("hammer-v0", reward_type=reward_type)
+    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2})
+    return env
 
 if __name__ == '__main__':
-    # episode length 125
+    # episode length 120
     from tools.utils import animate
-    env = gym.make("hammer-v0", reward_type='dense')
+    env = gym.make("hammer-v0", reward_type='sparse')
     env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2})
     env.reset()
 
