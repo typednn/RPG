@@ -135,4 +135,6 @@ WORKDIR /root/ManiSkill2-dev
 RUN git checkout cvpr2023-for-hza
 RUN python setup.py develop 
 RUN python tools/download.py --uid cabinet
+
+RUN pip install --no-cache git+https://github.com/aravindr93/mjrl.git
 WORKDIR /root/RPG/
