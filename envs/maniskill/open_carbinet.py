@@ -338,7 +338,7 @@ class OpenCabinetEnv(MS1BaseEnv):
         if self.reward == 'dense':
             return np.sum(reward_open) - np.min(ee_to_handles)
         elif self.reward == 'sparse':
-            return int(np.sum(reward_open) > 0)
+            return int(np.sum(reward_open) > 1)
         elif self.reward == 'partial':
             return np.sum(reward_open)
         else:

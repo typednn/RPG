@@ -11,6 +11,7 @@ sac_head = dict(
     head=dict(std_scale=1., std_mode='statewise', squash=True),
     pi_a=dict(ent=dict(coef=1., target_mode='auto'))
 )
+trainer_weights = dict(trainer=dict(weights=dict(reward=10., q_value=1.,)), reward_scale=5.) # sparse reward
 
 base_config = dict(
     max_epoch=2000, # 200 * 5 * 2000
@@ -137,9 +138,10 @@ base_config = dict(
             _inherit='eearm_rew', rnd=dict(scale=0.), info=dict(coef=0.), 
             hidden=dict(n=1, TYPE='Categorical'), path=None,
             **sac_head,
+            **trainer_weights,
         ),
         mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
-        rpgnormal=dict(_inherit='eearm_gaussian', reward_scale=1., rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
+        rpgnormal=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
         rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
     ),
 )
@@ -272,7 +274,16 @@ class Experiment(Configurable):
 
         for name, k in zip(names, variants):
             k =CN(k)
-            var_cfg = cfg.clone()
+            
+            if hasattr(k, '_base'):
+                var_cfg = self.base_config.clone()
+                var_cfg.defrost()
+                var = extract_variant(k._base, self.get_variants())
+                var_cfg.set_new_allowed(True)
+                merge_a_into_b(var, var_cfg)
+            else:
+                var_cfg = cfg.clone()
+
             kws = dict(env_name=env_name)
             if env_cfg is not None:
                 kws['env_cfg'] = env_cfg
