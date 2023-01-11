@@ -24,5 +24,14 @@ if __name__ == '__main__':
         #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
     )
 
+    exp.add_exps(
+        'cabinet',
+        dict(
+            _base=['rpgnormal1', 'mbsacrnd'],
+            env_cfg=dict(reward_type='sparse'),
+        ),
+        base=None, default_env='EEArm',
+        #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
+    )
 
     exp.main()
