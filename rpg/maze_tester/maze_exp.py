@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 sac_head = dict(
-    head=dict(std_scale=0.3, std_mode='statewise', squash=True),
+    head=dict(std_scale=1., std_mode='statewise', squash=True),
     pi_a=dict(ent=dict(coef=1., target_mode='auto'))
 )
 
@@ -139,7 +139,7 @@ base_config = dict(
             **sac_head,
         ),
         mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
-        rpgnormal=dict(_inherit='eearm_guassian', reward_scale=1., rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
+        rpgnormal=dict(_inherit='eearm_gaussian', reward_scale=1., rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
         rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
     ),
 )
