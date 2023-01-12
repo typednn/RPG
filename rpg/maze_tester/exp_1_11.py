@@ -37,7 +37,7 @@ if __name__ == '__main__':
     exp.add_exps(
         'stickpull',
         dict(
-            _base=['mbsacrnd', 'rpgnormal'],
+            _base=['mbsacrnd5', 'rpgnormal'],
             env_cfg=dict(reward_type='sparse', n=5),
         ),
         base=None, default_env='MWStickPull',
