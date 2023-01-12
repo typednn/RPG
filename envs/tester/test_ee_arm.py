@@ -14,6 +14,7 @@ history = None
 for i in tqdm.trange(40000):
     obs = env.step(env.action_space.sample())[0]
     trajs.append(obs)
+    continue
     if (i + 1) % 100 == 0:
         data = env._render_traj_rgb({'next_obs': np.array(trajs)}, occ_val=1, history=history)
         history = data['history']

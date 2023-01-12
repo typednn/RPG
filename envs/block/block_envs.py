@@ -52,12 +52,13 @@ class BlockEnv(gym.Env, SimulatorBase):
         random_goals=False,
         n_block=3,
         success_reward=0,
-        reward=False,
-
+        reward_type='sparse',
         obs_dim=5,
     ):
 
         self.obs_dim = obs_dim
+        self.reward_type =reward_type
+        assert reward_type == 'sparse'
 
         
         self.n_block = n_block
@@ -72,7 +73,7 @@ class BlockEnv(gym.Env, SimulatorBase):
         self.random_blocks = random_blocks
         self.random_goals = random_goals
         if self.obs_dim > 0:
-            from ..maze import get_embedder
+            from ..utils import get_embedder
             self.emebdder, _ = get_embedder(self.obs_dim)
 
         super(BlockEnv, self).__init__(dt, frameskip, gravity)
@@ -82,8 +83,6 @@ class BlockEnv(gym.Env, SimulatorBase):
         self.observation_space = spaces.Box(low=-4, high=4, shape=(len(obs),))
         self.action_space = spaces.Box(low=-1, high=1, shape=(2,))
         self.success_reward = success_reward
-
-        self.reward = reward
 
 
 
@@ -99,13 +98,9 @@ class BlockEnv(gym.Env, SimulatorBase):
             self.agent.set_qvel(action.clip(-1, 1) * 4)
             self._scene.step()
 
-        if self.reward:
-            r = self.compute_reward()
-            info = {'success': self.success}
-        else:
-            r = 0.
-            info = {}
-
+        r = self.compute_reward()
+        info = {'success': self.success}
+        r = (self.success == self.n_block)
         return self._get_obs(), r, False, info
 
     def reset(self):
