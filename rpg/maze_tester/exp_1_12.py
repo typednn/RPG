@@ -13,4 +13,13 @@ if __name__ == '__main__':
         base=None, default_env='BlockPush',
     )
 
+    exp.add_exps(
+        'stickpull',
+        dict(
+            _base=['rpgnormal', 'mbsacrnd5'],
+            env_cfg=dict(reward_type='sparse'),
+        ),
+        base=None, default_env='MWStickPull',
+    )
+
     exp.main()
