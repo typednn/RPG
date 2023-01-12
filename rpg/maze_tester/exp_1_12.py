@@ -22,4 +22,15 @@ if __name__ == '__main__':
         base=None, default_env='MWStickPull',
     )
 
+
+    exp.add_exps(
+        'test_video',
+        dict(
+            _base=['mbsacrnd5'],
+            env_cfg=dict(reward_type='sparse', n=1),
+            hooks=dict(save_traj=dict(n_epoch=1)),
+            max_epoch=10,
+        ),
+        base=None, default_env='MWStickPull',
+    )
     exp.main()

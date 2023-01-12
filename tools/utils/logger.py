@@ -406,7 +406,15 @@ def animate(images, f, *args, wandb_name=None, **kwargs):
     from .utils import animate 
     ani = animate(list(images), dir_path(f), *args, **kwargs)
     if get_current().use_wandb:
-        get_current().use_wandb.run.log({wandb_name or f: wandb.Video(dir_path(f))})
+        #get_current().use_wandb.run.log({wandb_name or f: wandb.Video(dir_path(f))})
+        #get_current().use_wandb.run.log({wandb_name or f: wandb.save(dir_path(f))})
+        get_current().use_wandb.run.save(dir_path(f))
+        assert not f.endswith('.gif'), "we don't support gif for video now"
+        html="""
+<video width="320" height="240" controls>
+<source src="FILENAME" type="video/TYPE">
+</video>"""
+        write_html(html.replace('FILENAME', f).replace("TYPE", f.split('.')[-1]), f'{f}.html')
     return ani
 
 
