@@ -97,6 +97,10 @@ class GymVecEnv(VecEnv):
                 from envs.modem.adroit import make_adroit_env
                 return TimeLimit(make_adroit_env('hammer-v0', **kwargs), 125)
 
+            elif env_name == 'MWStickPull':
+                from envs.modem.metaworld_envs import make_metaworld_env
+                return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
+
             elif env_name == 'Rope':
                 from envs.softbody.plb_envs import RopeEnv
                 return TimeLimit(RopeEnv(**kwargs), 50)

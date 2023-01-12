@@ -147,6 +147,7 @@ base_config = dict(
         rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
         rpgsac=dict(_inherit='rpgnormal1', **sac_head),
+        rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
     ),
 )
 

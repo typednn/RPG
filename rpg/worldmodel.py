@@ -77,6 +77,7 @@ class GeneralizedQ(torch.nn.Module):
         self, obs, z, timestep, step,
         pi_z=None, pi_a=None, z_seq=None, a_seq=None, 
         intrinsic_reward=None,
+        discard_ent=False,
     ):
         # z_seq is obs -> z -> a
         assert a_seq is not None or pi_a is not None
@@ -149,7 +150,11 @@ class GeneralizedQ(torch.nn.Module):
             rewards, aux_rewards = intrinsic_reward(out) # return rewards, (ent_a,ent_z)
             out['extra_rewards'] = aux_rewards
 
-            extra_rewards = sum(aux_rewards.values())
+
+            if not discard_ent:
+                extra_rewards = sum(aux_rewards.values())
+            else:
+                extra_rewards = sum([aux_rewards[i] for i in aux_rewards if 'ent' not in i])
 
 
             vpreds = []
@@ -304,6 +309,8 @@ class DynamicsLearner(LossOptimizer):
 
         max_grad_norm=1.,
         lr=3e-4,
+
+        discard_ent=False,
     ):
         if auxilary is not None:
             model_to_train = torch.nn.ModuleList([models, auxilary])
@@ -344,6 +351,7 @@ class DynamicsLearner(LossOptimizer):
             samples = self.target_net.inference(
                 next_obs, z_seq, next_timesteps, self._cfg.target_horizon or horizon,
                 pi_z=self.pi_z, pi_a=self.pi_a, intrinsic_reward = self.intrinsic_reward,
+                discard_ent=self._cfg.discard_ent, 
             )
             # self.pi_a.set_mode('train'); self.pi_z.set_mode('train')
 

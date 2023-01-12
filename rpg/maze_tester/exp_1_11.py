@@ -34,4 +34,13 @@ if __name__ == '__main__':
         #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
     )
 
+    exp.add_exps(
+        'stickpull',
+        dict(
+            _base=['mbsacrnd'],
+            env_cfg=dict(reward_type='sparse', n=5),
+        ),
+        base=None, default_env='MWStickPull',
+    )
+
     exp.main()
