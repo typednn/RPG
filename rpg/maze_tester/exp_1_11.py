@@ -17,7 +17,7 @@ if __name__ == '__main__':
     exp.add_exps(
         'hammer2',
         dict(
-            _base=['rpgnormal1', 'mbsacrnd'],
+            _base=['rpgnormal1', 'mbsacrnd', 'rpgsac'],
             env_cfg=dict(reward_type='sparse'),
         ),
         base=None, default_env='AdroitHammer',

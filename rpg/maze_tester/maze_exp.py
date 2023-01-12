@@ -146,6 +146,7 @@ base_config = dict(
         rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
         rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
+        rpgsac=dict(_inherit='rpgnormal1', **sac_head),
     ),
 )
 
