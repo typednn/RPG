@@ -105,6 +105,16 @@ def get_embedder(multires, i=0, **kwargs):
     embed = lambda x, eo=embedder_obj : eo.embed(x)
     return embed, embedder_obj.out_dim
 
+def extract_obs_from_tarj(traj):
+    if isinstance(traj, dict):
+        obs = traj['next_obs']
+        import torch
+        if isinstance(obs, torch.Tensor):
+            obs = obs.detach().cpu().numpy()
+    else:
+        obs = traj.get_tensor('next_obs', device='numpy')
+    return obs
+
 def symlog(x):
     return np.sign(x) * np.log(np.abs(x) + 1)
 

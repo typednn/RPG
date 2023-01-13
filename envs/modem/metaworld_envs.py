@@ -59,7 +59,12 @@ class MetaWorldWrapper(gym.Env):
         handle = obs[11:14]
         tcp = self.env.tcp_center
 
-        inp = np.concatenate(((stick - handle) * 3, (stick - tcp)*3, [obs[3]])) # tcp opened ..
+        # 0.4 
+        #print(stick - handle, stick - tcp, obs[3])
+        #exit(0)
+        from ..utils import symlog
+
+        inp = np.concatenate((symlog((stick - handle)/0.4), symlog((stick - tcp)/0.4), [obs[3]])) # tcp opened ..
         inp = self.embedder(inp)
         return np.concatenate((obs * 0.05, inp))
 
@@ -99,11 +104,18 @@ class MetaWorldWrapper(gym.Env):
 
     def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
         # don't count occupancy now ..
+        from .. import utils
+        high = 0.4
+        obs = utils.extract_obs_from_tarj(traj) / 0.05
+        stick = obs[..., 4:7]
+        handle = obs[..., 11:14]
+        outs = dict(occ=utils.count_occupancy(handle - stick, -high, high, 0.02))
+        history = utils.update_occupancy_with_history(outs, history)
         output = {
             'background': {},
-            'history': None,
+            'history': history,
             'image': {},
-            'metric': {}
+            'metric': {k: (v > 0.).mean() for k, v in history.items()},
         }
         return output
 

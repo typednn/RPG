@@ -161,7 +161,8 @@ class GeneralizedQ(torch.nn.Module):
             discount = 1
             prefix = 0.
             for i in range(len(rewards)):
-                prefix = prefix + extra_rewards[i].sum(axis=-1, keepdims=True) * discount
+                if extra_rewards is not 0:
+                    prefix = prefix + extra_rewards[i].sum(axis=-1, keepdims=True) * discount
                 vpreds.append(prefix + q_values[i] * discount)
                 prefix = prefix + rewards[i] * discount
                 discount = discount * self.gamma

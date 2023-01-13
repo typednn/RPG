@@ -146,7 +146,7 @@ base_config = dict(
         mbddpgrnd=dict(_inherit='eearm_rew', rnd=dict(scale=0.1), info=dict(coef=0.), hidden=dict(n=1, TYPE='Categorical'), 
                        path=None, **trainer_weights),
         mbsacv2rnd=dict(_inherit='mbsacrnd', trainer=dict(discard_ent=True)),
-        mbsaclowstd=dict(_inherit='mbsacrnd', head=dict(std_scale=0.2)),
+        mbsaclowstd=dict(_inherit='mbsacrnd', pi_a=dict(ent=dict(coef=0.01)), head=dict(std_scale=0.4)),
         #mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
 
         rpgc=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None, env_cfg=dict(n=1)),
@@ -420,7 +420,7 @@ class Experiment(Configurable):
                     for i in range(len(configs)):
                         os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
                     exit(0)
-                exp.plot(configs, 'success')
+                exp.plot(configs, 'success' or args.key)
 
 
 def build_exp(base_config, **kwargs):
@@ -438,6 +438,7 @@ def build_exp(base_config, **kwargs):
     parser.add_argument('--cpu', default=2, type=int)
 
     parser.add_argument('--seed', default=None)
+    parser.add_argument('--key', default=None)
 
     exp = Experiment.parse(base_config, parser=parser)
     exp.parser = parser
