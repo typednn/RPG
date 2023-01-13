@@ -138,4 +138,5 @@ RUN python tools/download.py --uid cabinet
 
 RUN pip install --no-cache git+https://github.com/aravindr93/mjrl.git
 RUN pip install --no-cache git+https://github.com/rlworkgroup/metaworld.git@master#egg=metaworld
+RUN pip install git+https://github.com/Farama-Foundation/d4rl@master#egg=d4rl
 WORKDIR /root/RPG/

@@ -14,8 +14,8 @@ class AdroitWrapper(gym.Env):
     def __init__(self, env, cfg, obs_dim):
         super().__init__()
         self.env = env
-        from envs.utils import get_embeder_np
-        self.embedder, d = get_embeder_np(obs_dim, 9)
+        self.obs_dim = obs_dim
+        self.embedder = None
         
         self.env = env
         self.cfg = cfg
@@ -38,14 +38,27 @@ class AdroitWrapper(gym.Env):
 
     def _get_state_obs(self, obs):
         task = self.cfg.get('task')
+        from envs.utils import get_embeder_np
+
         if task == "adroit-door":
+            if self.embedder is None:
+                self.embedder, d = get_embeder_np(self.obs_dim, 9)
+
             qp = self.env.data.qpos.ravel()
             palm_pos = self.env.data.site_xpos[self.env.grasp_sid].ravel()
+            
+
+            inp = np.concatenate([[obs[-11]], obs[-7:-4], obs[-4:-1]]) # door pos, handle pos, relative pos
+
             manual = np.concatenate([qp[1:-2], palm_pos])
             obs = np.concatenate([obs[:27], obs[29:32]])
             assert np.isclose(obs, manual).all()
+            obs = np.concatenate((obs * 0.05, self.embedder(inp)))
             return obs
         elif task == "adroit-hammer":
+            if self.embedder is None:
+                self.embedder, d = get_embeder_np(self.obs_dim, 9)
+
             qp = self.env.data.qpos.ravel()
             qv = np.clip(self.env.data.qvel.ravel(), -1.0, 1.0)
             palm_pos = self.env.data.site_xpos[self.env.S_grasp_sid].ravel()
@@ -155,22 +168,23 @@ class AdroitWrapper(gym.Env):
 #     cfg.state_dim = env.state.shape[0]
 #     return env
 
-def make_adroit_env(env_name, reward_type='sprase', obs_dim=6):
+def make_adroit_env(env_name, reward_type='sparse', obs_dim=6):
     env = gym.make(env_name, reward_type=reward_type)
-    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2}, obs_dim=obs_dim)
+
+    env_type = env_name.split('-')[0]
+    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': f'adroit-{env_type}', 'action_repeat': 2}, obs_dim=obs_dim)
     return env
 
 if __name__ == '__main__':
     # episode length 120
     from tools.utils import animate
-    env = gym.make("hammer-v0", reward_type='sparse')
-    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': 'adroit-hammer', 'action_repeat': 2})
+
+    env = make_adroit_env('door-v0')
     env.reset()
 
     images = []
     for i in range(100):
         r = env.step(env.action_space.sample())[1]
-        print(r)
         img = env.render('rgb_array')
         images.append(img)
 

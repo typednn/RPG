@@ -8,7 +8,8 @@ ADD_BONUS_REWARDS = True
 
 
 class DoorEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self):
+    def __init__(self, reward_type='sparse'):
+        self.reward_type = reward_type
         self.door_hinge_did = 0
         self.door_bid = 0
         self.grasp_sid = 0
@@ -92,7 +93,10 @@ class DoorEnvV0(mujoco_env.MujocoEnv, utils.EzPickle):
 
         # reward from awac paper
         door_pos = self.data.qpos[self.door_hinge_did]
+        
+        assert self.reward_type == 'sparse'
         reward = float(door_pos >= 1.0) - 1.0
+        #reward = door_pos >= 1.
 
         goal_achieved = True if door_pos >= 1.0 else False
 

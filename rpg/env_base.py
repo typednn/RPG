@@ -97,6 +97,11 @@ class GymVecEnv(VecEnv):
                 from envs.modem.adroit import make_adroit_env
                 return TimeLimit(make_adroit_env('hammer-v0', **kwargs), 125)
 
+            elif env_name == 'AdroitDoor':
+                from envs.modem.adroit import make_adroit_env
+                return TimeLimit(make_adroit_env('door-v0', **kwargs), 100)
+
+
             elif env_name == 'MWStickPull':
                 from envs.modem.metaworld_envs import make_metaworld_env
                 return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
@@ -104,7 +109,7 @@ class GymVecEnv(VecEnv):
             elif env_name == 'PegInsert':
                 #from envs.mani. import make_metaworld_env
                 from envs.maniskill.peg_insert import PegInsert
-                return TimeLimit(PegInsert(**kwargs), 200)
+                return TimeLimit(PegInsert(**kwargs), 60)
 
             elif env_name == 'Rope':
                 from envs.softbody.plb_envs import RopeEnv

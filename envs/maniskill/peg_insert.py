@@ -280,6 +280,27 @@ class PegInsert(StationaryManipulationEnv):
         # The general way is to handle variables explicitly
         self._initialize_task()
 
+    def _add_ground(self, altitude=0.0, render=True):
+        # half_size = 0.75
+        half_size = 10000.0
+        render=True
+        if render:
+            rend_mtl = self._renderer.create_material()
+            rend_mtl.base_color = [0.4, 0.5, 0.7, 1]
+            rend_mtl.metallic = 0.0
+            rend_mtl.roughness = 0.9
+            rend_mtl.specular = 0.8
+        else:
+            rend_mtl = None
+        ab = self._scene.create_actor_builder()
+        # if render:
+        #     ab.add_box_visual(half_size=[half_size, half_size, .0001], material=rend_mtl)
+        ab.add_box_collision(half_size=[half_size, half_size, .0001])
+        box = ab.build_static()
+        # box.set_pose(sapien.Pose(p=[-0.2,0,altitude-.0001])) 
+        box.set_pose(sapien.Pose(p=[0.,0.,altitude-.0001])) 
+        return box
+
     def _get_obs(self, obs):
         def devectorize_pose(pose):
             return Pose(pose[:3], pose[3:])
@@ -298,6 +319,7 @@ class PegInsert(StationaryManipulationEnv):
 
         if not hasattr(self, 'embedder'):
             self.embedder, d = utils.get_embeder_np(self.obs_dim, 10) # only for the differences between objects ..
+        print(a, b)
 
         inp = np.concatenate((utils.symlog(a/0.2), utils.symlog(b/0.2))) # tcp opened ..
         inp = self.embedder(inp)
