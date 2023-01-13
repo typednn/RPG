@@ -23,7 +23,7 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
-        'hammerN5',
+        'hammern5',
         dict(
             _base=['mbsacrnd', 'mbddpgrnd', 'mbsacv2rnd', 'mbsaclowstd'],
             env_cfg=dict(reward_type='sparse', n=5),
