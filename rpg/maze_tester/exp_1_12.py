@@ -23,9 +23,18 @@ if __name__ == '__main__':
     )
 
     exp.add_exps(
+        'peginsert',
+        dict(
+            _base=['rpgc', 'mbsacrnd'],
+            env_cfg=dict(reward_type='sparse', n=5),
+        ),
+        base=None, default_env='PegInsert',
+    )
+
+    exp.add_exps(
         'hammern5',
         dict(
-            _base=['mbsacrnd', 'mbddpgrnd', 'mbsacv2rnd', 'mbsaclowstd'],
+            _base=['mbsacrnd', 'mbddpgrnd', 'mbsacv2rnd', 'mbsaclowstd', 'mbsacv3'],
             env_cfg=dict(reward_type='sparse', n=5),
             max_total_steps=1500000, # 1.5M
         ),

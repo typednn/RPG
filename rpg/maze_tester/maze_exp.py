@@ -137,6 +137,7 @@ base_config = dict(
         # method base, to test on different algorithms
         mbsac=dict(
             _inherit='eearm_rew', rnd=dict(scale=0.), info=dict(coef=0.), 
+            env_cfg=dict(obs_dim=6),
             hidden=dict(n=1, TYPE='Categorical'), path=None,
             **sac_head,
             **trainer_weights,
@@ -147,15 +148,17 @@ base_config = dict(
                        path=None, **trainer_weights),
         mbsacv2rnd=dict(_inherit='mbsacrnd', trainer=dict(discard_ent=True)),
         mbsaclowstd=dict(_inherit='mbsacrnd', pi_a=dict(ent=dict(coef=0.01)), head=dict(std_scale=0.4)),
+        mbsacv3=dict(_inherit='mbsaclowstd', trainer=dict(discard_ent=True)),
         #mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
 
         rpgc=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None, env_cfg=dict(n=1)),
         rpgd=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
+        rpgcv2=dict(_inherit='mbsacv3', hidden=dict(n=12), info=dict(coef=0.001)),
+        rpgdv3=dict(_inherit='rpgcv3', hidden=dict(TYPE='Categorical')),
 
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
-        rpgsac=dict(_inherit='rpgnormal1', **sac_head),
-        rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
+        # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
     ),
 )
 
