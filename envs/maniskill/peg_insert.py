@@ -290,13 +290,16 @@ class PegInsert(StationaryManipulationEnv):
         # A = tcp_pose * peg_pose.inv()
         # point in tcp frame first to world and the transform to the peg frame ..
         from envs import utils 
-        a =  peg_pose.inv() * tcp_pose
-        b =  peg_pose.inv() * box_hole_pos
+        #a =  peg_pose.inv() * tcp_pose
+        #b =  peg_pose.inv() * box_hole_pos
+        a = peg_pose.p - tcp_pose.p
+        b = peg_pose.p - box_hole_pos.p
+
 
         if not hasattr(self, 'embedder'):
             self.embedder, d = utils.get_embeder_np(self.obs_dim, 10) # only for the differences between objects ..
 
-        inp = np.concatenate((utils.symlog(a.p/0.4), utils.symlog(b.p/0.4))) # tcp opened ..
+        inp = np.concatenate((utils.symlog(a/0.2), utils.symlog(b/0.2))) # tcp opened ..
         inp = self.embedder(inp)
         return np.concatenate((obs * 0.05, inp))
 
