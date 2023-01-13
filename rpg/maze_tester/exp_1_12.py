@@ -7,8 +7,8 @@ if __name__ == '__main__':
     exp.add_exps(
         'block',
         dict(
-            _base=['rpgc', 'mbsacrnd'],
-            env_cfg=dict(reward_type='sparse', n_block=2),
+            _base=['rpgcv2', 'mbsacv3'],
+            env_cfg=dict(reward_type='sparse', n_block=2, n=5),
         ),
         base=None, default_env='BlockPush',
     )
@@ -16,11 +16,22 @@ if __name__ == '__main__':
     exp.add_exps(
         'stickpull',
         dict(
-            _base=['rpgc', 'mbsacrnd'],
+            _base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='sparse', n=5),
         ),
         base=None, default_env='MWStickPull',
     )
+
+    exp.add_exps(
+        'cabinet',
+        dict(
+            _base=['rpgcv2', 'mbsacv3'],
+            env_cfg=dict(reward_type='sparse', n=5),
+        ),
+        base=None, default_env='EEArm',
+    )
+    
+
 
     exp.add_exps(
         'peginsert',
