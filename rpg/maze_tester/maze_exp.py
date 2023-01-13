@@ -141,10 +141,11 @@ base_config = dict(
             **sac_head,
             **trainer_weights,
         ),
+
         mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
         mbddpgrnd=dict(_inherit='eearm_rew', rnd=dict(scale=0.1), info=dict(coef=0.), hidden=dict(n=1, TYPE='Categorical'), 
                        path=None, **trainer_weights),
-        mbsacv2rnd=dict(_inherit='mbsacrnd', discard_ent=True),
+        mbsacv2rnd=dict(_inherit='mbsacrnd', trainer=dict(discard_ent=True)),
         mbsaclowstd=dict(_inherit='mbsacrnd', head=dict(std_scale=0.2)),
         #mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
 
