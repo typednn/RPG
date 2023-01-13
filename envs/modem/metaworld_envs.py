@@ -59,7 +59,7 @@ class MetaWorldWrapper(gym.Env):
         handle = obs[11:14]
         tcp = self.env.tcp_center
 
-        inp = np.concatenate(((stick - handle) *3, (stick - tcp)*3, [obs[3]])) # tcp opened ..
+        inp = np.concatenate(((stick - handle) * 3, (stick - tcp)*3, [obs[3]])) # tcp opened ..
         inp = self.embedder(inp)
         return np.concatenate((obs * 0.05, inp))
 

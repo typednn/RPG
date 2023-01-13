@@ -11,6 +11,7 @@ sac_head = dict(
     head=dict(std_scale=1., std_mode='statewise', squash=True),
     pi_a=dict(ent=dict(coef=1., target_mode='auto'))
 )
+
 trainer_weights = dict(trainer=dict(weights=dict(reward=10., q_value=1., state=10000.,)), reward_scale=5., actor_delay=2) # sparse reward
 
 base_config = dict(
@@ -141,11 +142,17 @@ base_config = dict(
             **trainer_weights,
         ),
         mbsacrnd=dict(_inherit='mbsac', rnd=dict(scale=0.1)),
-        mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
-        rpgnormal=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None),
-        rpgdiscrete=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
-        rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
-        rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
+        mbddpgrnd=dict(_inherit='eearm_rew', rnd=dict(scale=0.1), info=dict(coef=0.), hidden=dict(n=1, TYPE='Categorical'), 
+                       path=None, **trainer_weights),
+        mbsacv2rnd=dict(_inherit='mbsacrnd', discard_ent=True),
+        mbsaclowstd=dict(_inherit='mbsacrnd', head=dict(std_scale=0.2)),
+        #mbsacrnd5=dict(_inherit='mbsacrnd', env_cfg=dict(n=5)),
+
+        rpgc=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None, env_cfg=dict(n=1)),
+        rpgd=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
+
+        # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
+        # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
         rpgsac=dict(_inherit='rpgnormal1', **sac_head),
         rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
     ),
@@ -412,7 +419,7 @@ class Experiment(Configurable):
                     for i in range(len(configs)):
                         os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))
                     exit(0)
-                exp.plot(configs, 'train_occ_metric')
+                exp.plot(configs, 'success')
 
 
 def build_exp(base_config, **kwargs):
