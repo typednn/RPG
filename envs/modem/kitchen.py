@@ -3,6 +3,7 @@ import os
 import numpy as np
 # 'microwave', 'kettle', 'light switch', 'slide cabinet'
 os.environ['MUJOCO_GL'] = 'egl'
+import d4rl # must import ...
 import gym
 from dm_control.mujoco import engine
 from d4rl.kitchen.adept_envs.utils.configurable import configurable
@@ -72,7 +73,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         for element in self.tasks_to_complete:
             element_idx = OBS_ELEMENT_INDICES[element]
             inp = next_obj_obs[..., element_idx - idx_offset]
-            outs.append(self.embedder(symlog(inp/0.4))/len(inp))
+            outs.append(self.embedder(symlog(inp))/len(inp))
             dofs += len(inp)
         self.dofs = dofs
         ee_id = self.model.site_name2id("end_effector")
@@ -118,7 +119,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             [self.tasks_to_complete.remove(element) for element in completions]
         bonus = float(len(completions))
         reward_dict['bonus'] = bonus
-        reward_dict['r_total'] = len(completions) == self.tasks_to_complete
+        reward_dict['r_total'] = len(completions) == len(self.tasks_to_complete)
         if self.reward_type == 'sparse':
             pass
         else:
