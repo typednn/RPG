@@ -23,7 +23,6 @@ def count_occupancy(state, low, high, gap=None, n_bin=None):
     else:
         n_bin = np.int32(float2array(n_bin, dim))
         gap = (high - low) / n_bin
-        raise NotImplementedError
 
 
     state = state.reshape(-1, dim)

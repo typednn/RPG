@@ -9,6 +9,7 @@ if __name__ == '__main__':
         dict(
             _base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='sparse', n_block=2, n=5),
+            max_total_steps=1500000, # 1.5M
         ),
         base=None, default_env='BlockPush',
     )
@@ -40,6 +41,26 @@ if __name__ == '__main__':
         ),
         base=None, default_env='AdroitHammer',
         #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
+    )
+
+    exp.add_exps(
+        'hammern1',
+        dict(
+            _base=['rpgcv2', 'mbsacv3', 'rpgcv3'], # 3x3 = 9
+            env_cfg=dict(reward_type='sparse', n=1),
+            max_total_steps=200000, # 1.5M
+        ),
+        base=None, default_env='AdroitHammer',
+    )
+
+    exp.add_exps(
+        'stickpulln1',
+        dict(
+            _base=['rpgcv2', 'mbsacv3', 'rpgcv3'], # 3x3 = 9
+            env_cfg=dict(reward_type='sparse', n=1),
+            max_total_steps=200000, # 1.5M
+        ),
+        base=None, default_env='MWStickPull',
     )
 
 

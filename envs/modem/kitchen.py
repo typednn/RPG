@@ -166,7 +166,6 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
     def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
         # don't count occupancy now ..
         from .. import utils
-        high = 0.4
         obs = utils.extract_obs_from_tarj(traj) / 0.05
         obs = obs[..., :self.dofs]
         outs = dict(occ=utils.count_occupancy(obs, -1., 1., n_bin=5))

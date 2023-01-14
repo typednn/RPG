@@ -154,6 +154,9 @@ base_config = dict(
         rpgc=dict(_inherit='eearm_gaussian', **trainer_weights, rnd=dict(scale=0.1), hidden=dict(n=12), info=dict(coef=0.001), path=None, env_cfg=dict(n=1)),
         rpgd=dict(_inherit='rpgnormal', hidden=dict(TYPE='Categorical'), path=None),
         rpgcv2=dict(_inherit='mbsacv3', hidden=dict(n=12, TYPE='Gaussian'), info=dict(coef=0.001)),
+
+        rpgcv3=dict(_inherit='rpgcv2', buffer=dict(max_episode_num=500)),
+
         rpgdv2=dict(_inherit='rpgcv2', hidden=dict(TYPE='Categorical')),
 
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
