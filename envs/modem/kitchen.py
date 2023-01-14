@@ -38,7 +38,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
     REMOVE_TASKS_WHEN_COMPLETE = False
     TERMINATE_ON_TASK_COMPLETE = False
 
-    def __init__(self, dataset_url=None, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
+    def __init__(self, dataset_url=None, n_block=4, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
+        self.TASK_ELEMENTS = self.TASK_ELEMENTS[:n_block]
         self.embedder = None
         self.tasks_to_complete = set(self.TASK_ELEMENTS)
         self.obs_dim = obs_dim
@@ -61,10 +62,13 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         idx_offset = len(next_q_obs)
 
         outs = []
+        dofs = 0
         for element in self.tasks_to_complete:
             element_idx = OBS_ELEMENT_INDICES[element]
             inp = next_obj_obs[..., element_idx - idx_offset]
             outs.append(inp)
+            dofs += len(inp)
+        self.dofs = dofs
         ee_id = self.model.site_name2id("end_effector")
         ee_pos = self.data.site_xpos[ee_id]
 
@@ -75,7 +79,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             from envs.utils import get_embeder_np
             self.embedder, d = get_embeder_np(self.obs_dim, len(inp))
 
-        obs = np.concatenate([obs * 0.05, self.embedder(inp)], axis=-1)
+        obs = np.concatenate([inp * 0.05, obs * 0.05, self.embedder(inp)], axis=-1)
         return obs
 
     def _get_task_goal(self):
@@ -112,7 +116,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             [self.tasks_to_complete.remove(element) for element in completions]
         bonus = float(len(completions))
         reward_dict['bonus'] = bonus
-        reward_dict['r_total'] = bonus
+        reward_dict['r_total'] = np.all(completions)
         score = bonus
         return reward_dict, score
 
@@ -159,6 +163,22 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         # self.render()
         return obs, reward_dict['r_total'], done, env_info
 
+    def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
+        # don't count occupancy now ..
+        from .. import utils
+        high = 0.4
+        obs = utils.extract_obs_from_tarj(traj) / 0.05
+        obs = obs[..., :self.dofs]
+        outs = dict(occ=utils.count_occupancy(obs, -1., 1., n_bin=5))
+        history = utils.update_occupancy_with_history(outs, history)
+        output = {
+            'background': {},
+            'history': history,
+            'image': {},
+            'metric': {k: (v > 0.).mean() for k, v in history.items()},
+        }
+        return output
+
 
 class KitchenMicrowaveKettleLightSliderV0(KitchenBase):
     TASK_ELEMENTS = ['microwave', 'kettle', 'light switch', 'slide cabinet']
@@ -166,7 +186,7 @@ class KitchenMicrowaveKettleLightSliderV0(KitchenBase):
 
 
 if __name__ == '__main__':
-    env = KitchenMicrowaveKettleLightSliderV0()
+    env = KitchenMicrowaveKettleLightSliderV0(n_block=1)
     env.reset()
     images = []
     for i in range(1000):

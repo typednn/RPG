@@ -48,12 +48,18 @@ if __name__ == '__main__':
         dict(
             _base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='sparse', n=5),
-            #max_total_steps=1500000, # 1.5M
         ),
         base=None, default_env='AdroitDoor',
-        #names=['rnd', 'rl', 'rndx5', 'rnd001', 'rnd0005', 'rnd01'] + ['g0005', 'g005', 'g001', 'g01', 'g05', 'g1']
     )
 
+    exp.add_exps(
+        'kitchensimple',
+        dict(
+            _base=['rpgcv2', 'mbsacv3'],
+            env_cfg=dict(reward_type='sparse', n=5),
+        ),
+        base=None, default_env='KitchenSimple',
+    )
 
 
     exp.add_exps(
