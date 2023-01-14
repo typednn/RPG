@@ -322,9 +322,9 @@ class PegInsert(StationaryManipulationEnv):
 
         if self.obs_dim == 0:
             return obs
-        inp = np.concatenate((utils.symlog(a/0.2), utils.symlog(b/0.2))) # tcp opened ..
+        inp = np.concatenate((utils.symlog(a/0.4), utils.symlog(b/0.4), utils.symlog(peg_pose.p))) # tcp opened ..
         inp = self.embedder(inp)
-        return np.concatenate((obs * 0.05, inp))
+        return np.concatenate((utils.symlog(obs) * 0.2, inp))
 
 
     def reset(self, reconfigure=False):
