@@ -116,7 +116,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             [self.tasks_to_complete.remove(element) for element in completions]
         bonus = float(len(completions))
         reward_dict['bonus'] = bonus
-        reward_dict['r_total'] = np.all(completions)
+        reward_dict['r_total'] = len(completions) == self.tasks_to_complete
         score = bonus
         return reward_dict, score
 

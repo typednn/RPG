@@ -43,11 +43,11 @@ class GymVecEnv(VecEnv):
 
         def make_env():
             from gym.wrappers import TimeLimit
-            if env_name == 'AntPush':
-                from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 60)
+            # if env_name == 'AntPush':
+            #     from envs.ant_envs import AntHEnv
+            #     return TimeLimit(AntHEnv(env_name, **kwargs), 60)
 
-            elif env_name == 'TripleAnt':
+            if env_name == 'TripleAnt':
                 from envs.triple_ant import TripleAntEnv
                 return TimeLimit(TripleAntEnv( **kwargs), 100)
 
@@ -122,6 +122,11 @@ class GymVecEnv(VecEnv):
             elif env_name == 'Rope':
                 from envs.softbody.plb_envs import RopeEnv
                 return TimeLimit(RopeEnv(**kwargs), 50)
+
+            elif env_name == 'AntPush':
+                from envs.ant_envs import AntHEnv
+                return TimeLimit(AntHEnv(env_name, **kwargs), 200)
+
 
             elif env_name == 'PixelCheetah':
                 from envs.mujoco_env import make

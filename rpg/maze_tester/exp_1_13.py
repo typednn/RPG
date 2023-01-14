@@ -56,13 +56,21 @@ if __name__ == '__main__':
     exp.add_exps(
         'stickpulln1',
         dict(
-            _base=['rpgcv2', 'mbsacv3', 'rpgcv3'], # 3x3 = 9
+            _base=['rpgcv2', 'mbsacv3'], # 3x3 = 9
             env_cfg=dict(reward_type='sparse', n=1),
             max_total_steps=200000, # 1.5M
         ),
         base=None, default_env='MWStickPull',
     )
 
+    exp.add_exps(
+        'antpush',
+        dict(
+            _base=['rpgcv2', 'mbsacv3'],
+            env_cfg=dict(reward_type='sparse', n=5),
+        ),
+        base=None, default_env='AntPush',
+    )
 
     exp.add_exps(
         'door',

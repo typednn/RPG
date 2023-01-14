@@ -57,7 +57,7 @@ class AntHEnv(gym.Env):
     #   3. provide high, low observations
     #   4. provide extra states [real goal] in states
 
-    def __init__(self, env_name, env_subgoal_dim=15, goal_threshold=5):
+    def __init__(self, env_name, env_subgoal_dim=15, obs_dim=6, reward_type='dense', goal_threshold=5):
         self.base_env = create_maze_env(env_name, include_block_in_obs=False)
         self.env_name = env_name
         self.evaluate = False
@@ -65,6 +65,7 @@ class AntHEnv(gym.Env):
         self.goal = None
         self.distance_threshold = 5
         self.goal_threshold = goal_threshold
+        self.reward_type = reward_type
         self.metadata = {'render.modes': ['human', 'rgb_array', 'depth_array'], 'video.frames_per_second': 125}
         # create general subgoal space, independent of the env
         self.subgoal_dim = env_subgoal_dim
@@ -72,42 +73,27 @@ class AntHEnv(gym.Env):
                            0.5, 0.3, 0.5, 0.3, 0.5, 0.3, 0.5, 0.3])[:self.subgoal_dim]
 
         self.subgoal_space = gym.spaces.Box(low=-limits, high=limits)
+        from . import utils
 
         if env_name == 'AntMaze' or env_name == 'AntPush':
             env_goal_dim = 2
         else:
             env_goal_dim = 3
+        self.embedder, dim = utils.get_embeder_np(obs_dim, env_goal_dim)
+
         self.goal_dim = env_goal_dim
 
         self.substeps = 10
-        self.observation_space = Dict(
-            low=Box(-np.inf, np.inf, (self.base_env.observation_space.shape[0] + self.subgoal_dim,)),
-            meta=Box(-np.inf, np.inf, (self.base_env.observation_space.shape[0] + self.goal_dim,)),
-        )['meta']
-        self.action_space = Dict(
-            low=self.base_env.action_space,
-            meta=self.subgoal_space,
-        )['low']
+        self.action_space = self.base_env.action_space
         self._subgoal = self.subgoal_space.sample()
         self.default_substeps = 10
         self._max_episode_steps = 500
 
-    def _get_obs(self):
-        # we first follow the previous implementation..
-        low = np.r_[
-            self._base_obs, self._subgoal - self._base_obs[:self.subgoal_dim]].copy()  # only input the relative goal ..
-        low[:2] = 0  # # Zero-out x, y position. Hacky. WTF!!!!!!!!!
-        return {
-            HIGH: np.r_[self._base_obs, self.goal],  # input the original goal..
-            LOW: low
-        }[HIGH]
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self.reset().shape)
 
-    def _get_reward(self):
-        meta_reward = self.reward_fn(self._base_obs, self.goal)
-        return {
-            HIGH: meta_reward,
-            LOW: -np.linalg.norm(self._subgoal - self._base_obs[:self.subgoal_dim])
-        }[HIGH]
+    def _get_obs(self):
+        inp = self.embedder(self._base_obs[:self.subgoal_dim])
+        return np.r_[self._base_obs * 0.05, self.goal * 0.05, inp]  # input the original goal..
 
     def seed(self, seed=None):
         self.base_env.seed(seed)
@@ -120,14 +106,15 @@ class AntHEnv(gym.Env):
         self._subgoal = self._base_obs[:self.subgoal_dim]
         return self._get_obs()
 
-    # def step_meta(self, subgoal):
-    #     self._subgoal = self._base_obs[:self.subgoal_dim] + subgoal
-    #     return self._get_obs()
-
     def step(self, a):
         self._base_obs, _, done, info = self.base_env.step(a)
-        r = self._get_reward()
-        return self._get_obs(), r, done, {'success': r > -self.goal_threshold}
+        negative_dist = self.reward_fn(self._base_obs, self.goal)
+        #r = self._get_reward()
+        reward = negative_dist
+        
+        if self.reward_type == 'sparse':
+            reward = float(negative_dist > -self.goal_threshold)
+        return self._get_obs(), reward, done, {'success': negative_dist > -self.goal_threshold}
 
     def render(self, mode='rgb_array'):
         img = self.base_env.render(mode='rgb_array')
@@ -139,3 +126,29 @@ class AntHEnv(gym.Env):
             return None
         else:
             return img
+
+    def _render_traj_rgb(self, traj, z=None, occ_val=False, verbose=True, history=None, **kwargs):
+        from .utils import extract_obs_from_tarj
+        obs = (extract_obs_from_tarj(traj)/0.05)[..., :2]
+        images = {}
+        output = {
+            'state': obs,
+            'background': {
+                'image':  None,
+            },
+            'image': images,
+        }
+
+        return output
+
+if __name__ == '__main__':
+    env = AntHEnv('AntPush')
+    env.reset()
+    images = []
+    for i in range(100):
+        env.step(env.action_space.sample())
+        images.append(env.render('rgb_array'))
+    env.close()
+
+    from tools.utils import animate
+    animate(images)
