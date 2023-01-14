@@ -123,7 +123,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         if self.reward_type == 'sparse':
             pass
         else:
-            self.reward_type += 0.2 * bonus / 5.
+            reward_dict['r_total'] += 0.2 * bonus / 5.
         
         score = bonus
         return reward_dict, score
