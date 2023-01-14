@@ -40,6 +40,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
 
     def __init__(self, dataset_url=None, n_block=4, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
         self.TASK_ELEMENTS = self.TASK_ELEMENTS[:n_block]
+        self.reward_type = reward_type
         self.embedder = None
         self.tasks_to_complete = set(self.TASK_ELEMENTS)
         self.obs_dim = obs_dim
@@ -117,6 +118,11 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         bonus = float(len(completions))
         reward_dict['bonus'] = bonus
         reward_dict['r_total'] = len(completions) == self.tasks_to_complete
+        if self.reward_type == 'sparse':
+            pass
+        else:
+            self.reward_type += 0.2 * bonus / 5.
+        
         score = bonus
         return reward_dict, score
 
@@ -157,7 +163,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             'time': self.obs_dict['t'],
             'obs_dict': self.obs_dict,
             'rewards': reward_dict,
-            'score': score,
+            'success': score,
             # 'images': np.asarray(self.render(mode='rgb_array'))
         }
         # self.render()
