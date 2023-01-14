@@ -136,6 +136,7 @@ class AntHEnv(gym.Env):
             'background': {
                 'image':  None,
             },
+            'history': {},
             'image': images,
         }
 
