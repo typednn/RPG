@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
 
     exp.add_exps(
-        'antpush2',
+        'antpush500',
         dict(
             _base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='sparse', n=5),
