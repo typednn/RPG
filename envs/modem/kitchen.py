@@ -79,7 +79,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         ee_id = self.model.site_name2id("end_effector")
         ee_pos = self.data.site_xpos[ee_id]
 
-        outs.append(self.embedder(ee_pos - np.array([-0.4, 0., 1.2])) / 0.3)
+        outs.append(self.embedder(ee_pos - np.array([-0.4, 0., 1.2])) * 0.3)
         inp = np.concatenate(outs, axis=-1)
 
         obs = np.concatenate([inp * 0.05, obs * 0.05, inp], axis=-1)
