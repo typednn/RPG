@@ -4,13 +4,14 @@ if __name__ == '__main__':
     exp = build_exp(base_config)
 
     exp.add_exps(
-        'kitchenbonus',
+        'kitcheninfo',
         dict(
-            _base=['rpgcv2', 'mbsacv3'],
+            #_base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='bonus', n=5),
             buffer=dict(max_episode_num=5000),
+            info=dict(coef=[0.002, 0.005, 0.01, 0.0005, 0.0001, 0.0008])
         ),
-        base=None, default_env='Kitchen',
+        base='rpgcv2', default_env='Kitchen',
     )
 
 
