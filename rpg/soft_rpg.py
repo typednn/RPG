@@ -1,4 +1,5 @@
 import tqdm
+import d4rl
 from einops import repeat
 import torch
 from .common_hooks import RLAlgo, build_hooks
