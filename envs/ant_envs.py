@@ -92,11 +92,11 @@ class AntHEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self.reset().shape)
 
     def _get_obs(self):
-        inp = self.embedder(self._base_obs[:self.subgoal_dim]/5.)
+        inp = self.embedder(self._base_obs[:self.subgoal_dim])
         if self.env_name == 'AntPush':
             #print()
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
-            inp = np.concatenate((inp, self.embedder(movable[:2] / 5.)))
+            inp = np.concatenate((inp, self.embedder(movable[:2])))
         return np.r_[self._base_obs * 0.05, self.goal * 0.05, inp]  # input the original goal..
 
     def seed(self, seed=None):
