@@ -104,17 +104,17 @@ class PegInsert(StationaryManipulationEnv):
         self.box_hole_radius = inner_radius
 
     def _initialize_actors(self):
-        #xy = self._episode_rng.uniform([-0.1, -0.3], [0.1, 0])
-        xy = np.array([0, -0.15])
+        xy = self._episode_rng.uniform([-0.1, -0.3], [0.1, 0])
+        #xy = np.array([0, -0.15])
         pos = np.hstack([xy, self.peg_half_size[2]])
-        ori = np.pi / 2 #+ self._episode_rng.uniform(-np.pi / 3, np.pi / 3)
+        ori = np.pi / 2 + self._episode_rng.uniform(-np.pi / 3, np.pi / 3)
         quat = euler2quat(0, 0, ori)
         self.peg.set_pose(Pose(pos, quat))
 
-        #xy = self._episode_rng.uniform([-0.05, 0.2], [0.05, 0.4])
-        xy = np.array([0., 0.3])
+        xy = self._episode_rng.uniform([-0.05, 0.2], [0.05, 0.4])
+        #xy = np.array([0., 0.3])
         pos = np.hstack([xy, self.peg_half_size[0]])
-        ori = np.pi / 2 # + self._episode_rng.uniform(-np.pi / 8, np.pi / 8)
+        ori = np.pi / 2  + self._episode_rng.uniform(-np.pi / 8, np.pi / 8)
         quat = euler2quat(0, 0, ori)
         self.box.set_pose(Pose(pos, quat))
 
