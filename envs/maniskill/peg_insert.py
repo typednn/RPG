@@ -317,9 +317,11 @@ class PegInsert(StationaryManipulationEnv):
         b = peg_pose.p - box_hole_pos.p
 
 
-        if not hasattr(self, 'embedder'):
+        if not hasattr(self, 'embedder') and self.obs_dim > 0:
             self.embedder, d = utils.get_embeder_np(self.obs_dim, 10) # only for the differences between objects ..
 
+        if self.obs_dim == 0:
+            return obs
         inp = np.concatenate((utils.symlog(a/0.2), utils.symlog(b/0.2))) # tcp opened ..
         inp = self.embedder(inp)
         return np.concatenate((obs * 0.05, inp))
