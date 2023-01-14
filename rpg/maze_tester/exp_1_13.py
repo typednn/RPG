@@ -95,6 +95,7 @@ if __name__ == '__main__':
         dict(
             _base=['rpgcv2', 'mbsacv3'],
             env_cfg=dict(reward_type='bonus', n=5),
+            buffer=dict(max_episode_num=5000),
         ),
         base=None, default_env='Kitchen',
     )
