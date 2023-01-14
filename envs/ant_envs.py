@@ -138,6 +138,7 @@ class AntHEnv(gym.Env):
             },
             'history': {},
             'image': images,
+            'metric': {},
         }
 
         return output
