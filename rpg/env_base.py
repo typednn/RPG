@@ -125,7 +125,7 @@ class GymVecEnv(VecEnv):
 
             elif env_name == 'AntPush':
                 from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 200)
+                return TimeLimit(AntHEnv(env_name, **kwargs), 400)
 
 
             elif env_name == 'PixelCheetah':
