@@ -101,6 +101,10 @@ class GymVecEnv(VecEnv):
                 from envs.modem.adroit import make_adroit_env
                 return TimeLimit(make_adroit_env('door-v0', **kwargs), 100)
 
+            elif env_name == 'KitchenDoor':
+                from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
+                return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs), 250)
+
 
             elif env_name == 'MWStickPull':
                 from envs.modem.metaworld_envs import make_metaworld_env

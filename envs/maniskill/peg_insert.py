@@ -319,7 +319,6 @@ class PegInsert(StationaryManipulationEnv):
 
         if not hasattr(self, 'embedder'):
             self.embedder, d = utils.get_embeder_np(self.obs_dim, 10) # only for the differences between objects ..
-        print(a, b)
 
         inp = np.concatenate((utils.symlog(a/0.2), utils.symlog(b/0.2))) # tcp opened ..
         inp = self.embedder(inp)
