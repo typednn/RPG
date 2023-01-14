@@ -18,7 +18,7 @@ OBS_ELEMENT_INDICES = {
     'hinge cabinet': np.array([20, 21]),
     'microwave': np.array([22]),
     'kettle': np.array([23, 24, 25]),#, 26, 27, 28, 29]),
-    }
+}
 OBS_ELEMENT_GOALS = {
     'bottom burner': np.array([-0.88, -0.01]),
     'top burner': np.array([-0.92, -0.01]),
@@ -62,25 +62,26 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         idx_offset = len(next_q_obs)
         idx_offset = len(next_q_obs)
 
+
+        from envs.utils import get_embeder_np, symlog
+        if self.embedder is None:
+            self.embedder, _ = get_embeder_np(self.obs_dim, 1)
+
         outs = []
         dofs = 0
         for element in self.tasks_to_complete:
             element_idx = OBS_ELEMENT_INDICES[element]
             inp = next_obj_obs[..., element_idx - idx_offset]
-            outs.append(inp)
+            outs.append(self.embedder(symlog(inp/0.4))/len(inp))
             dofs += len(inp)
         self.dofs = dofs
         ee_id = self.model.site_name2id("end_effector")
         ee_pos = self.data.site_xpos[ee_id]
 
-        outs.append(ee_pos - np.array([-0.4, 0., 1.2]))
+        outs.append(self.embedder(ee_pos - np.array([-0.4, 0., 1.2])) / 0.3)
         inp = np.concatenate(outs, axis=-1)
 
-        if self.embedder is None:
-            from envs.utils import get_embeder_np
-            self.embedder, d = get_embeder_np(self.obs_dim, len(inp))
-
-        obs = np.concatenate([inp * 0.05, obs * 0.05, self.embedder(inp)], axis=-1)
+        obs = np.concatenate([inp * 0.05, obs * 0.05, inp], axis=-1)
         return obs
 
     def _get_task_goal(self):
