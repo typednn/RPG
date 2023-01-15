@@ -126,6 +126,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             reward_dict['r_total'] += 0.2 * bonus / 5.
         elif  self.reward_type == 'bonus2':
             reward_dict['r_total'] = bonus / len(self.tasks_to_complete)
+        else:
+            raise NotImplementedError(self.reward_type)
         
         score = bonus
         return reward_dict, score

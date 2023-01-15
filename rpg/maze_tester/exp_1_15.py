@@ -56,6 +56,7 @@ if __name__ == '__main__':
             _base=['rpgcv2', 'mbsacv3', 'rpgdv2'],
             env_cfg=dict(reward_type='sparse', n=5),
             buffer=dict(max_episode_num=4000),
+            info=dict(coef=0.005),
         ),
         base=None, default_env='AntPush',
     )
@@ -64,7 +65,7 @@ if __name__ == '__main__':
         'kitchensac',
         dict(
             _base=['mbsacv3'],
-            env_cfg=dict(n=5),
+            env_cfg=dict(n=5, reward_type='sparse'),
         ),
         base='mbsacv3', default_env='Kitchen',
     )
@@ -79,6 +80,7 @@ if __name__ == '__main__':
             base='rpgcv2', default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen')[env_name],
         )
 
+    # python3 maze_tester/exp_1_14.py --exp hammerinfo --runall remote_parallel  --wandb True --cpu 5 --seed 1,2 --silent
     exp.add_exps(
         f'hammerinfo',
         dict(

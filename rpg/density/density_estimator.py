@@ -53,7 +53,7 @@ class DensityEstimator(OptimModule):
         if normalizer is None or normalizer == 'none':
             self.normalizer = None
         elif normalizer == 'ema':
-            self.normalizer = RunningMeanStd(last_dim=True, clip_max=10.)
+            self.normalizer = RunningMeanStd(last_dim=True, clip_max=100.)
         elif isinstance(normalizer, int):
             self.normalizer = ScalarNormalizer(normalizer)
         else:

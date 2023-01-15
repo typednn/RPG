@@ -99,7 +99,7 @@ class AntHEnv(gym.Env):
         if self.env_name == 'AntPush':
             #print()
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
-            inp = np.concatenate((inp, self.embedder(movable[:2])))
+            inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 10.)))
         return np.r_[self._base_obs * 0.05, self.goal * 0.05, inp]  # input the original goal..
 
     def seed(self, seed=None):
