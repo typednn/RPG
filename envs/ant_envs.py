@@ -89,6 +89,9 @@ class AntHEnv(gym.Env):
         self.default_substeps = 10
         self._max_episode_steps = 500
 
+        self.action_scale = self.action_space.high[0]
+        self.action_space = gym.spaces.Box(-1, 1, shape=self.action_space.shape, dtype=np.float32)
+
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self.reset().shape)
 
     def _get_obs(self):
@@ -111,6 +114,7 @@ class AntHEnv(gym.Env):
         return self._get_obs()
 
     def step(self, a):
+        a = a.clip(-1, 1) * self.action_scale
         self._base_obs, _, done, info = self.base_env.step(a)
         negative_dist = self.reward_fn(self._base_obs, self.goal)
         #r = self._get_reward()
