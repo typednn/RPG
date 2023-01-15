@@ -81,7 +81,7 @@ class ReplayBuffer(Configurable):
     def __init__(self,
         obs_space, action_space, episode_length, horizon,
         cfg=None, device='cuda:0', max_episode_num=1000,
-        max_capacity=1000000,
+        max_capacity=800000,
     ):
         super().__init__()
 
