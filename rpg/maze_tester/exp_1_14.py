@@ -60,4 +60,13 @@ if __name__ == '__main__':
         base=None, default_env='AntPush',
     )
 
+    exp.add_exps(
+        'kitchensac',
+        dict(
+            _base=['mbsacv3'],
+            env_cfg=dict(reward_type='bonus', n=5),
+        ),
+        base='mbsacv3', default_env='Kitchen',
+    )
+
     exp.main()

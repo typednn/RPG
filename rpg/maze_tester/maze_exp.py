@@ -384,7 +384,9 @@ class Experiment(Configurable):
 
                 ids = list(range(len(configs)))
                 if args.ids is not None:
-                    ids = [int(i) for i in args.ids.split(',')]
+                    split = ',' if ',' in args.ids else '_'
+                    ids = [int(i) for i in args.ids.split(split)]
+                        
                     
                 workers = []
                 for seed in seeds:
@@ -427,7 +429,7 @@ class Experiment(Configurable):
                             cmd = cmd + ' --cpu ' + str(args.cpu) + ' '
                             cmd =  cmd + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
                             if args.runall == 'remote_parallel':
-                                cmd = cmd + ' --runall parallel --seed  ' + str(args.seed)
+                                cmd = cmd + ' --runall parallel --seed  ' + str(args.seed).replace(',', '_')
                             os.system(cmd)
 
                 for w in workers:
