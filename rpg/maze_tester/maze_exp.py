@@ -432,7 +432,7 @@ class Experiment(Configurable):
                             if args.runall == 'remote_parallel':
                                 seed_info = str(args.seed).replace(',', '_')
                                 cmd = cmd + ' --runall parallel --seed  ' + str(args.seed).replace(',', '_')
-                            cmd = cmd +  ' --job_name {}-{}{} '.format(expname, i, seed_info)
+                            cmd = cmd +  ' --job_name {}-{}{} '.format(expname, i, seed_info.replace('_','x'))
                             os.system(cmd)
 
                 for w in workers:
