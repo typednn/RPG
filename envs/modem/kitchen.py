@@ -39,7 +39,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
     REMOVE_TASKS_WHEN_COMPLETE = False
     TERMINATE_ON_TASK_COMPLETE = False
 
-    def __init__(self, dataset_url=None, n_block=4, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
+    def __init__(self, dataset_url=None, n_block=4, reward_type='bonus2', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
         self.TASK_ELEMENTS = self.TASK_ELEMENTS[:n_block]
         self.reward_type = reward_type
         self.embedder = None

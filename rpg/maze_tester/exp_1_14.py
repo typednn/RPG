@@ -64,9 +64,18 @@ if __name__ == '__main__':
         'kitchensac',
         dict(
             _base=['mbsacv3'],
-            env_cfg=dict(reward_type='bonus', n=5),
+            env_cfg=dict(n=5),
         ),
         base='mbsacv3', default_env='Kitchen',
+    )
+
+    exp.add_exps(
+        'searchinfo',
+        dict(
+            env_name =['cabinet', 'stickpull', 'kitchen'], 
+            env_cfg=dict(n=5),
+        ),
+        base='rpgcv2'
     )
 
     exp.main()
