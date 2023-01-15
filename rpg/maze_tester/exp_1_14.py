@@ -73,7 +73,7 @@ if __name__ == '__main__':
         exp.add_exps(
             f'{env_name}info',
             dict(
-                env_cfg=dict(n=5),
+                env_cfg=dict(n=5, reward_type='sparse'),
                 info=dict(coef=[0.002, 0.005, 0.01, 0.0008, 0.0001])
             ),
             base='rpgcv2', default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen')[env_name],
