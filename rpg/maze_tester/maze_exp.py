@@ -428,9 +428,11 @@ class Experiment(Configurable):
                             seed_info = '-seed-' + str(seed) if seed is not None else ''
                             cmd = 'remote.py --go '
                             cmd = cmd + ' --cpu ' + str(args.cpu) + ' '
-                            cmd =  cmd + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
+                            cmd =  cmd + silent +base + ' --id '+str(i)
                             if args.runall == 'remote_parallel':
+                                seed_info = str(args.seed).replace(',', '_')
                                 cmd = cmd + ' --runall parallel --seed  ' + str(args.seed).replace(',', '_')
+                            cmd = cmd +  ' --job_name {}-{}{} '.format(expname, i, seed_info)
                             os.system(cmd)
 
                 for w in workers:
