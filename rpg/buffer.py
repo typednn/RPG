@@ -81,13 +81,14 @@ class ReplayBuffer(Configurable):
     def __init__(self,
         obs_space, action_space, episode_length, horizon,
         cfg=None, device='cuda:0', max_episode_num=1000,
+        max_capacity=1000000,
     ):
         super().__init__()
 
         self.cfg = cfg
         self.device = torch.device(cfg.device)
         self.episode_length = episode_length
-        self.capacity = max_episode_num * episode_length
+        self.capacity = min(max_episode_num * episode_length, max_capacity)
         self.horizon = horizon
 
         dtype = torch.float32

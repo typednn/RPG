@@ -377,7 +377,7 @@ class Experiment(Configurable):
                         base = base + ' --seed ' + seed
                     return base
 
-                if args.seed is None:
+                if args.seed is None or args.runall == 'remote_parallel':
                     seeds = [None]
                 else:
                     seeds = args.seed.split(',')
@@ -385,6 +385,8 @@ class Experiment(Configurable):
                 ids = list(range(len(configs)))
                 if args.ids is not None:
                     ids = [int(i) for i in args.ids.split(',')]
+                    
+                workers = []
                 for seed in seeds:
 
                     if args.runall == 'local':
@@ -396,7 +398,25 @@ class Experiment(Configurable):
                             x = input()
                             if x == 'yes':
                                 os.system(cmd)
+                    elif args.runall == 'parallel': # run in local in parallel ..
+                        def work(cmd):
+                            os.system(cmd)
+
+                        assert args.id is not None
+                        #ids = [args.id]
+                        #for i in range(len(configs)):
+                        i =  args.id
+                        base = make_base(configs[i], seed)
+                        seed_info = '-seed-' + str(seed) if seed is not None else ''
+                        cmd = 'python3 '
+                        cmd =  cmd + base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
+
+                        from multiprocessing import Process
+                        workers.append(Process(target=work, args=(cmd,)))
+                        workers[-1].start()
+
                     else:
+                        assert args.runall == 'remote_parallel' or args.runall == 'remote'
                         for i in range(len(configs)):
                             if i not in ids:
                                 continue
@@ -406,7 +426,12 @@ class Experiment(Configurable):
                             cmd = 'remote.py --go '
                             cmd = cmd + ' --cpu ' + str(args.cpu) + ' '
                             cmd =  cmd + silent +base + ' --id '+str(i) + ' --job_name {}-{}{} '.format(expname, i, seed_info)
+                            if args.runall == 'remote_parallel':
+                                cmd = cmd + ' --runall parallel --seed  ' + str(args.seed)
                             os.system(cmd)
+
+                for w in workers:
+                    w.join()
                     
         else:
             configs = sum(configs, [])

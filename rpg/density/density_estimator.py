@@ -41,17 +41,19 @@ class ScalarNormalizer:
 @as_builder
 class DensityEstimator(OptimModule):
     name='density'
-    def __init__(self, space, cfg=None, normalizer=None) -> None:
+    def __init__(self, space, cfg=None, normalizer=None, warmup_normalizer=100) -> None:
         # build the network
         network = self.make_network(space)
         super().__init__(network)
         self.network = network
+        self.warmup_normalizer = warmup_normalizer
+        self.update_step = 0
 
 
         if normalizer is None or normalizer == 'none':
             self.normalizer = None
         elif normalizer == 'ema':
-            self.normalizer = RunningMeanStd(last_dim=True)
+            self.normalizer = RunningMeanStd(last_dim=True, clip_max=10.)
         elif isinstance(normalizer, int):
             self.normalizer = ScalarNormalizer(normalizer)
         else:
@@ -73,9 +75,13 @@ class DensityEstimator(OptimModule):
 
     def update(self, samples):
         log_prob = self._update(samples)
-        if self.normalizer is not None:
+        self.update_step += 1
+
+        if self.normalizer is not None and (self.warmup_normalizer==0 or self.update_step > self.warmup_normalizer):
             self.normalizer.update(log_prob)
             from tools.utils import logger
+            logger.logkv(self.name + '_cur_mean', log_prob.mean())
+            logger.logkv(self.name + '_cur_std', log_prob.std())
             logger.logkv(self.name + '_buffer_mean', self.normalizer.mean.item())
             logger.logkv(self.name + '_buffer_std', self.normalizer.std.item())
 

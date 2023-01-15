@@ -39,6 +39,15 @@ if __name__ == '__main__':
         base='rpgcv2', default_env='Kitchen',
     )
 
+    exp.add_exps(
+        'stickpull',
+        dict(
+            env_cfg=dict(reward_type='sparse', n=5),
+            info=dict(coef=[0.002,0.005,0.01,0.0005,0.0001,0.0008])
+        ),
+        base='rpgcv2', default_env='MWStickPull',
+    )
+
 
 
     exp.add_exps(
