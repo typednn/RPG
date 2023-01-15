@@ -69,14 +69,14 @@ if __name__ == '__main__':
         base='mbsacv3', default_env='Kitchen',
     )
 
-    exp.add_exps(
-        'searchinfo',
-        dict(
-            env_name =['cabinet', 'stickpull', 'kitchen'], 
-            env_cfg=dict(n=5),
-            info=dict(coef=[0.002, 0.005, 0.01, 0.0008])
-        ),
-        base='rpgcv2'
-    )
+    for env_name  in ['cabinet', 'stickpull', 'kitchen']:
+        exp.add_exps(
+            f'{env_name}info',
+            dict(
+                env_cfg=dict(n=5),
+                info=dict(coef=[0.002, 0.005, 0.01, 0.0008, 0.0001])
+            ),
+            base='rpgcv2', default_env = env_name,
+        )
 
     exp.main()

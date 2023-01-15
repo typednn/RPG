@@ -218,7 +218,7 @@ class Experiment(Configurable):
         cfgs = exp_config.pop('cfgs')
         if env_name is None:
             env_name = exp_config.pop('default_env', None)
-        assert env_name is not None
+        #assert env_name is not None
 
         names = cfgs.pop('_names', [])
         names = [[i] for i in names]
