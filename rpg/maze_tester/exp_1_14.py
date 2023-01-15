@@ -74,6 +74,7 @@ if __name__ == '__main__':
         dict(
             env_name =['cabinet', 'stickpull', 'kitchen'], 
             env_cfg=dict(n=5),
+            info=dict(coef=[0.002, 0.005, 0.01, 0.0008])
         ),
         base='rpgcv2'
     )
