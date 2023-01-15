@@ -51,9 +51,9 @@ if __name__ == '__main__':
 
 
     exp.add_exps(
-        'antpush500',
+        'antpush300',
         dict(
-            _base=['rpgcv2', 'mbsacv3'],
+            _base=['rpgcv2', 'mbsacv3', 'rpgdv2'],
             env_cfg=dict(reward_type='sparse', n=5),
             buffer=dict(max_episode_num=4000),
         ),
