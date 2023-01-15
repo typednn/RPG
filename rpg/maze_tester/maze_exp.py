@@ -380,11 +380,12 @@ class Experiment(Configurable):
                 if args.seed is None or args.runall == 'remote_parallel':
                     seeds = [None]
                 else:
-                    seeds = args.seed.split(',')
+                    split = ',' if ',' in args.seed else '_'
+                    seeds = args.seed.split(split)
 
                 ids = list(range(len(configs)))
                 if args.ids is not None:
-                    split = ',' if ',' in args.ids else '_'
+                    split = ','
                     ids = [int(i) for i in args.ids.split(split)]
                         
                     
