@@ -79,4 +79,14 @@ if __name__ == '__main__':
             base='rpgcv2', default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen')[env_name],
         )
 
+    exp.add_exps(
+        f'hammerinfo',
+        dict(
+            env_cfg=dict(n=5, reward_type='sparse'),
+            info=dict(coef=[0., 0.001, 0.002, 0.005, 0.01]),
+            max_total_steps=1500000,
+        ),
+        base='rpgcv2', default_env = 'AdroitHammer',
+    )
+
     exp.main()
