@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 env_cfg=dict(n=5),
                 info=dict(coef=[0.002, 0.005, 0.01, 0.0008, 0.0001])
             ),
-            base='rpgcv2', default_env = env_name,
+            base='rpgcv2', default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen')[env_name],
         )
 
     exp.main()
