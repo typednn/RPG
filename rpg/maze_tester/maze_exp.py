@@ -444,12 +444,19 @@ class Experiment(Configurable):
                     
         else:
             configs = sum(configs, [])
-            if args.id is not None:
+            if args.id is not None or args.ids is not None:
+                exp_id = args.id
+                if args.ids is not None:
+                    assert args.id is None
+                    for idx, i in enumerate(configs):
+                        if i['path'].split('_')[-1] == args.ids:
+                            exp_id = idx
+
                 if args.download:
-                    os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[args.id].path, configs[args.id].path))
+                    os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[exp_id].path, configs[exp_id].path))
                     exit(0)
 
-                cfg = configs[args.id]
+                cfg = configs[exp_id]
                 cfg.seed = args.seed
                 if args.seed is not None and cfg.path is not None:
                     cfg.path += '_seed' + str(args.seed)
