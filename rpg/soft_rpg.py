@@ -1,4 +1,5 @@
 import tqdm
+import numpy as np
 from einops import repeat
 import torch
 from .common_hooks import RLAlgo, build_hooks
@@ -18,6 +19,25 @@ from .policy_learner import PolicyLearner
 from .hidden import HiddenSpace, Categorical
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
 from . import repr 
+
+def scheduler(step, schedule):
+    if schedule is None:
+        return 1.
+    else:
+        import re
+        if isinstance(schedule, str):
+            match = re.match(r'linear\((.+),(.+),(.+)\)', schedule)
+            if match:
+                init, final, duration = [float(g) for g in match.groups()]
+            else:
+                duration = int(schedule)
+                init, final = 0, 1
+        else:
+            duration = int(schedule)
+            init, final = 0., 1.
+        mix = np.clip(step / duration, 0.0, 1.0)
+        return (1.0 - mix) * init + mix * final
+
 
 class Trainer(Configurable, RLAlgo):
     def __init__(
@@ -74,6 +94,7 @@ class Trainer(Configurable, RLAlgo):
         backbone=None,
         reward_scale=1.,
         reward_relabel = None,
+        reward_schedule = None,
 
 
         actor_buffer=None, # use the limit the data for training the policy network .. tend to use the latest data if necessary
@@ -236,7 +257,14 @@ class Trainer(Configurable, RLAlgo):
         if self.reward_relabel is not None:
             seg.reward = self.reward_relabel(seg.obs_seq[:-1], seg.action, seg.obs_seq[1:])
         
-        seg.reward = seg.reward * self._cfg.reward_scale
+        reward_schedule = scheduler(
+            self.update_step, self._cfg.reward_schedule
+        )
+        if self._cfg.reward_schedule is not None:
+            logger.logkv_mean('reward_schedule', reward_schedule)
+
+        seg.reward = seg.reward * self._cfg.reward_scale * reward_schedule
+
         if self.exploration is not None and self.exploration.as_reward:
             intrinsic_reward = self.exploration.intrinsic_reward(seg.obs_seq[1:], repeat(z, "... -> t ...", t=len(seg.obs_seq) - 1))
             logger.logkv_mean('reward_rnd', intrinsic_reward.mean())
