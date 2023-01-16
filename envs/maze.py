@@ -366,9 +366,24 @@ class SmallMaze(LargeMaze):
 
         ]))
 
-    def __init__(self, cfg=None, low_steps=20) -> None:
+    def __init__(self,
+            cfg=None,
+            low_steps=20,
+            reward_type='sparse',
+            reward_mapping=[[[4, -2], 1], [[-5, 1], 2]],
+        ) -> None:
         super().__init__(cfg)
         self.reset()
+
+    def get_reward(self):
+        if self.reward_mapping is None:
+            return self.pos.sum(axis=-1)
+        else:
+            reward = torch.zeros_like(self.pos[..., 0])
+            for k, v in self.reward_mapping:
+                x, y = k
+                reward = reward + torch.logical_and(self.pos[..., 0].long() == x, self.pos[..., 1].long() == y).float() * v
+            return reward
 
 
 class MediumMaze(LargeMaze):

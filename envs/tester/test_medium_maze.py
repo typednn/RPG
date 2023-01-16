@@ -1,12 +1,13 @@
 import torch
 import matplotlib.pyplot as plt
-from envs.maze import MediumMaze
+from envs.maze import MediumMaze, SmallMaze
 from tools.utils import totensor
 import tqdm
 import matplotlib.pyplot as plt
 
 N = 1000
-env = MediumMaze(batch_size=N, reward_mapping=[[[6, 1], 10], [[6, 6], 20]])
+#env = MediumMaze(batch_size=N, reward_mapping=[[[6, 1], 10], [[6, 6], 20]])
+env = SmallMaze(batch_size=N)
 
 trajs = []
 

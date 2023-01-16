@@ -60,7 +60,7 @@ class RunningMeanStd(object):
     """
 
     def __init__(
-        self, mean: Union[float, np.ndarray] = 0.0, var: Union[float, np.ndarray] = 1.0, clip_max=None, last_dim=True, warmpu=0,
+        self, mean: Union[float, np.ndarray] = 0.0, var: Union[float, np.ndarray] = 1.0, clip_max=None, last_dim=True,
     ) -> None:
         self.mean, self.var = mean, var
         self.count = 0

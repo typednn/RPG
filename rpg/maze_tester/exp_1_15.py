@@ -56,7 +56,7 @@ if __name__ == '__main__':
             _base=['rpgcv2', 'mbsacv3', 'rpgdv2'],
             env_cfg=dict(reward_type='sparse', n=5),
             buffer=dict(max_episode_num=4000),
-            info=dict(coef=[0.001, 0., 0.005]),
+            info=dict(coef=[0.0002, 0., 0.001]),
         ),
         base=None, default_env='AntPush',
     )
@@ -102,5 +102,18 @@ if __name__ == '__main__':
             ),
             base=None, default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen', hammer='AdroitHammer')[env_name],
         )
+
+    
+    exp.add_exps(
+        'smallmaze',
+        dict(
+            reward_scale=0.,
+            env_cfg=dict(n=5),
+            max_epoch=1000,
+        ),
+        base='small', default_env='SmallMaze',
+        names=['rnd', 'vae', 'count','rndn100']
+    )
+
 
     exp.main()
