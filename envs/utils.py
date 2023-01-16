@@ -118,11 +118,12 @@ def symlog(x):
     return np.sign(x) * np.log(np.abs(x) + 1)
 
 class EmbedderNP:
-    def __init__(self, inp_dim, multires) -> None:
+    def __init__(self, inp_dim, multires, include_input=True) -> None:
         max_freq = multires - 1
         N_freqs = multires
         self.freq_bands = 2. ** np.linspace(0., max_freq, num=N_freqs)
-        self.out_dim = inp_dim * (1 + multires * 2)
+        self.out_dim = inp_dim * (int(include_input) + multires * 2)
+        self.include_input = include_input
 
     def __call__(self, x):
         inp = x
@@ -130,11 +131,15 @@ class EmbedderNP:
         x = np.stack((np.sin(x), np.cos(x)), -2)
         assert x.shape[-2] == 2
         x = x.reshape(x.shape[:-3] + (-1,)) # freq, (sin, cos), d
-        return np.concatenate((inp, x), -1)
+        #print('xx', x.max(), inp.max(), inp.shape)
+        if self.include_input:
+            return np.concatenate((inp, x), -1)
+        else:
+            return inp
 
 
-def get_embeder_np(multires, dim):
-    embeder = EmbedderNP(dim, multires)
+def get_embeder_np(multires, dim, include_input=True):
+    embeder = EmbedderNP(dim, multires, include_input=include_input)
     return embeder, embeder.out_dim
 
 def test_embedder_np():

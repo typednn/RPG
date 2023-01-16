@@ -79,7 +79,7 @@ class AntHEnv(gym.Env):
             env_goal_dim = 2
         else:
             env_goal_dim = 3
-        self.embedder, dim = utils.get_embeder_np(obs_dim, env_goal_dim)
+        self.embedder, dim = utils.get_embeder_np(obs_dim, env_goal_dim, include_input=False)
 
         self.goal_dim = env_goal_dim
 
@@ -97,10 +97,9 @@ class AntHEnv(gym.Env):
     def _get_obs(self):
         inp = self.embedder(self._base_obs[:self.subgoal_dim])
         if self.env_name == 'AntPush':
-            #print()
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
             inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 10.)))
-        return np.r_[self._base_obs * 0.05, self.goal * 0.05, inp]  # input the original goal..
+        return np.r_[self._base_obs * 0.025,  inp]  # input the original goal..
 
     def seed(self, seed=None):
         self.base_env.seed(seed)

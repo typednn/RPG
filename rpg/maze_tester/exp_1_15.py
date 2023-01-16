@@ -56,7 +56,7 @@ if __name__ == '__main__':
             _base=['rpgcv2', 'mbsacv3', 'rpgdv2'],
             env_cfg=dict(reward_type='sparse', n=5),
             buffer=dict(max_episode_num=4000),
-            info=dict(coef=0.005),
+            info=dict(coef=[0.001, 0., 0.005]),
         ),
         base=None, default_env='AntPush',
     )
@@ -90,5 +90,17 @@ if __name__ == '__main__':
         ),
         base='rpgcv2', default_env = 'AdroitHammer',
     )
+
+
+    for env_name  in ['cabinet', 'stickpull', 'hammer']: # ensure the experiments are finished ..
+        exp.add_exps(
+            f'{env_name}baseline',
+            dict(
+                env_cfg=dict(n=5, reward_type='sparse'),
+                _base=['rpgcv2', 'mbsacv3'],
+                info = dict(coef=0.005)
+            ),
+            base=None, default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen', hammer='AdroitHammer')[env_name],
+        )
 
     exp.main()

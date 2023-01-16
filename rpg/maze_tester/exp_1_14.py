@@ -64,7 +64,7 @@ if __name__ == '__main__':
         'kitchensac',
         dict(
             _base=['mbsacv3'],
-            env_cfg=dict(n=5),
+            env_cfg=dict(n=5, reward_type='sparse'),
         ),
         base='mbsacv3', default_env='Kitchen',
     )
