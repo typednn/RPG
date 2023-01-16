@@ -92,16 +92,23 @@ if __name__ == '__main__':
     )
 
 
-    for env_name  in ['cabinet', 'stickpull', 'hammer']: # ensure the experiments are finished ..
+    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant']: # ensure the experiments are finished ..
         exp.add_exps(
             f'{env_name}baseline',
             dict(
                 env_cfg=dict(n=5, reward_type='sparse'),
-                _base=['rpgcv2', 'mbsacv3', 'rpgcv2'],
-                info = dict(coef=[0.005, 0., 0.002])
+                _base=['rpgcv2', 'mbsacv3',
+                       'rpgcv2', 'rpgdv3'],
+                info = dict(coef=[0.005, 0., 0.002, 0.001])
             ),
-            names=['rpg', 'sac', 'rpg002'],
-            base=None, default_env = dict(cabinet='EEArm', stickpull='MWStickPull', kitchen='Kitchen', hammer='AdroitHammer')[env_name],
+            names=['rpg', 'sac', 'rpg002', 'rpgd'],
+            base=None, default_env = dict(
+                cabinet='EEArm',
+                stickpull='MWStickPull',
+                kitchen='Kitchen',
+                hammer='AdroitHammer',
+                ant='AntPush'
+            )[env_name],
         )
 
     
