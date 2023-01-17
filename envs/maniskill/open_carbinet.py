@@ -322,18 +322,26 @@ class OpenCabinetEnv(MS1BaseEnv):
                 reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 4
                 if self.reward != 'dense':
                     reward_qpos = reward_qpos > 4 * 0.8
+                    total_success += reward_qpos > 0 #info[target_link_id]["success"]
+                else:
+                    total_success += info[target_link_id]["success"] * 2.
                 reward_open.append(reward_qpos)
-                total_success += reward_qpos > 0 #info[target_link_id]["success"]
 
             if target_link_id == 1:
                 reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id]) * 1
                 if self.reward != 'dense':
                     reward_qpos = reward_qpos > 0.8
+                    total_success += reward_qpos > 0 # info[target_link_id]["success"]
+                else:
+                    total_success += info[target_link_id]["success"]
                 reward_open.append(reward_qpos)
-                total_success += reward_qpos > 0 # info[target_link_id]["success"]
 
 
-        info.update(success=int(total_success > 1))
+        if self.reward != 'dense':
+            info.update(success=int(total_success > 1))
+        else:
+            info.update(success=total_success)
+        
         if self.reward == 'dense':
             return np.sum(reward_open) - np.min(ee_to_handles)
         elif self.reward == 'sparse':
