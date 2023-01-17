@@ -363,7 +363,7 @@ class TorchEnv(VecEnv):
 
         
 def make(env_name, n, **kwargs):
-    if env_name in ['LargeMaze', 'SmallMaze', 'MediumMaze', 'TripleMove', 'TreeMaze', 'MediumMazeR']:
+    if env_name in ['LargeMaze', 'SmallMaze', 'MediumMaze', 'TripleMove', 'TreeMaze', 'MediumMazeR', 'SmallMaze2']:
         return TorchEnv(env_name, n, **kwargs)
     else:
         return GymVecEnv(env_name, n, **kwargs)

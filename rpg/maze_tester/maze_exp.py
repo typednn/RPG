@@ -160,6 +160,7 @@ base_config = dict(
         rpgdv2=dict(_inherit='rpgcv2', hidden=dict(TYPE='Categorical')),
 
         rpgdv3=dict(_inherit='rpgdv2', pi_z=dict(ent=dict(coef=1., target_mode='none'),)),
+        mpc=dict(_inherit='mbsacv3', cem=dict()),
 
         rewardrpg=dict(_inherit='rpgdv3', reward_schedule='10000'),
         rewardsac=dict(_inherit='mbsacv3', reward_schedule='10000'),
