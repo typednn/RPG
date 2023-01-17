@@ -117,7 +117,7 @@ class LargeMaze(Configurable):
     ))
 
 
-    def __init__(self, cfg=None, batch_size=128, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0,
+    def __init__(self, cfg=None, batch_size=128, reward_type=None, device='cuda:0', low_steps=200, reward=False, mode='batch', obs_dim=0,
                  rescale_before_embed=True,
                  reward_mapping=None, action_scale=None) -> None:
         super().__init__()

@@ -358,31 +358,16 @@ class OpenCabinetEnv(MS1BaseEnv):
     def get_done(self, info: dict, **kwargs):
         return False # never stop early ..
 
+    def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
+        output = {
+            'background': {},
+            'history': {},
+            'image': {},
+            'metric': {}
+        }
 
-    def _render_traj_rgb(self, traj, **kwargs):
-        import matplotlib.pyplot
-        from tools.utils import plt_save_fig_array
-        import matplotlib.pyplot as plt
-        from solver.draw_utils import plot_colored_embedding
-        import torch
-        #states = states.detach().cpu().numpy()
-        states = traj.get_tensor('obs', device='cpu')
+        return output
 
-        states = states[..., :3]
-        z = traj.get_tensor('z', device='cpu')
-
-        if z.dtype == torch.float64:
-            print(torch.bincount(z.long().flatten()))
-
-        states = states[..., :2]
-        plt.clf()
-        # plt.imshow(np.uint8(img[...,::-1]*255))
-        plot_colored_embedding(z, states[:, :, :2], s=2)
-
-        # plt.xlim([0, 256])
-        # plt.ylim([0, 256])
-        out = plt_save_fig_array()[:, :, :3]
-        return out
 
 
 # @register_gym_env(name="OpenCabinetDoor-v1", max_episode_steps=200)
