@@ -115,6 +115,7 @@ if __name__ == '__main__':
     exp.add_exps(
         'smallmaze',
         dict(
+            # TODO: action_scale=0.3
             reward_scale=5.,
             env_cfg=dict(n=5),
             max_epoch=1000,

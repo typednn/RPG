@@ -246,6 +246,10 @@ class TorchEnv(VecEnv):
             from envs.maze import SmallMaze
             self.goal_env = SmallMaze(**kwargs)
 
+        elif env_name == 'SmallMaze2':
+            from envs.maze import SmallMaze
+            self.goal_env = SmallMaze(**kwargs, action_scale=0.3)
+
         elif env_name == 'TreeMaze':
             from envs.maze import TreeMaze
             self.goal_env = TreeMaze(**kwargs)
