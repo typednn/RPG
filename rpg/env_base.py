@@ -133,6 +133,10 @@ class GymVecEnv(VecEnv):
                 from envs.ant_envs import AntHEnv
                 return TimeLimit(AntHEnv(env_name, **kwargs), 400)
 
+            elif env_name == 'AntFall':
+                from envs.ant_envs import AntHEnv
+                return TimeLimit(AntHEnv(env_name, **kwargs), 400)
+
 
             elif env_name == 'PixelCheetah':
                 from envs.mujoco_env import make

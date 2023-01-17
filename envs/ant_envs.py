@@ -99,6 +99,10 @@ class AntHEnv(gym.Env):
     def _get_obs(self):
         if self.env_name == 'AntPush':
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
+        elif self.env_name == 'AntFall':
+            movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
+        else:
+            raise NotImplementedError
         
         if self.obs_dim > 1:
             inp = self.embedder(self._base_obs[:self.subgoal_dim]/10.)
@@ -160,7 +164,7 @@ class AntHEnv(gym.Env):
         return output
 
 if __name__ == '__main__':
-    env = AntHEnv('AntPush')
+    env = AntHEnv('AntFall')
     env.reset()
     images = []
     for i in range(100):
