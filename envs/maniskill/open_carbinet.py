@@ -345,6 +345,7 @@ class OpenCabinetEnv(MS1BaseEnv):
             info.update(success=int(total_success > 1))
         else:
             info.update(success=total_success)
+            info.update(metric=dict(door0=info[0]['success']))
         
         if self.reward == 'dense':
             return np.sum(reward_open) - np.min(ee_to_handles)
@@ -371,7 +372,11 @@ class OpenCabinetEnv(MS1BaseEnv):
         return False # never stop early ..
 
     def _render_traj_rgb(self, traj, occ_val=False, history=None, verbose=True, **kwargs):
+        from ..utils import extract_obs_from_tarj
+        obs = (extract_obs_from_tarj(traj))[..., :2]
+
         output = {
+            'state': obs,
             'background': {},
             'history': {},
             'image': {},
@@ -380,6 +385,21 @@ class OpenCabinetEnv(MS1BaseEnv):
 
         return output
 
+
+    def wrap_obs(self, obs):
+        ee_xyz = self.agent.get_ee_coords().mean(axis=0)
+        assert ee_xyz.shape == (3,)
+        return np.concatenate([ee_xyz, obs])
+
+    def step(self, action):
+        #raise NotImplementedError
+        obs, reward, done, info = super().step(action)
+        return self.wrap_obs(obs), reward, done, info
+        
+
+    def reset(self, seed=None, reconfigure=False):
+        obs = super().reset(seed, reconfigure)
+        return self.wrap_obs(obs)
 
 
 # @register_gym_env(name="OpenCabinetDoor-v1", max_episode_steps=200)

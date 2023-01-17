@@ -151,12 +151,12 @@ class FixArm(OpenCabinetDoorEnv):
         return output
 
     
-    def step(self, action: Union[None, np.ndarray, Dict]):
-        #raise NotImplementedError
-        obs, reward, done, info = super().step(action)
-        return self.wrap_obs(obs), reward, done, info
+    # def step(self, action: Union[None, np.ndarray, Dict]):
+    #     #raise NotImplementedError
+    #     obs, reward, done, info = super().step(action)
+    #     return self.wrap_obs(obs), reward, done, info
         
 
-    def reset(self, seed=None, reconfigure=False):
-        obs = super().reset(seed, reconfigure)
-        return self.wrap_obs(obs)
+    # def reset(self, seed=None, reconfigure=False):
+    #     obs = super().reset(seed, reconfigure)
+    #     return self.wrap_obs(obs)
