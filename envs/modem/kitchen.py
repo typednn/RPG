@@ -106,6 +106,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         next_goal = obs_dict['goal']
         idx_offset = len(next_q_obs)
         completions = []
+        reward_dict['metric'] = {}
         for element in self.tasks_to_complete:
             element_idx = OBS_ELEMENT_INDICES[element]
             distance = np.linalg.norm(
@@ -114,6 +115,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             complete = distance < BONUS_THRESH
             if complete:
                 completions.append(element)
+
+            reward_dict['metric'][element.replace(' ', '_')] = complete
 
         if self.REMOVE_TASKS_WHEN_COMPLETE:
             [self.tasks_to_complete.remove(element) for element in completions]
@@ -172,6 +175,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             'obs_dict': self.obs_dict,
             'rewards': reward_dict,
             'success': score,
+            'metric': reward_dict['metric'],
             # 'images': np.asarray(self.render(mode='rgb_array'))
         }
         # self.render()

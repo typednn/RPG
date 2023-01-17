@@ -79,6 +79,8 @@ class AntHEnv(gym.Env):
             env_goal_dim = 2
         else:
             env_goal_dim = 3
+        
+        self.obs_dim = obs_dim
         self.embedder, dim = utils.get_embeder_np(obs_dim, env_goal_dim, include_input=True)
 
         self.goal_dim = env_goal_dim
@@ -95,11 +97,15 @@ class AntHEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self.reset().shape)
 
     def _get_obs(self):
-        inp = self.embedder(self._base_obs[:self.subgoal_dim]/10.)
         if self.env_name == 'AntPush':
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
+        
+        if self.obs_dim > 1:
+            inp = self.embedder(self._base_obs[:self.subgoal_dim]/10.)
             inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 1.)))
-        return np.r_[self._base_obs[:2] * 0.01, self._base_obs[2:] * 0.1,  inp]  # input the original goal..
+            return np.r_[self._base_obs[:2] * 0.01, self._base_obs[2:] * 0.1,  inp]  # input the original goal..
+        else:
+            return np.concatenate((self._base_obs, movable))
 
     def seed(self, seed=None):
         self.base_env.seed(seed)
@@ -136,7 +142,10 @@ class AntHEnv(gym.Env):
 
     def _render_traj_rgb(self, traj, z=None, occ_val=False, verbose=True, history=None, **kwargs):
         from .utils import extract_obs_from_tarj
-        obs = (extract_obs_from_tarj(traj)/0.01)[..., :2]
+        obs = (extract_obs_from_tarj(traj))[..., :2]
+        if self.obs_dim > 1:
+            obs = obs / 0.01
+
         images = {}
         output = {
             'state': obs,

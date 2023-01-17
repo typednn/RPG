@@ -168,10 +168,20 @@ class save_train_occupancy(HookBase):
         self.n_epoch = n_epoch
         self.history = None 
         self.obs = []
+        self.episode_metrics = {}
         
     def on_epoch(self, trainer, env, steps, traj, **locals_):
-        #return super().on_epoch(trainer, **locals_)
         self.obs.append(traj.get_tensor('obs').detach())
+
+        for i in traj.traj:
+            for j in range(traj.nenv):
+                if i['truncated'][j] or i['done'][j]:
+                    if 'metric' in i['info'][j]:
+                        for k, v in i['info'][j]['metric'].items():
+                            if k not in self.episode_metrics:
+                                self.episode_metrics[k] = []
+                            self.episode_metrics[k].append(v)
+
         if trainer.epoch_id % int(self.n_epoch) == 0:
             import torch
             from tools.utils import logger
@@ -184,7 +194,12 @@ class save_train_occupancy(HookBase):
             
             for k, v in data['metric'].items():
                 logger.logkv_mean('train_{}_metric'.format(k), v)
+
+            for k, v in self.episode_metrics.items():
+                logger.logkv_mean('train_{}_metric'.format(k), np.mean(v))
+
             self.obs = []
+            self.episode_metrics = {}
 
 
     
