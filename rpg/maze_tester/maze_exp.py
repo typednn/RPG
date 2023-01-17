@@ -163,6 +163,8 @@ base_config = dict(
         mpc=dict(_inherit='mbsacv3', cem=dict()),
 
         rewardrpg=dict(_inherit='rpgdv3', use_reward_schedule=True),
+        rewardrpgc=dict(_inherit='rpgcv2', use_reward_schedule=True),
+
         rewardsac=dict(_inherit='mbsacv3', use_reward_schedule=True),
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),

@@ -79,7 +79,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         ee_id = self.model.site_name2id("end_effector")
         ee_pos = self.data.site_xpos[ee_id]
 
-        outs.append(self.embedder(ee_pos - np.array([-0.4, 0., 1.2])) * 0.3)
+        outs.append(self.embedder(ee_pos - np.array([-0.4, 0., 1.2])))
         inp = np.concatenate(outs, axis=-1)
 
         obs = np.concatenate([inp * 0.05, obs * 0.05, inp], axis=-1)
@@ -122,7 +122,7 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         reward_dict['r_total'] = len(completions) == len(self.tasks_to_complete)
 
         if self.reward_type == 'sparse':
-            reward_dict['r_total'] = bonus / len(self.tasks_to_complete) * 0.5 + (bonus == len(self.tasks_to_complete)) * 0.5
+            reward_dict['r_total'] = bonus / len(self.tasks_to_complete) + (bonus == len(self.tasks_to_complete))
 
         elif self.reward_type == 'bonus':
             #     reward_dict['r_total'] += 0.2 * bonus / 5.
