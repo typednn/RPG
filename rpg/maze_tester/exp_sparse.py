@@ -6,14 +6,15 @@ configs = dict(
         stickpull='MWStickPull',
         kitchen='Kitchen',
         hammer='AdroitHammer',
-        ant='AntPush'
+        ant='AntPush',
+        block='BlockPush2',
     )
 )
 
 if __name__ == '__main__':
     exp = build_exp(base_config)
 
-    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant']: # ensure the experiments are finished ..
+    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant', 'block']: # ensure the experiments are finished ..
         exp.add_exps(
             f'{env_name}',
             dict(
