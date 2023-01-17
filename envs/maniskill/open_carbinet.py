@@ -321,7 +321,7 @@ class OpenCabinetEnv(MS1BaseEnv):
             if target_link_id == 0:
                 reward_qpos = clip_and_normalize(link_qpos, 0, self.target_qpos[target_link_id])
                 if self.reward != 'dense':
-                    reward_qpos = reward_qpos > 4 * 0.8
+                    reward_qpos = reward_qpos > 0.8
                     total_success += reward_qpos > 0 #info[target_link_id]["success"]
                 else:
                     total_success += info[target_link_id]["success"] * 2.
