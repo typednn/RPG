@@ -152,6 +152,7 @@ class Trainer(Configurable, RLAlgo):
 
         # z learning ..
         z_head = self.z_space.make_policy_head(z_head)
+        
         pi_z_net = QPolicy(state_dim, hidden_dim, z_head, cfg=backbone, time_embedding=time_embedding).cuda()
         self.pi_z = PolicyLearner('z', env.action_space, pi_z_net, z_space.tokenize, cfg=pi_z, ignore_hidden=True)
 
@@ -316,7 +317,8 @@ class Trainer(Configurable, RLAlgo):
                     self.info_learner.update(rollout)
 
     def update_pi_z(self):
-        if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0:
+        from .hidden import Gaussian
+        if self._cfg.z_delay > 0 and self.update_step % self._cfg.z_delay == 0 and not isinstance(self.z_space, Gaussian):
             o, z, t = self.buffer.sample_start(self._cfg.batch_size)
             assert (t < 1).all()
             #z = self.relabel_z(o, t, z) relabel does not makes any sense here

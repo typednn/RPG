@@ -48,6 +48,8 @@ class DiffPolicy(PolicyBase):
         return -rollout['value'][..., 0].mean()
 
 
+
+
 class QPolicy(PolicyBase):
     def __init__(
         self, state_dim, hidden_dim, head, cfg=None,
@@ -63,6 +65,7 @@ class QPolicy(PolicyBase):
         q = self.q_value(state)
         logits = q / alpha
         out = self.head(logits)
+        
         a, logp = out.sample()
         return Aout(a, logp, out.entropy())
 
