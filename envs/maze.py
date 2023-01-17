@@ -187,7 +187,7 @@ class LargeMaze(Configurable):
         intersection = self.pos + torch.relu(t[:, None] - 1e-5) * (new_pos - self.pos)
         new_pos = torch.where(collide[:, None], intersection, new_pos)
 
-        self.pos = new_pos
+        self.pos = new_pos.clamp(-self.SIZE-1, self.SIZE+1)
 
         reward = torch.zeros(self.batch_size, device=self.device) + self.get_reward()
         if self.mode == 'batch':

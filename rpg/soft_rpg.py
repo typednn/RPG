@@ -95,6 +95,7 @@ class Trainer(Configurable, RLAlgo):
         reward_scale=1.,
         reward_relabel = None,
         reward_schedule = None,
+        use_reward_schedule=False,
 
 
         actor_buffer=None, # use the limit the data for training the policy network .. tend to use the latest data if necessary
@@ -257,11 +258,13 @@ class Trainer(Configurable, RLAlgo):
         if self.reward_relabel is not None:
             seg.reward = self.reward_relabel(seg.obs_seq[:-1], seg.action, seg.obs_seq[1:])
         
-        reward_schedule = scheduler(
-            self.update_step, self._cfg.reward_schedule
-        )
-        if self._cfg.reward_schedule is not None:
+        if self._cfg.reward_schedule is not None and self._cfg.use_reward_schedule:
+            reward_schedule = scheduler(
+                self.update_step, self._cfg.reward_schedule
+            )
             logger.logkv_mean('reward_schedule', reward_schedule)
+        else:
+            reward_schedule = 1.
 
         seg.reward = seg.reward * self._cfg.reward_scale * reward_schedule
 

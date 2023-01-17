@@ -162,8 +162,8 @@ base_config = dict(
         rpgdv3=dict(_inherit='rpgdv2', pi_z=dict(ent=dict(coef=1., target_mode='none'),)),
         mpc=dict(_inherit='mbsacv3', cem=dict()),
 
-        rewardrpg=dict(_inherit='rpgdv3', reward_schedule='10000'),
-        rewardsac=dict(_inherit='mbsacv3', reward_schedule='10000'),
+        rewardrpg=dict(_inherit='rpgdv3', use_reward_schedule=True),
+        rewardsac=dict(_inherit='mbsacv3', use_reward_schedule=True),
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
         # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
