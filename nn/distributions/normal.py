@@ -59,12 +59,14 @@ class Normal(DistHead):
                  std_mode: str = 'fix_no_grad',
                  std_scale=0.1,
                  minimal_std_val=-np.inf,
+                 maximal_std_val=np.inf,
                  squash=False, linear=True, nocenter=False):
         super().__init__(action_space)
 
         self.std_mode = std_mode
         self.std_scale = std_scale  # initial std scale
         self.minimal_std_val = minimal_std_val
+        self.maximal_std_val = maximal_std_val
         self.action_scale = action_space.high[0]
 
         assert std_mode in self.STD_MODES
@@ -94,7 +96,7 @@ class Normal(DistHead):
         from tools.utils import clamp
         # log_stds = clamp(min=self.LOG_STD_MIN, max=self.LOG_STD_MAX)
         log_stds = clamp(
-            log_stds, minval=max(self.LOG_STD_MIN, self.minimal_std_val), maxval=self.LOG_STD_MAX)
+            log_stds, minval=max(self.LOG_STD_MIN, self.minimal_std_val), maxval=min(self.LOG_STD_MAX, self.maximal_std_val))
         action_std = torch.exp(log_stds) * self.std_scale
         # else:
         #     log_stds = torch.tanh(log_stds)

@@ -370,7 +370,7 @@ class SmallMaze(LargeMaze):
             cfg=None,
             low_steps=20,
             reward_type='sparse',
-            reward_mapping=[[[1, -2], 1], [[-5, 1], 2]],
+            reward_mapping=[[[1, -2], 0.2], [[-5, 1], 2]],
         ) -> None:
         super().__init__(cfg)
         self.reset()

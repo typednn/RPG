@@ -169,6 +169,11 @@ base_config = dict(
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
         # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
+
+        relabel=dict(_inherit='rpgcv2', relabel_latent='linear(0.,0.99,1000)',
+                     hidden=dict(action_weight=0.,  use_next_state=True, head=dict(std_mode='statewise', maximal_std_val=1.))),
+        relabeld = dict(_inherit='rpgcv2', relabel_latent='linear(0.,0.99,1000)',
+                     hidden=dict(action_weight=0., use_next_state=True, head=dict(epsilon=0.01), TYPE='Categorical')),
     ),
 )
 

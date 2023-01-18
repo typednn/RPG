@@ -155,7 +155,6 @@ class FixArm(OpenCabinetDoorEnv):
     #     #raise NotImplementedError
     #     obs, reward, done, info = super().step(action)
     #     return self.wrap_obs(obs), reward, done, info
-        
 
     # def reset(self, seed=None, reconfigure=False):
     #     obs = super().reset(seed, reconfigure)

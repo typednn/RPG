@@ -37,9 +37,6 @@ class HiddenSpace(Configurable):
     def reward(self, inp, z, timestep):
         return self.likelihood(inp, z, timestep, is_reward=True)
 
-    def relabel(self):
-        raise NotImplementedError
-
     @property
     def learn(self):
         return True
@@ -130,3 +127,8 @@ class Gaussian(HiddenSpace):
             # print(self.head(inp).dist.loc.shape)
             # print(super().sample(inp, mode).shape)
             return (self.head(inp).dist.loc, None)
+
+            
+class Mixture(Categorical):
+    def __init__(self, cfg=None, n_cont=None) -> None:
+        super().__init__(cfg, n_cont)

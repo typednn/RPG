@@ -32,18 +32,23 @@ class InfoNet(Network):
         action_dim = action_space.shape[0]
         from .hidden import HiddenSpace
         self.hidden: HiddenSpace = hidden_space
-        self.info_net = Seq(mlp(state_dim + action_dim, hidden_dim, self.hidden.get_input_dim()))
-
         self.config = self.hidden._cfg
 
-        if learn_posterior:
-            self.posterior_z = Seq(mlp(state_dim, hidden_dim, self.hidden.get_input_dim()))
+        self.info_net = Seq(mlp(state_dim + (action_dim if self.config.action_weight > 0. else 0),
+                                hidden_dim, self.hidden.get_input_dim()))
 
-    def compute_feature(self, states, a_seq):
+
+        # if learn_posterior:
+        #     self.posterior_z = Seq(mlp(state_dim, hidden_dim, self.hidden.get_input_dim()))
+
+    def compute_feature(self, states, a_seq,):
         states = states * self.config.obs_weight
-        a_seq = (a_seq + torch.randn_like(a_seq) * self.config.noise)
-        a_seq = a_seq * self.config.action_weight
-        return self.info_net(states, a_seq)
+        if self.config.action_weight > 0.:
+            a_seq = (a_seq + torch.randn_like(a_seq) * self.config.noise)
+            a_seq = a_seq * self.config.action_weight
+            return self.info_net(states, a_seq)
+        else:
+            return self.info_net(states)
 
     def get_state_seq(self, traj):
         if self.config.use_next_state:
@@ -88,7 +93,7 @@ class InfoLearner(LossOptimizer):
                  net=InfoNet.dc,
                  coef=1.,
                  weight=Scheduler.to_build(TYPE='constant'),
-                 hidden_dim=256, learn_posterior=False,
+                 hidden_dim=256, #learn_posterior=False,
 
                  use_latent=True,  # if this is not True, the network will take the original observation as input
                  learn_with_dynamics=False, # if this is true, the network will be trained with dynamics model
@@ -99,20 +104,22 @@ class InfoLearner(LossOptimizer):
 
         if learn_with_dynamics:
             assert use_latent, 'learn_with_dynamics requires use_latent'
-            assert not learn_posterior, 'learn_with_dynamics requires not learn_posterior'
+            # assert not learn_posterior, 'learn_with_dynamics requires not learn_posterior'
 
         if not use_latent:
             state_dim = obs_space.shape[0]
 
         net = InfoNet(
             state_dim, action_space, hidden_dim, hidden_space, cfg=net,
-            learn_posterior=learn_posterior
+            # learn_posterior=learn_posterior
         ).cuda()
         self.coef = coef
         self.info_decay: Scheduler = Scheduler.build(weight)
-        self.learn_posterior = learn_posterior
+        # self.learn_posterior = learn_posterior
         super().__init__(net)
         self.net = net
+        import copy
+        self.target_net = copy.deepcopy(net)
 
     # @classmethod
     # def build_from_cfgs(self, net_cfg, learner_cfg, *args, **kwargs):
@@ -131,16 +138,17 @@ class InfoLearner(LossOptimizer):
             z_detach = rollout['z'].detach()
 
             mutual_info = self.net(rollout, mode='likelihood').mean()
-            if self.learn_posterior:
-                posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
-            else:
-                posterior = 0.
+            #if self.learn_posterior:
+            #    posterior = self.net.get_posterior(rollout['state'][1:].detach(), z_detach).mean()
+            #else:
+            #    posterior = 0.
+            posterior = 0.
 
             self.optimize(- mutual_info - posterior)
 
             # TODO: estimate the posterior
             logger.logkv_mean('info_ce_loss', float(-mutual_info))
-            logger.logkv_mean('info_posterior_loss', float(-posterior))
+            # logger.logkv_mean('info_posterior_loss', float(-posterior))
 
             self.info_decay.step()
             logger.logkv_mean('info_decay', self.info_decay.get())
@@ -151,19 +159,27 @@ class InfoLearner(LossOptimizer):
             self.update(seg2rollout(seg), update_with_latent=False)
 
 
-    def sample_z(self, states, a):
-        raise NotImplementedError
-        assert not self.learn_with_dynamics
-        return self.net(
-            {
-                'state': states,
-                'a': a[None,:],
-                'z': a[None, :] * 0 # fake z
-            },
-            mode='sample'
-        )[0]
+    def sample_latent(self, states):
+        # raise NotImplementedError
+        # assert not self.learn_with_dynamics
+        # return self.net(
+        #     {
+        #         'state': states,
+        #         'a': a[None,:],
+        #         'z': a[None, :] * 0 # fake z
+        #     },
+        #     mode='sample'
+        # )[0]
+        #return self.net({'state': [states, states]})
+        # state based mutual information
+        feature = self.target_net.compute_feature(states, None)
+        return self.net.hidden.sample(feature)[0] # do not need the log prob ..
 
-    def sample_posterior(self, states):
-        assert not self.learn_with_dynamics
+    # def sample_posterior(self, states):
+    #     assert not self.learn_with_dynamics
 
-        return self.net.get_posterior(states)[0]
+    #     return self.net.get_posterior(states)[0]
+
+    def ema(self, decay=0.999):
+        from tools.utils import ema
+        ema(self.net, self.target_net, decay)
