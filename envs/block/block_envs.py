@@ -99,7 +99,7 @@ class BlockEnv(gym.Env, SimulatorBase):
             self._scene.step()
 
         r = self.compute_reward()
-        info = {'success': self.success}
+        info = {'success': self.success, 'metric': {'true': (self.success == self.n_block)}}
         r = (self.success == self.n_block)
         return self._get_obs(), r, False, info
 
