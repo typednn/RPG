@@ -19,12 +19,12 @@ from .policy_learner import PolicyLearner
 from .hidden import HiddenSpace, Categorical
 from .worldmodel import HiddenDynamicNet, DynamicsLearner
 from . import repr 
+import re
 
 def scheduler(step, schedule):
     if schedule is None:
         return 1.
     elif 'exp' not in schedule:
-        import re
         if isinstance(schedule, str):
             match = re.match(r'linear\((.+),(.+),(.+)\)', schedule)
             if match:
@@ -40,7 +40,12 @@ def scheduler(step, schedule):
     else:
         match = re.match(r'exp\((.+),(.+),(.+)\)', schedule)
         if match:
-            init, final, duration = [float(g) for g in match.groups()]
+            # init should be zero
+            init, gamma, duration = [float(g) for g in match.groups()]
+            # init value
+            # gradually decay to 0
+            target_step = np.maximum(duration - step, 0.)
+            return init + gamma ** (target_step)
         else:
             raise NotImplementedError
 
