@@ -334,7 +334,8 @@ class Trainer(Configurable, RLAlgo):
             self.model_learner.ema(self._cfg.tau)
             self.pi_a.ema(self._cfg.tau)
             self.pi_z.ema(self._cfg.tau)
-            self.info_learner.ema(self._cfg.tau)
+            if self.z_space.learn:
+                self.info_learner.ema(self._cfg.tau)
 
     def eval(self):
         #print("Eval is not implemented")
