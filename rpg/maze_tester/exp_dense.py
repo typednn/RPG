@@ -21,7 +21,7 @@ if __name__ == '__main__':
                 z_delay=4,
                 pi_a=dict(ent=dict(coef=1.)),
                 pi_z=dict(ent=dict(coef=100.)),
-                reward_schedule=["1000000" if env_name == 'ant' else "100000"] * 9 + ['exp(0.,0.9999,200000)', 'exp(0.,0.9999,200000)'],
+                reward_schedule=["1000000" if env_name == 'ant' else "100000"] * 9 + ['exp(0.,0.9999,200000)', 'exp(0.,0.9999,100000)'],
             ),
             names=['sac', 'discrete5', 'discrete10', 'discrete50', 'discrete100', 'discrete500', 'gaussian10', 'incrR', 'incrRc1', 'exp1', 'exp2'],
             base='mbsacv3', 
