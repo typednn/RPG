@@ -23,7 +23,7 @@ from . import repr
 def scheduler(step, schedule):
     if schedule is None:
         return 1.
-    else:
+    elif 'exp' not in schedule:
         import re
         if isinstance(schedule, str):
             match = re.match(r'linear\((.+),(.+),(.+)\)', schedule)
@@ -37,6 +37,12 @@ def scheduler(step, schedule):
             init, final = 0., 1.
         mix = np.clip(step / duration, 0.0, 1.0)
         return (1.0 - mix) * init + mix * final
+    else:
+        match = re.match(r'exp\((.+),(.+),(.+)\)', schedule)
+        if match:
+            init, final, duration = [float(g) for g in match.groups()]
+        else:
+            raise NotImplementedError
 
 
 class Trainer(Configurable, RLAlgo):

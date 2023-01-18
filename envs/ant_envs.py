@@ -106,7 +106,10 @@ class AntHEnv(gym.Env):
         
         if self.obs_dim > 1:
             inp = self.embedder(self._base_obs[:self.subgoal_dim]/10.)
-            inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 1.)))
+            if self.env_name == 'AntPush':
+                inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 1.)))
+            else:
+                inp = np.concatenate((inp, movable * 0.01))
             return np.r_[self._base_obs[:2] * 0.01, self._base_obs[2:] * 0.1,  inp]  # input the original goal..
         else:
             return np.concatenate((self._base_obs, movable))
