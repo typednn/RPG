@@ -14,7 +14,6 @@ class MixtureAction(ActionDistr):
 
     def rsample(self, detach=False):
         discrete, discrete_logp = self.discrete.sample()
-        print(self.discrete.dist.probs[0])
         continuous, continuous_logp = self.continuous.rsample(detach)
         # print(continuous.shape)
         continuous = batched_index_select(continuous, discrete.dim(), discrete)[..., 0, :]
@@ -25,8 +24,10 @@ class MixtureAction(ActionDistr):
         assert discrete_logp.shape == continuous_logp.shape
         return action, discrete_logp + continuous_logp * 0.0
 
-    def entropy(self):
-        raise NotImplementedError
+    def entropy(self, tolerate=False):
+        if not tolerate:
+            raise NotImplementedError
+        return self.discrete.entropy() #+ self.continuous.entropy()
 
     def sample(self):
         return self.rsample(detach=True)
@@ -50,6 +51,7 @@ class MixtureAction(ActionDistr):
         continuous = action[..., None, 1:].expand(*([-1] * (action.dim() - 1)), discrete_logits.shape[-1], -1)
         dd  = self.discrete.log_prob(discrete) # * 10
 
+
         continuous_probs = self.continuous.log_prob(continuous)
         cc = torch.gather(continuous_probs, discrete.dim(), discrete[..., None])[..., 0] * WEIGHT_CONTINUOUS
         return dd + cc
@@ -61,7 +63,7 @@ class Mixture(DistHead):
 
         Network.__init__(self)
         self.discrete = DistHead.build(action_space.discrete, cfg=cfg['discrete'])
-        self.continuous = DistHead.build(action_space.continuous, cfg=cfg['continuous'])
+        self.continuous = DistHead.build(action_space.continuous, cfg=cfg['continuous']).cuda() # move to cuda.. hack
         self.ddim = self.discrete.get_input_dim()
         self.cdim = self.continuous.get_input_dim()
 

@@ -50,11 +50,15 @@ class DiffPolicy(PolicyBase):
 
 
 
+from nn.distributions import Mixture
+from tools.utils import myround
 class QPolicy(PolicyBase):
+    # hack for the mixture policy 
     def __init__(
         self, state_dim, hidden_dim, head, cfg=None,
         first_state=True,
     ) -> None:
+        self.is_mixture = isinstance(head, Mixture)
         super().__init__(state_dim, 0, hidden_dim, head)
 
     def q_value(self, state):
@@ -63,17 +67,27 @@ class QPolicy(PolicyBase):
     def forward(self, state, hidden, alpha):
         assert hidden is None
         q = self.q_value(state)
-        logits = q / alpha
+        if self.is_mixture:
+            logits = q.clone()
+            q[..., :self.head.ddim] /= alpha
+        else:
+            logits = q / alpha
         out = self.head(logits)
         
         a, logp = out.sample()
-        return Aout(a, logp, out.entropy())
+        if not self.is_mixture:
+            return Aout(a, logp, out.entropy())
+        else:
+            return Aout(a, logp, out.entropy(tolerate=True))
 
     def loss(self, rollout, alpha):
         # for simplicity, we directly let the high-level policy to select the action with the best z values .. 
         state = rollout['state'].detach()
         q_value = rollout['q_value'].detach()
         z = rollout['z'].detach()
+
+        if self.is_mixture:
+            z = myround(z[..., 0])
 
         q_value = q_value.min(axis=-1, keepdims=True).values
         with torch.no_grad():

@@ -1,7 +1,7 @@
 import torch
 from tools.config import Configurable, as_builder, merge_a_into_b, CN
 from nn.distributions.discrete import Discrete
-from nn.distributions.normal import Normal
+from nn.distributions.normal import Normal, DistHead
 from gym.spaces import Box
 
 
@@ -135,25 +135,60 @@ class Gaussian(HiddenSpace):
             return (self.head(inp).dist.loc, None)
 
             
-# from nn.space.mixture import MixtureSpace
-# from nn.distributions.mixture import Mixture as MixtureOutput
-# class Mixture(Categorical):
+from nn.space.mixture import MixtureSpace
+from nn.distributions.mixture import Mixture as MixtureOutput
+class Mixture(HiddenSpace):
 
-#     def __init__(
-#         self, cfg=None, n_cont=None,
-#         head=MixtureOutput(
-#             discrete=Discrete.gdc(epsilon=0.05),
-#             continuous=Normal.gdc(linear=True, std_mode='fix_no_grad', std_scale=0.3989),
-#         )
-#     ) -> None:
-#         super().__init__(cfg, n_cont)
+    def __init__(
+        self, cfg=None, n=6, n_cont=None,
+        head=MixtureOutput.gdc(
+            discrete=DistHead.to_build(TYPE='Discrete', epsilon=0.05),
+            continuous=DistHead.to_build(TYPE='Normal', linear=True, std_mode='fix_no_grad', std_scale=0.3989),
+        )
+    ) -> None:
+        super().__init__()
 
-#         if n_cont is not None:
-#             self.n_cont = n_cont
-#         else:
-#             self.n_cont = self._cfg.n//2
-#         self.n_discrete = self._cfg.n - self.n_cont
-#         from gym.spaces import Discrete as D
+        if n_cont is not None:
+            self.n_cont = n_cont
+        else:
+            self.n_cont = self._cfg.n//2
+        self.n_discrete = self._cfg.n - self.n_cont
+        from gym.spaces import Discrete as D
 
-#         self._space = MixtureSpace(D(self.n_discrete), Gaussian(-1, 1, (self.n_cont,)))
-#         self.head = MixtureOutput(self._space, cfg=self.space)
+        self._space = MixtureSpace(D(self.n_discrete), Box(-1, 1, (self.n_cont,)))
+        self.head = MixtureOutput(self._space, cfg=head)
+
+
+    @property
+    def space(self):
+        return self._space
+
+    @property
+    def dim(self):
+        return self.n_discrete + self.n_cont
+
+    def tokenize(self, z):
+        from tools.utils import myround
+
+        z_discrete = myround(z[..., 0])
+        z_continuous = z[..., 1:]
+        return torch.cat([torch.nn.functional.one_hot(z_discrete, self.n_discrete).float(), z_continuous * 0.3], dim=-1)
+
+    def get_input_dim(self):
+        return self.head.get_input_dim()
+
+    def make_policy_head(self, cfg=None):
+        default = MixtureOutput.gdc(
+            continuous=DistHead.to_build(TYPE='Normal', linear=True, std_scale=1., std_mode='fix_no_grad', nocenter=True, squash=False),
+            discrete=DistHead.to_build(TYPE='Discrete', epsilon=0.05)
+        )
+        return MixtureOutput(self._space, cfg=merge_a_into_b(CN(cfg), default))
+
+    def likelihood(self, inp, z, timestep, **kwargs):
+        return self.head(inp).log_prob(z)
+
+    def sample(self, inp, mode='sample'):
+        if mode == 'sample':
+            return super().sample(inp, mode)
+        else:
+            return (self.head(inp).dist.loc, None)

@@ -38,7 +38,6 @@ class GMMAction(NormalAction):
             action = action.reshape(-1, *action.shape[len(sample_shape):])
             action = (index * action).sum(dim=2)
             action = action.reshape(*sample_shape, *action.shape[1:])
-            raise NotADirectoryError
         else:
             index = self.mode.sample(sample_shape, *args, **kwargs) # we store index, there is no gradient here ..
 
