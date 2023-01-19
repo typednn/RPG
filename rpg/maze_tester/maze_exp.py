@@ -156,6 +156,7 @@ base_config = dict(
         rpgcv2=dict(_inherit='mbsacv3', hidden=dict(n=12, TYPE='Gaussian'), info=dict(coef=0.001)),
 
         rpgcv3=dict(_inherit='rpgcv2', buffer=dict(max_episode_num=500)),
+        rpgdelay = dict(_inherit='rpgcv2', info_delay=1),
 
         rpgdv2=dict(_inherit='rpgcv2', hidden=dict(TYPE='Categorical')),
 

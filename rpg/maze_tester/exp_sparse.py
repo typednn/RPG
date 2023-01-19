@@ -20,12 +20,12 @@ if __name__ == '__main__':
             f'{env_name}',
             dict(
                 env_cfg=dict(n=5, reward_type='sparse'),
-                _base=['mbsacv3', 'rpgcv2', 'rpgcv2', 'rpgcv2', 'rpgcv2', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgcv2'],
+                _base=['mbsacv3', 'rpgcv2', 'rpgcv2', 'rpgcv2', 'rpgcv2', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgcv2', 'rpgdelay'],
                 info = dict(coef=[0.0, 0.002, 0.005, 0.001, 0.0005,
                                   0.001, 0.005, 0.0005, 0.002, 0.0001,
-                                  0.0001])
+                                  0.0001, 0.005])
             ),
-            names=['sac', 'gaussian002', 'gaussian005', 'gaussian001', 'gaussian0005', 'discrete001', 'discrete005', 'discrete0005', 'discrete002', 'discrete0001', 'gaussian0001'],
+            names=['sac', 'gaussian002', 'gaussian005', 'gaussian001', 'gaussian0005', 'discrete001', 'discrete005', 'discrete0005', 'discrete002', 'discrete0001', 'gaussian0001', 'delay005'],
             base='mbsacv3', 
             default_env = configs['env_name'][env_name],
         )
