@@ -24,6 +24,12 @@ import re
 def scheduler(step, schedule):
     if schedule is None:
         return 1.
+    if isinstance(schedule, str) and '2seg' in schedule:
+        match = re.match(r'2seg\((.+),(.+),(.+)\)', schedule)
+        score1, t1, t2 = [float(g) for g in match.groups()]
+
+        return np.clip(step / t1, 0.0, 1.0) * score1 + np.clip((step - t1) / (t2 - t1), 0.0, 1.0) * (1-score1)
+
     elif isinstance(schedule, int) or 'exp' not in schedule:
         if isinstance(schedule, str):
             match = re.match(r'linear\((.+),(.+),(.+)\)', schedule)
