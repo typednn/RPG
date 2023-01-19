@@ -11,7 +11,7 @@ from .intrinsic import IntrinsicMotivation
 #from .rnd import RNDExplorer
 from .exploration_bonus import ExplorationBonus
 from .utils import create_hidden_space
-from nn.distributions import Normal
+from nn.distributions import Normal, DistHead
 from typing import Union
 from tools.config import Configurable
 from tools.utils import logger, totensor
@@ -73,11 +73,12 @@ class Trainer(Configurable, RLAlgo):
         pi_a=PolicyLearner.dc,
         pi_z=PolicyLearner.dc,
 
-        head = Normal.gdc(
+        head = DistHead.gdc(
             linear=False,
             squash=True,
             std_mode='statewise',
             std_scale=1.,
+            TYPE='Normal',
         ),
         z_head=None,
 
@@ -158,7 +159,7 @@ class Trainer(Configurable, RLAlgo):
         hidden_dim = 256
 
         from .policy_net import DiffPolicy, QPolicy
-        pi_a_net = DiffPolicy(state_dim, z_space.dim, hidden_dim, Normal(env.action_space, cfg=head),
+        pi_a_net = DiffPolicy(state_dim, z_space.dim, hidden_dim, DistHead.build(env.action_space, cfg=head),
                               cfg=backbone, time_embedding=time_embedding).cuda()
         self.pi_a = PolicyLearner('a', env.action_space, pi_a_net, z_space.tokenize, cfg=pi_a)
 

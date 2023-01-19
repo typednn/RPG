@@ -171,6 +171,8 @@ base_config = dict(
         # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
 
         rpgmix=dict(_inherit='rpgcv2', hidden=dict(TYPE='Mixture', n=12)),
+        sacgmm=dict(_inherit='mbsacv3', head=dict(TYPE='GMM')),
+        sacflow=dict(_inherit='mbsacv3', head=dict(TYPE='Flow')),
 
         relabel=dict(_inherit='rpgcv2', relabel_latent='exp(0.,0.99,10000)',
                      hidden=dict(action_weight=0.,  use_next_state=True, head=dict(std_mode='statewise', maximal_std_val=1., minimal_std_val=0.05))),

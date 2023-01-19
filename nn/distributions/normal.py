@@ -29,6 +29,8 @@ class NormalAction(ActionDistr):
         return action * self.act_scale, logp
 
     def entropy(self):
+        #TODO: sac entropy bugs here ..
+        assert not self.tanh
         return self.dist.entropy().sum(axis=-1)
 
     def sample(self):

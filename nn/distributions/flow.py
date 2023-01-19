@@ -13,7 +13,6 @@ import pyro.distributions.transforms as T
 class FlowAction(ActionDistr):
     def __init__(self, flow_dist, batch_size=1):
         # NOTE: flow is conditioned ..
-        raise NotImplementedError
         self.flow_dist = flow_dist
         self.batch_size = batch_size
 
@@ -22,17 +21,17 @@ class FlowAction(ActionDistr):
             sample_shape = (self.batch_size,)
         samples = self.flow_dist.rsample(sample_shape)
         log_prob = self.flow_dist.log_prob(samples)
-        #print(samples.shape, log_prob.shape)
-        raise NotImplementedError
-        return samples, log_prob[..., None]
+        return samples, log_prob
 
     def sample(self):
+        raise NotImplementedError
         samples = self.flow_dist.sample((self.batch_size,))
         log_prob = self.flow_dist.log_prob(samples.detach())
         #print(samples.shape, log_prob.shape)
         return samples, log_prob
 
     def log_prob(self, action, sum=True):
+        raise NotImplementedError
         assert action.shape[0] == self.batch_size
         assert sum
         return self.flow_dist.log_prob(action)
@@ -41,6 +40,7 @@ class FlowAction(ActionDistr):
         return next(self.flow_dist.parameters())
 
     def entropy(self, n=1):
+        return None
         samples = self.flow_dist.sample((n,))
         return self.flow_dist.log_prob(samples).mean()
 
@@ -49,7 +49,7 @@ class FlowAction(ActionDistr):
 
         
 class Flow(DistHead):
-    def __init__(self, action_space, cfg = None, layers=4, hidden_dim=128, tanh=False, mode='affine_autoregressive'):
+    def __init__(self, action_space, cfg = None, layers=4, hidden_dim=128, tanh=True, mode='affine_autoregressive', linear=None, std_mode=None, squash=None, std_scale=None):
         super().__init__(action_space)
 
         self.base_mean = nn.Parameter(torch.zeros(self.action_dim), requires_grad=False)

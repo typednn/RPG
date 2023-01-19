@@ -13,21 +13,20 @@ loss = (pd.mean * grad.detach() + pd.scale *
         (grad/theta).detach()).sum(axis=-1).mean()
 """
 import torch
-from .normal import NormalAction
+from .normal import ActionDistr
 from torch.distributions import Categorical
 
 
-class GMMAction(NormalAction):
-    def __init__(self, log_mu, loc, scale, gumbel=False):
-        super().__init__(loc, scale)
-        assert log_mu.shape[:2] == loc.shape[:2] and len(log_mu.shape) == 2, f"{log_mu.shape}, {loc.shape}, {scale.shape}"
-        self.gumbel = gumbel
+class GMMAction(ActionDistr):
+    def __init__(self, log_mu, normal, gumbel=True):
+        #super().__init__(loc, scale)
+        self.normal = normal
         self.log_mu = log_mu
         self.mode = Categorical(logits=log_mu)
-        raise NotImplementedError
+        self.gumbel = gumbel
 
     def rsample(self, sample_shape=torch.Size(), *args, **kwargs):
-        action = self.dist.rsample(sample_shape, *args, **kwargs)
+        action, logp = self.normal.rsample(sample_shape, *args, **kwargs)[:2]
         if self.gumbel:
             if not isinstance(sample_shape, torch.Size):
                 sample_shape = torch.Size(sample_shape)
@@ -36,9 +35,17 @@ class GMMAction(NormalAction):
             log_mu = self.log_mu[None,:].expand(sample_shape.numel(), *self.log_mu.shape)
             index = torch.nn.functional.gumbel_softmax(log_mu, hard=False)
             action = action.reshape(-1, *action.shape[len(sample_shape):])
-            action = (index * action).sum(dim=2)
+            action = (index[..., None] * action).sum(dim=-2)
+
+            logp = logp.reshape(-1, *logp.shape[len(sample_shape):])
+            assert logp.shape == log_mu.shape, f"{logp.shape} vs {log_mu.shape}"
+            logpa = (index * (logp + log_mu)).sum(dim=-1)
             action = action.reshape(*sample_shape, *action.shape[1:])
+            logpa = logpa.reshape(*sample_shape, *logpa.shape[1:])
+            
+            return action, logpa
         else:
+            raise NotImplementedError
             index = self.mode.sample(sample_shape, *args, **kwargs) # we store index, there is no gradient here ..
 
             #return action[torch.arange(len(action), device=action.device), self.index]
@@ -62,7 +69,7 @@ class GMMAction(NormalAction):
         #return self.rsample(*args, **kwargs).detach()
         raise NotImplementedError
 
-    def entropy(self, n=1000):
+    def entropy(self, n=100):
         assert self.log_mu.shape[0] == 1
         #action, _ = self.rsample((n,))
         action = torch.rand(size=(n, 1), device=self.dist.loc.device) * 2 - 1
@@ -96,3 +103,19 @@ class GMMAction(NormalAction):
         log_prob = self.mode.log_prob(self.index)
         assert log_prob.shape == values.shape, f"{log_prob.shape}, {values.shape}"
         return log_prob * values.detach() # we need to maximize log p * R
+
+
+from .normal import Normal
+class GMM(Normal):
+    def __init__(self, action_space, cfg=None, n_component=12):
+        super().__init__(action_space, cfg)
+        self.n_component = n_component
+
+    def get_input_dim(self):
+        return (self.net_output_dim + 1) * (self.n_component)
+
+    def forward(self, means):
+        log_mu = means[..., :self.n_component]
+        others = means[..., self.n_component:].reshape(*means.shape[:-1], self.n_component, -1)
+        normal_action = super().forward(others)
+        return GMMAction(log_mu, normal_action)
