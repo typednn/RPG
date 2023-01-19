@@ -123,9 +123,10 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         bonus = float(len(completions))
         reward_dict['bonus'] = bonus
         reward_dict['r_total'] = len(completions) == len(self.tasks_to_complete)
+        reward_dict['metric']['true'] = (len(completions) == len(self.tasks_to_complete))
 
         if self.reward_type == 'sparse':
-            reward_dict['r_total'] = bonus / len(self.tasks_to_complete) + (bonus == len(self.tasks_to_complete))
+            reward_dict['r_total'] = bonus / len(self.tasks_to_complete) + (len(completions) == len(self.tasks_to_complete))
 
         elif self.reward_type == 'bonus':
             #     reward_dict['r_total'] += 0.2 * bonus / 5.
