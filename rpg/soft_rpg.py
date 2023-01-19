@@ -224,13 +224,13 @@ class Trainer(Configurable, RLAlgo):
         else:
             self.exploration = None
 
-    def relabel_z(self, seg):
+    def relabel_z(self, seg, relabel_z=True):
         z = seg.z
         if self._cfg.fix_buffer:
             z = torch.zeros_like(z)
             assert self._cfg.hidden.n == 1
         # .obs_seq[0], seg.timesteps[0], seg.z
-        if self._cfg.relabel_latent is not None and self.update_step > 100:
+        if self._cfg.relabel_latent is not None and self.update_step > 200 and relabel_z:
             relabel_ratio = scheduler(self.update_step, self._cfg.relabel_latent)
 
             if self._cfg.relabel_method == 'future':
@@ -265,7 +265,9 @@ class Trainer(Configurable, RLAlgo):
 
     def update_dynamcis(self):
         seg = self.buffer.sample(self._cfg.batch_size)
-        z = self.relabel_z(seg)
+        # never relabel z for dynamics learning ..
+        # this is the off policy part
+        z = self.relabel_z(seg, relabel_z=False) # don't do relabel for dynamics learning
         
         if self.reward_relabel is not None:
             seg.reward = self.reward_relabel(seg.obs_seq[:-1], seg.action, seg.obs_seq[1:])

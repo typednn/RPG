@@ -66,6 +66,7 @@ class ExplorationBonus(Configurable):
 
         self.include_latent = include_latent
         if include_latent:
+            raise NotImplementedError
             assert self.obs_mode != 'state'
             assert not self.training_on_rollout
 

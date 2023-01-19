@@ -171,7 +171,7 @@ base_config = dict(
         # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
 
         relabel=dict(_inherit='rpgcv2', relabel_latent='linear(0.,0.99,1000)',
-                     hidden=dict(action_weight=0.,  use_next_state=True, head=dict(std_mode='statewise', maximal_std_val=1.))),
+                     hidden=dict(action_weight=0.,  use_next_state=True, head=dict(std_mode='statewise', maximal_std_val=1., minimal_std_val=0.05))),
         relabeld = dict(_inherit='rpgcv2', relabel_latent='linear(0.,0.99,1000)',
                      hidden=dict(action_weight=0., use_next_state=True, head=dict(epsilon=0.01), TYPE='Categorical')),
     ),

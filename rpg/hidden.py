@@ -91,23 +91,29 @@ class Categorical(HiddenSpace):
 class Gaussian(HiddenSpace):
     def __init__(
         self, cfg=None, n=6,
-        head = Normal.gdc(linear=True, std_mode='fix_no_grad', std_scale=0.3989)
+        head = Normal.gdc(linear=True, std_mode='fix_no_grad', std_scale=0.3989),
+        obs_dim=1,
     ) -> None:
         super().__init__()
         self._dim = n
         self._space = Box(-1, 1, (n,))
         self.head = Normal(self.space, head).cuda()
+        self.obs_dim = obs_dim
 
     @property
     def dim(self):
-        return self._dim
+        if self.obs_dim == 1:
+            return self._dim 
+        else:
+            return self._dim * (self.obs_dim + 1)
 
     @property
     def space(self):
         return self._space
 
     def tokenize(self, z):
-        return z
+        from .utils import positional_encoding
+        return positional_encoding(self.obs_dim, z)
 
     def get_input_dim(self):
         return self.head.get_input_dim()

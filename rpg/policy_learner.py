@@ -116,6 +116,7 @@ class PolicyLearner(LossOptimizer):
         inps = [s]
         hidden = self.enc_z(hidden) if not self._cfg.ignore_hidden else None
         #s = self.policy.add_alpha(*inps, timestep=timestep) # concatenate the two
+        
 
         with torch.no_grad():
             alpha = self.ent.alpha
