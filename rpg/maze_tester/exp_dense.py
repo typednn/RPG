@@ -3,14 +3,15 @@ from rpg.maze_tester.maze_exp import *
 configs = dict(
     env_name = dict(
         cabinet='Cabinet',
-        ant='AntPush'
+        ant='AntPush',
+        fall='AntFall'
     )
 )
 
 if __name__ == '__main__':
     exp = build_exp(base_config)
 
-    for env_name  in ['cabinet', 'ant']: # ensure the experiments are finished ..
+    for env_name  in ['cabinet', 'ant', 'fall']: # ensure the experiments are finished ..
         exp.add_exps(
             f'dense{env_name}',
             dict(
