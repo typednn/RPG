@@ -27,7 +27,6 @@ class MixtureAction(ActionDistr):
 
     def entropy(self):
         raise NotImplementedError
-        return self.discrete.entropy() + self.continuous.entroy()
 
     def sample(self):
         return self.rsample(detach=True)
@@ -43,7 +42,7 @@ class MixtureAction(ActionDistr):
         return self.discrete.get_parameters() + self.continuous.get_parameters()
 
     def log_prob(self, action):
-        from ..utils import myround
+        from tools.utils import myround
         discrete = myround(action[..., 0])
 
         discrete_logits = self.discrete.dist.logits

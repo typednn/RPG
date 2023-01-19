@@ -1,4 +1,4 @@
-
+# python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path xxx --info.coef 0.01 --env_cfg.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000 --relabel_latent None --info_delay 1 --hidden.head.std_mode fix_no_grad
 from rpg.maze_tester.maze_exp import *
 
 if __name__ == '__main__':

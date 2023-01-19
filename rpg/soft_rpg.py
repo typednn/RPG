@@ -24,7 +24,7 @@ import re
 def scheduler(step, schedule):
     if schedule is None:
         return 1.
-    elif 'exp' not in schedule:
+    elif isinstance(schedule, int) or 'exp' not in schedule:
         if isinstance(schedule, str):
             match = re.match(r'linear\((.+),(.+),(.+)\)', schedule)
             if match:

@@ -135,6 +135,25 @@ class Gaussian(HiddenSpace):
             return (self.head(inp).dist.loc, None)
 
             
-class Mixture(Categorical):
-    def __init__(self, cfg=None, n_cont=None) -> None:
-        super().__init__(cfg, n_cont)
+# from nn.space.mixture import MixtureSpace
+# from nn.distributions.mixture import Mixture as MixtureOutput
+# class Mixture(Categorical):
+
+#     def __init__(
+#         self, cfg=None, n_cont=None,
+#         head=MixtureOutput(
+#             discrete=Discrete.gdc(epsilon=0.05),
+#             continuous=Normal.gdc(linear=True, std_mode='fix_no_grad', std_scale=0.3989),
+#         )
+#     ) -> None:
+#         super().__init__(cfg, n_cont)
+
+#         if n_cont is not None:
+#             self.n_cont = n_cont
+#         else:
+#             self.n_cont = self._cfg.n//2
+#         self.n_discrete = self._cfg.n - self.n_cont
+#         from gym.spaces import Discrete as D
+
+#         self._space = MixtureSpace(D(self.n_discrete), Gaussian(-1, 1, (self.n_cont,)))
+#         self.head = MixtureOutput(self._space, cfg=self.space)
