@@ -9,13 +9,14 @@ configs = dict(
         ant='AntPush',
         block='BlockPush2',
         fall='AntFall',
+        block3='BlockPush',
     )
 )
 
 if __name__ == '__main__':
     exp = build_exp(base_config)
 
-    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant', 'block', 'fall']: # ensure the experiments are finished ..
+    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant', 'block', 'fall', 'block3']: # ensure the experiments are finished ..
         exp.add_exps(
             f'{env_name}',
             dict(

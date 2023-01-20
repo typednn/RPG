@@ -72,7 +72,7 @@ class GymVecEnv(VecEnv):
                 import os
                 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
                 from envs.block import BlockEnv
-                return TimeLimit(BlockEnv(**kwargs), 60)
+                return TimeLimit(BlockEnv(**kwargs), 100)
 
             elif env_name == 'BlockPush2':
                 import os
