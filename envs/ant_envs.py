@@ -131,6 +131,9 @@ class AntHEnv(gym.Env):
         negative_dist = self.reward_fn(self._base_obs, self.goal)
         #r = self._get_reward()
         reward = negative_dist * 0.1
+
+        if self.env_name == 'AntFall':
+            reward = reward * 0.2
         
         if self.reward_type == 'sparse':
             reward = float(negative_dist > -self.goal_threshold)
