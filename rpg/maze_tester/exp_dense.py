@@ -18,7 +18,7 @@ if __name__ == '__main__':
                 env_cfg=dict(n=5, reward_type='dense', obs_dim=0),
                 _base=[
                     'mbsacv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 'rpgdv3', 
-                    'rpgdv3', 'rpgcv2', 'rewardrpg', 'rewardrpgc'],
+                    'rpgdv3', 'rpgcv2', 'rewardrpg', 'rewardrpg'],
                 info=dict(coef=[0.0, 0.5, 1., 5., 10., 
                                 50., 1., 1., 1.]),
                 rnd=dict(scale=0.),
