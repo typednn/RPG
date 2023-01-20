@@ -29,7 +29,7 @@ if __name__ == '__main__':
             ),
             names=[
                 'sac', 'discrete5', 'discrete10', 'discrete50', 'discrete100',
-                'discrete500', 'gaussian10', 'incrR', 'seg2'],
+                'discrete500', 'gaussian10', 'incrR', 'seg'], # note that seg is seg2 before
             base='mbsacv3', 
             default_env = configs['env_name'][env_name],
         )
