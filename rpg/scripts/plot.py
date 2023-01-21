@@ -57,6 +57,14 @@ def plot_curve_with_shade(ax, x, mean, std, label, color='green', smoothingWeigh
 
 KEYS = defaultdict(lambda: 'success')
 MAX_STEPS = defaultdict(lambda: 2000000)
+KEYS['densecabinet'] = 'rewards'
+MAX_STEPS['densecabinet'] = 800000
+MAX_STEPS['denseantpush'] = 4000000
+MAX_STEPS['denseantfall'] = 4000000
+
+MAX_STEPS['kitchen'] = 5000000
+MAX_STEPS['antfall'] = 3500000
+KEYS['kitchen'] = 'train_microwave_metric'
 
 
 def get_df_xy(df, x, y):
@@ -67,13 +75,16 @@ def get_df_xy(df, x, y):
     return data[:, 0], data[:, 1]
 
 def read_baseline_result(env_name, method):
-    env_name = dict(
+    ENVS = dict(
         hammer='AdroitHammer',
-        ant='AntPush',
-        block='BlockPush',
+        antpush='AntPush',
+        block='BlockPush2',
         cabinet='Cabinet',
         stickpull='MWStickPull',
-    )[env_name]
+    )
+    if env_name not in ENVS:
+        return [], []
+    env_name = ENVS[env_name]
 
     x_keys = dict(sac='env_n_samples', tdmpc='env_steps')
 
@@ -104,7 +115,7 @@ def read_wandb_result(env_name, method):
             # print(e)
             continue
 
-        x, y = get_df_xy(df, 'total_steps', 'success')
+        x, y = get_df_xy(df, 'total_steps', KEYS[env_name])
         # print(path, len(x))
         xs.append(x); ys.append(y)
     return xs, ys
@@ -131,15 +142,25 @@ def plot_env(ax: plt.Axes, env_name):
     ax.legend(loc=2)
     ax.set_title(env_name)
     ax.set_xlabel("interactions (M)"); 
-    ax.set_ylabel("success rate")
+    ax.set_ylabel(KEYS[env_name])
     ax.grid()
     
 
     
 if __name__ == '__main__':
-    #plt.figure(figsize=(6, 6))
-    envs = ['stickpull', 'cabinet', 'block']
+    plt.figure(figsize=(6, 6))
+    envs = ['hammer', 'stickpull', 'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
     fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
     for ax, env_name in zip(axs, envs):
         plot_env(ax, env_name)
-    plt.savefig('test.png', dpi=300)
+    plt.tight_layout()
+    plt.savefig('sparse.png', dpi=300)
+
+    envs = ['densecabinet', 'denseantpush', 'denseantfall']
+    fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
+    if len(envs) == 1:
+        axs = [axs]
+    for ax, env_name in zip(axs, envs):
+        plot_env(ax, env_name)
+    plt.tight_layout()
+    plt.savefig('dense.png', dpi=300)
