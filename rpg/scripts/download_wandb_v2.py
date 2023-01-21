@@ -24,7 +24,7 @@ results = dict(
     ),
     densecabinet=dict(
         rpg=['l74istv9', 'a1mwbhc2', 'mxk0e15e', 'nezxnnsm'],
-        mbsac=['czbmv6kz', '80fo7yfs', 'rdbxkafw', 's098uexc', 'zmr3ajup', 'j1e5wnf6', 'lw181jcr', 'b10g5qf8'],
+        mbsac=['czbmv6kz', '80fo7yfs', 'rdbxkafw', 's098uexc', 'zmr3ajup', 'j1e5wnf6'],
     ),
     denseantpush=dict(
         mbsac=['qrk7pms9', 'imuhdlx3', 'rologrt9', 'y6f90qiv', '2vaesy7r', '0i8xrgw0'],

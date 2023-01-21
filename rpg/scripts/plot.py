@@ -57,7 +57,7 @@ def plot_curve_with_shade(ax, x, mean, std, label, color='green', smoothingWeigh
 
 KEYS = defaultdict(lambda: 'success')
 MAX_STEPS = defaultdict(lambda: 2000000)
-KEYS['densecabinet'] = 'rewards'
+KEYS['densecabinet'] = 'train_door0_metric'
 MAX_STEPS['densecabinet'] = 800000
 MAX_STEPS['denseantpush'] = 4000000
 MAX_STEPS['denseantfall'] = 4000000
