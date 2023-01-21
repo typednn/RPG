@@ -149,7 +149,7 @@ def plot_env(ax: plt.Axes, env_name):
     
 if __name__ == '__main__':
     plt.figure(figsize=(6, 6))
-    envs = ['hammer', 'stickpull', 'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
+    envs = ['hammer', 'door', 'stickpull', 'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
     fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
     for ax, env_name in zip(axs, envs):
         plot_env(ax, env_name)

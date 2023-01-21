@@ -47,6 +47,10 @@ results = dict(
         rpg=['tp8vynv0', 'szm0fdhi'],
         mbsac=['dg8eqb43', 'rdux2as3'],
     ),
+    door=dict(
+        rpg=['guwbs8n3', 'xaqt9na9', '2hqi924c', '1ap4457z'],
+        mbsac=['9zrks8f2', 'row6vwfk', 'sglqybdb', '5rcqeg67'],
+    )
 )
 
 def download_run(rid, path):
