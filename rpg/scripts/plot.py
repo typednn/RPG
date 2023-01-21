@@ -148,10 +148,9 @@ def plot_env(ax: plt.Axes, env_name):
 
     
 if __name__ == '__main__':
-    envs = ['hammer', 'door', 'basket', 'stickpull', 
-            'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
+    envs = ['hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen', 'antpush'] #, 'antfall']
 
-    width = min(5, len(envs))
+    width = min(4, len(envs))
     n_rows = (len(envs) + width - 1)//width
     
     fig, axs = plt.subplots(n_rows, width, figsize=(6 * width, 6 * n_rows))
