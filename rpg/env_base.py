@@ -139,7 +139,7 @@ class GymVecEnv(VecEnv):
 
             elif env_name == 'AntPush2':
                 from envs.ant_envs import AntHEnv
-                return TimeLimit(AntHEnv(env_name, **kwargs), 200)
+                return TimeLimit(AntHEnv('AntPush', **kwargs), 200)
 
 
             elif env_name == 'AntFall':
