@@ -148,9 +148,16 @@ def plot_env(ax: plt.Axes, env_name):
 
     
 if __name__ == '__main__':
-    plt.figure(figsize=(6, 6))
-    envs = ['hammer', 'door', 'stickpull', 'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
-    fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
+    envs = ['hammer', 'door', 'basket', 'stickpull', 
+            'cabinet', 'block', 'kitchen', 'antpush', 'antfall']
+
+    width = min(5, len(envs))
+    n_rows = (len(envs) + width - 1)//width
+    
+    fig, axs = plt.subplots(n_rows, width, figsize=(6 * width, 6 * n_rows))
+    
+    if isinstance(axs[0], np.ndarray):
+        axs = sum([list(x) for x in axs], [])
     for ax, env_name in zip(axs, envs):
         plot_env(ax, env_name)
     plt.tight_layout()

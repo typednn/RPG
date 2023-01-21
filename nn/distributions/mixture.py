@@ -4,7 +4,7 @@ from .dist_head import DistHead, Network, ActionDistr
 
 
 #WEIGHT_CONTINUOUS = 0.001
-WEIGHT_CONTINUOUS = 0.3
+WEIGHT_CONTINUOUS = 0.1
 
 
 class MixtureAction(ActionDistr):
