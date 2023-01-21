@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 pi_a=dict(ent=dict(coef=1.)),
                 pi_z=dict(ent=dict(coef=100.)),
                 reward_schedule=["1000000" if env_name == 'ant' or env_name == 'fall' else "800000"] * 8 + [
-                    '2seg(0.25,240000,500000)', schedule, schedule],
+                    '2seg(0.4,400000,600000)', schedule, schedule],
             ),
             names=[
                 'sac', 'discrete5', 'discrete10', 'discrete50', 'discrete100',
