@@ -19,7 +19,7 @@ class MetaWorldWrapper(gym.Env):
         self.action_repeat = 2
 
         self.env_id = env_id
-        assert self.env_id == 'stick-pull'
+        #assert self.env_id == 'stick-pull'
         
 
         from envs.utils import get_embeder_np
@@ -54,18 +54,22 @@ class MetaWorldWrapper(gym.Env):
     def _get_obs(self):
         #raise NotImplementedError
         obs =  self._state_obs.copy()
-        
-        stick = obs[4:7]
-        handle = obs[11:14]
-        tcp = self.env.tcp_center
-
-        # 0.4 
-        #print(stick - handle, stick - tcp, obs[3])
-        #exit(0)
         from ..utils import symlog
 
-        inp = np.concatenate((symlog((stick - handle)/0.4), symlog((stick - tcp)/0.4), [obs[3]])) # tcp opened ..
-        inp = self.embedder(inp)
+        tcp = self.env.tcp_center
+        if self.env_id == 'stick-pull':
+            stick = obs[4:7]
+            handle = obs[11:14]
+
+            inp = np.concatenate((symlog((stick - handle)/0.4), symlog((stick - tcp)/0.4), [obs[3]])) # tcp opened ..
+            inp = self.embedder(inp)
+        elif self.env_id == 'basketball':
+            obj = obs[4:7]
+            inp = np.concatenate((symlog((tcp - obj)/0.4), symlog(obj/0.4), [obs[3]])) # tcp opened ..
+            inp = self.embedder(inp)
+        else:
+            raise NotImplementedError
+
         return np.concatenate((obs * 0.05, inp))
 
     def reset(self):
@@ -130,7 +134,8 @@ def make_metaworld_env(env_id, obs_dim=8, reward_type='sparse'):
 
 if __name__ == '__main__':
     from tools.utils import animate
-    env = make_metaworld_env('stick-pull')
+    #env = make_metaworld_env('stick-pull')
+    env = make_metaworld_env('basketball')
     env.reset()
 
     images = []

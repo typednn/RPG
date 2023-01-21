@@ -3,15 +3,15 @@ import numpy as np
 import torch
 import gym
 from envs.pacman.antman import AntManEnv
-from .maze import get_embedder
+#from .maze import get_embedder
+from .utils import get_embedder
 
 
 class AntMaze(gym.Env):
     SIZE = 4
-    def __init__(self, obs_dim=8, reward=False, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5), reset_loc=False) -> None:
+    def __init__(self, obs_dim=8, init_pos=(3, 3), maze_id=0, maze_type=None, lookat=(9, 9, 5), reset_loc=False) -> None:
         super().__init__()
         self.reset_loc = reset_loc
-        assert not reward
         self.reward = reward
         self.init_pos = init_pos
 
@@ -38,8 +38,7 @@ class AntMaze(gym.Env):
         if self.obs_dim > 0:
             pos = obs[:2] / self.grid_size / self.SIZE
             obs = np.concatenate(
-                [pos/100., obs[2:]/10., self.embedder(
-                    torch.tensor(pos)).detach().cpu().numpy()])
+                [pos/100., obs[2:]/10., self.embedder(obs)])
         return obs
 
     def get_obs(self):
@@ -57,8 +56,7 @@ class AntMaze(gym.Env):
 
     def step(self, action):
         # add clip ..
-        self.low_obs, _, _, _ = self.ant_env.step(action.clip(-1., 1.) * self.action_scale)
-        reward = 0.
+        self.low_obs, reward, _, _ = self.ant_env.step(action.clip(-1., 1.) * self.action_scale)
         return self.get_obs(), reward, False, {}
 
     def render(self, mode='rgb_array'):

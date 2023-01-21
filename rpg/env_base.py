@@ -120,6 +120,10 @@ class GymVecEnv(VecEnv):
                 from envs.modem.metaworld_envs import make_metaworld_env
                 return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
 
+            elif env_name == 'MWBasketBall':
+                from envs.modem.metaworld_envs import make_metaworld_env
+                return TimeLimit(make_metaworld_env('stick-pull', **kwargs), 100)
+
             elif env_name == 'PegInsert':
                 #from envs.mani. import make_metaworld_env
                 from envs.maniskill.peg_insert import PegInsert
