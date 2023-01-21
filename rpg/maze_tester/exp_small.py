@@ -16,9 +16,9 @@ if __name__ == '__main__':
                 _base=['rpgdv3', 'mbsacv3', 'rewardrpg', 'rewardsac', 'mpc', 'sacgmm', 'sacflow', 'rpgcv2', 'rpgdelay'],
                 save_video=0,
                 pi_z=dict(ent=dict(coef=10., target_mode='none')),
-                info=dict(coef=[0.1] * 7 + [0.02] * 2),
+                info=dict(coef=[0.1] * 7 + [0.02] * 2 + [0.1]),
                 reward_schedule='40000',
-                z_delay=10,
+                z_delay=[10] * 7 + [1] * 3,
             ),
             base=None, default_env='SmallMaze2',
         )

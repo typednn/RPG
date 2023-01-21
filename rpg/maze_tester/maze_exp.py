@@ -160,7 +160,10 @@ base_config = dict(
 
         rpgdv2=dict(_inherit='rpgcv2', hidden=dict(TYPE='Categorical')),
 
-        rpgdv3=dict(_inherit='rpgdv2', pi_z=dict(ent=dict(coef=1., target_mode='none'),)),
+        rpgdv3=dict(
+            _inherit='rpgdv2', 
+            pi_z=dict(ent=dict(coef=1., target_mode='none'),)
+        ),
         mpc=dict(_inherit='mbsacv3', cem=dict()),
 
         rewardrpg=dict(_inherit='rpgdv3', use_reward_schedule=True),
@@ -170,6 +173,11 @@ base_config = dict(
         # rpgnormal1=dict(_inherit='rpgnormal', env_cfg=dict(n=1)),
         # rpgdiscrete1=dict(_inherit='rpgdiscrete', env_cfg=dict(n=1)),
         # rpgsac_discard=dict(_inherit='rpgsac', trainer=dict(discard_ent=True)),
+        rpgoptim=dict(
+            _inherit='rpgdv3',
+            pi_z=dict(ent=dict(coef=0.01),),
+            z_delay=2
+        ),
 
         rpgmix=dict(_inherit='rpgcv2', hidden=dict(TYPE='Mixture', n=12)),
         sacgmm=dict(_inherit='mbsacv3', head=dict(TYPE='GMM')),
