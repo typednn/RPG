@@ -121,7 +121,7 @@ def read_wandb_result(env_name, method):
     return xs, ys
 
 
-def plot_env(ax: plt.Axes, env_name):
+def plot_env(ax: plt.Axes, env_name, index):
     results = dict(
         sac=read_baseline_result(env_name, 'sac'),
         tdmpc=read_baseline_result(env_name, 'tdmpc'),
@@ -140,7 +140,7 @@ def plot_env(ax: plt.Axes, env_name):
         
     
     ax.legend(loc=2)
-    ax.set_title(env_name)
+    ax.set_title("("+index +") " + env_name)
     ax.set_xlabel("interactions (M)"); 
     ax.set_ylabel(KEYS[env_name])
     ax.grid()
@@ -157,8 +157,10 @@ if __name__ == '__main__':
     
     if isinstance(axs[0], np.ndarray):
         axs = sum([list(x) for x in axs], [])
+    id = ord('A')
     for ax, env_name in zip(axs, envs):
-        plot_env(ax, env_name)
+        plot_env(ax, env_name, chr(id))
+        id += 1
     plt.tight_layout()
     plt.savefig('sparse.png', dpi=300)
 
@@ -166,7 +168,9 @@ if __name__ == '__main__':
     fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
     if len(envs) == 1:
         axs = [axs]
+    id = ord('A')
     for ax, env_name in zip(axs, envs):
-        plot_env(ax, env_name)
+        plot_env(ax, env_name, chr(id))
+        id += 1
     plt.tight_layout()
     plt.savefig('dense.png', dpi=300)
