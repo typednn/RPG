@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas
 
-font = {'size': 15}
+font = {'size': 24}
 import matplotlib
 import os
 matplotlib.rc('font', **font)
