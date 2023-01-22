@@ -21,7 +21,7 @@ class AdroitWrapper(gym.Env):
         self.cfg = cfg
         self._num_frames = cfg.get("frame_stack", 1)
         self._frames = deque([], maxlen=self._num_frames)
-        img_size = cfg.get('img_size', 84)
+        self.img_size = cfg.get('img_size', 84)
         # self.observation_space = gym.spaces.Box(
         #     low=0,
         #     high=255,
@@ -91,7 +91,7 @@ class AdroitWrapper(gym.Env):
         raise NotImplementedError()
 
     def _get_pixel_obs(self):
-        img_size = int(self.cfg.get('img_size', 84))
+        img_size = int(self.img_size)
         return self.render(width=img_size, height=img_size).transpose(
             2, 0, 1
         )
@@ -124,7 +124,7 @@ class AdroitWrapper(gym.Env):
         return self._state_obs.copy(), reward/2 + 1, False, info
 
     def render(self, mode="rgb_array", width=None, height=None, camera_id=None):
-        img_size = self.cfg.get('img_size', 224)
+        img_size = self.img_size #self.cfg.get('img_size', 224)
         width = width or img_size
         height = height or img_size
         return np.flip(
@@ -168,11 +168,11 @@ class AdroitWrapper(gym.Env):
 #     cfg.state_dim = env.state.shape[0]
 #     return env
 
-def make_adroit_env(env_name, reward_type='sparse', obs_dim=6):
+def make_adroit_env(env_name, reward_type='sparse', obs_dim=6, img_size=None):
     env = gym.make(env_name, reward_type=reward_type)
 
     env_type = env_name.split('-')[0]
-    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': 84, 'task': f'adroit-{env_type}', 'action_repeat': 2}, obs_dim=obs_dim)
+    env = AdroitWrapper(env, {'frame_stack': 1, 'camera_view': 'view_1', 'img_size': img_size or 84, 'task': f'adroit-{env_type}', 'action_repeat': 2}, obs_dim=obs_dim)
     return env
 
 if __name__ == '__main__':
