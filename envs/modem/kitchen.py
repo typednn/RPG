@@ -38,8 +38,9 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
     TASK_ELEMENTS = []
     REMOVE_TASKS_WHEN_COMPLETE = False
     TERMINATE_ON_TASK_COMPLETE = False
+    partial_reward=True
 
-    def __init__(self, dataset_url=None, n_block=4, reward_type='bonus2', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
+    def __init__(self, dataset_url=None, n_block=4, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
         self.TASK_ELEMENTS = self.TASK_ELEMENTS[:n_block]
         self.reward_type = reward_type
         self.embedder = None
@@ -126,7 +127,11 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
         reward_dict['metric']['true'] = (len(completions) == len(self.tasks_to_complete))
 
         if self.reward_type == 'sparse':
-            reward_dict['r_total'] = bonus / len(self.tasks_to_complete) + (len(completions) == len(self.tasks_to_complete))
+            if self.partial_reward:
+                reward_dict['r_total'] = bonus / len(self.tasks_to_complete) + (len(completions) == len(self.tasks_to_complete))
+            else:
+                reward_dict['r_total'] = len(self.tasks_to_complete) == len(completions)
+            
 
         elif self.reward_type == 'bonus':
             #     reward_dict['r_total'] += 0.2 * bonus / 5.
@@ -134,6 +139,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             #     reward_dict['r_total'] = bonus / len(self.tasks_to_complete)
             # else:
             raise NotImplementedError(self.reward_type)
+        else:
+            raise NotImplementedError
         
         score = bonus
         return reward_dict, score
@@ -200,6 +207,12 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
 
 class KitchenMicrowaveKettleLightSliderV0(KitchenBase):
     TASK_ELEMENTS = ['microwave', 'kettle', 'light switch', 'slide cabinet']
+
+
+
+class KitchenV2(KitchenBase):
+    TASK_ELEMENTS = ['microwave', 'slide cabinet']
+    partial_reward=False
 
 
 

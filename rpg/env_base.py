@@ -115,6 +115,10 @@ class GymVecEnv(VecEnv):
                 from envs.modem.kitchen import KitchenMicrowaveKettleLightSliderV0
                 return TimeLimit(KitchenMicrowaveKettleLightSliderV0(**kwargs), 250)
 
+            elif env_name == 'Kitchen2':
+                from envs.modem.kitchen import KitchenV2
+                return TimeLimit(KitchenV2(**kwargs), 120)
+
 
             elif env_name == 'MWStickPull':
                 from envs.modem.metaworld_envs import make_metaworld_env
