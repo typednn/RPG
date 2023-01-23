@@ -45,7 +45,13 @@ if __name__ == '__main__':
                     env_cfg=dict(n=1),
                     reward_schedule='2seg(0.1,400000,600000)',
                     trainer=dict(gamma=0.995),
-                )
+                ),
+                sacn1gamma=dict(
+                    _base='mbsacv3',
+                    env_cfg=dict(n=1),
+                    reward_schedule=None,
+                    trainer=dict(gamma=0.995),
+                ),
             )
         ),
         base=None, 
