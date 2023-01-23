@@ -309,18 +309,20 @@ class Experiment(Configurable):
             variants = []
             for k, v in _variants.items():
                 v = CN(v)
-                # priority: v > v._base > _base
+
+                # priority: v > _base > v._base
+                if _base is not None:
+                    var = CN(copy.deepcopy(_base))
+                    var.set_new_allowed(True)
+                    merge_a_into_b(v, var)
+                    v = var
+
                 if '_base' in v:
                     var = extract_variant(v.pop('_base'), self.get_variants())
                     var.set_new_allowed(True)
                     merge_a_into_b(v, var)
                     v = var
 
-                if _base is not None:
-                    var = CN(copy.deepcopy(_base))
-                    var.set_new_allowed(True)
-                    merge_a_into_b(v, var)
-                    v = var
                 names.append(k)
                 variants.append(v)
 
