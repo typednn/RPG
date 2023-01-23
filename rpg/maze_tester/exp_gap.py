@@ -116,11 +116,13 @@ if __name__ == '__main__':
                 gaussian_save=dict(
                     _base='rpgcv2',
                     info=dict(coef=0.01),
-                    path="/cephfs/hza/buffers/gaussian"
+                    path="/cephfs/hza/buffers/gaussian",
+                    save_buffer_epoch=100,
                 ),
                 mbsac_save=dict(
                     _base='mbsacv3',
-                    path="/cephfs/hza/buffers/mbsac"
+                    path="/cephfs/hza/buffers/mbsac",
+                    save_buffer_epoch=100,
                 ),
             )
         ), 
