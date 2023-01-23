@@ -18,10 +18,12 @@ if __name__ == '__main__':
                     z_delay=5,
                 ),
                 discirete=dict(
-                    _base='rpgdv3'
+                    _base='rpgdv3',
+                    info=dict(coef=0.1),
                 ),
                 gaussian=dict(
                     _base='rpgcv2'
+                    info=dict(coef=0.01),
                 ),
                 mbsac=dict(
                     _base='mbsacv3',
