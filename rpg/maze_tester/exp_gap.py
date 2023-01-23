@@ -45,6 +45,8 @@ if __name__ == '__main__':
                     _base='rpgdv3',
                     info=dict(coef=0.01),
                 ),
+
+                # ablation on info
                 gaussian05=dict(
                     _base='rpgcv2',
                     info=dict(coef=0.05),
@@ -53,6 +55,41 @@ if __name__ == '__main__':
                     _base='rpgcv2',
                     info=dict(coef=0.1),
                 ),
+
+                gaussian0=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.0),
+                ),
+                gaussian005=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.005),
+                ),
+                gaussian0001=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.0001),
+                ),
+
+                # ablation on hidden
+                gaussiand1=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    hidden=dict(n=1),
+                ),
+                gaussiand3=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    hidden=dict(n=3),
+                ),
+                gaussiand6=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    hidden=dict(n=6),
+                ),
+
+                mpc=dict(_base='mpc'),
+                sacgmm=dict(_base='sacgmm'),
+                sacflow=dict(_base='sacflow'),
+                # compare with other heads
             )
         ), 
         base=None, default_env='GapMaze',
