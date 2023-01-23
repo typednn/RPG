@@ -39,6 +39,13 @@ if __name__ == '__main__':
                     _base='rewardrpg',
                     reward_schedule='2seg(0.05,400000,600000)',
                 ),
+
+                seg3n1gamma=dict(
+                    _base='rewardrpg',
+                    env_cfg=dict(n=1),
+                    reward_schedule='2seg(0.1,400000,600000)',
+                    trainer=dict(gamma=0.995),
+                )
             )
         ),
         base=None, 
