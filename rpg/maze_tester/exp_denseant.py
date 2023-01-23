@@ -35,6 +35,10 @@ if __name__ == '__main__':
                     env_cfg=dict(n=1),
                     reward_schedule='2seg(0.1,400000,600000)',
                 ),
+                seg4=dict(
+                    _base='rewardrpg',
+                    reward_schedule='2seg(0.05,400000,600000)',
+                ),
             )
         ),
         base=None, 
