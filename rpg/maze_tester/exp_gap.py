@@ -109,7 +109,7 @@ if __name__ == '__main__':
                 rndnonorm=dict(
                     _base='rpgcv2',
                     info=dict(coef=0.01),
-                    rnd=dict(normalizer='none'),
+                    rnd=dict(density=dict(normalizer='none')),
                 ),
                 #rnd=dict(),
             )
