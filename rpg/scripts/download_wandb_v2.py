@@ -54,7 +54,27 @@ results = dict(
     basket=dict(
         rpg=['br432idf', '5d9gqf69', 'v8cgw2k5', 'evdbrymj'],
         mbsac=['3b1ah01n', 'ni4z9bqx', 'oa3eeu5v', '1o6la58u'],
-    )
+    ),
+
+
+    gapexplore=dict(
+        discrete=['sr28zf2d', '9dsw1kd4', '8r2izj37', 'wdu1kiqr', 'niflfzpl', 'dj0yl14z'],
+        gaussian=['sgt89o05', '63xovceh', '4rkgypwi', 'g7h113pn', 'dstuhayw', 'datstv8g'],
+        mbsac=['wst9rdma', 'juxzki6j', '55zrzlf6', 'c0ki4phi', 'ns1lde2p', 'bl5qygt1'],
+        gaussian05=['f36qxioj', '7fr4ydrh', 'wwofyx0z'],
+        gaussian0001=['kfgqeg7c', 'ag2n17dc', 'e832ufwl', 'q2w1bezy', 'mbvvawgm', 'elou48ql'],
+        gaussian0=['xaq8cwrf', 'ee83kcpl', '644bu1ut', 'cxkkpv0m', 'cq86vioo', 'wah4bo00'],
+        gaussian005=['fz18vlk8', '3352pxiq', '1lbtmgnx', 'j3v2lxnf', 'egaptasv', '6dwu95nv'],
+        gaussiand3=['6ndjhh76', 'xeqgwaou', '2gxn73fl', 'of2g238e', 'jkzmv65w', 'ctcdg1nn'],
+        gaussiand6=['j9xn3823', '4eswf4b0', 'tup4123d', 'h2ag4xbp', 'gdlkxca5', 'pwpig51t'],
+        gaussiand1=['nfm4zi9g', '93i64mv6', '3uukvt6u', 'wjee13tv', 'h130ktba', 'fprhq5j1'],
+        mpc=['uk7bxti8', 'u6xtv0eg', '3vx0zkjo', 'cwdwphbi', 'e6oof9o6', '5msztf2o'],
+        flow=['rc8r3nrs', 'otlrp3qt', '4lz18l3c', 'sbb7o6h5', 'f7lyevpd', 'f0ptehia'],
+        gmm=['zyxnuaks', 'u08gevjd', '5sc36fsk', 'nzeh1eed', 'i09ldafx', 'eineqnz1'],
+        rndd0=['ttrid9hp', 's3yq7dcc', '5t8k34ur', 'xyk57f8l', 'jm8p1o9t', '5qwg4g48'],
+        rndnobuf=['uqzkebsa', 'vt6twug9', 'kbu1kiwu', 'tw4f66lp', 'c3opl4in', 'n029tbse'],
+        #rndnonorm=[],
+    ),
 )
 
 def download_run(rid, path):
