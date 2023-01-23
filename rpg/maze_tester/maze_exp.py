@@ -245,55 +245,84 @@ class Experiment(Configurable):
             env_name = exp_config.pop('default_env', None)
         #assert env_name is not None
 
-        names = cfgs.pop('_names', [])
-        names = [[i] for i in names]
-        rename = len(names) == 0
-            
-        factor_name = []
-        default = {}
 
-        variants = []
-        def set_keyval(d, keys, val):
-            for k in keys[:-1]:
-                if k not in d:
-                    d[k] = {}
-                d = d[k]
-            d[keys[-1]] = val
+        _variants = cfgs.pop('_variants', None)
 
-        def process_variants(configs, keys):
-            for k, v in configs.items():
-                new_keys = keys + k.split('.')
-                if isinstance(v, list):
-                    factor_name.append(k)
-                    if len(variants) == 0:
+        if len(cfgs) > 0:
+            names = cfgs.pop('_names', [])
+            names = [[i] for i in names]
+            rename = len(names) == 0
+                
+            factor_name = []
+            default = {}
+
+            variants = []
+            def set_keyval(d, keys, val):
+                for k in keys[:-1]:
+                    if k not in d:
+                        d[k] = {}
+                    d = d[k]
+                d[keys[-1]] = val
+
+            def process_variants(configs, keys):
+                for k, v in configs.items():
+                    new_keys = keys + k.split('.')
+                    if isinstance(v, list):
+                        factor_name.append(k)
+                        if len(variants) == 0:
+                            for i in range(len(v)):
+                                variants.append(copy.deepcopy(default))
+                        if not rename:
+                            assert len(variants) == len(names), "The length of the list should be the same."
+                        else:
+                            if len(names) == 0:
+                                names.extend([[] for i in range(len(v))])
+                            for i in range(len(v)):
+                                names[i].append(str(v[i]))
+                        assert len(variants) == len(v), "The length of the list should be the same."
                         for i in range(len(v)):
-                            variants.append(copy.deepcopy(default))
-                    if not rename:
-                        assert len(variants) == len(names), "The length of the list should be the same."
+                            set_keyval(variants[i], new_keys, v[i])
+                    elif isinstance(v, dict):
+                        process_variants(v, new_keys)
                     else:
-                        if len(names) == 0:
-                            names.extend([[] for i in range(len(v))])
-                        for i in range(len(v)):
-                            names[i].append(str(v[i]))
-                    assert len(variants) == len(v), "The length of the list should be the same."
-                    for i in range(len(v)):
-                        set_keyval(variants[i], new_keys, v[i])
-                elif isinstance(v, dict):
-                    process_variants(v, new_keys)
-                else:
-                    if len(variants) == 0:
-                        set_keyval(default, new_keys, v)
-                    else:
-                        for i in range(len(variants)):
-                            set_keyval(variants[i], new_keys, v)
-                            
-        process_variants(cfgs, [])
-        factor_name = '_'.join(factor_name)
-        if rename:
-            names = [factor_name + '_'.join(n) for n in names]
+                        if len(variants) == 0:
+                            set_keyval(default, new_keys, v)
+                        else:
+                            for i in range(len(variants)):
+                                set_keyval(variants[i], new_keys, v)
+                                
+            process_variants(cfgs, [])
+
+
+            factor_name = '_'.join(factor_name)
+            if rename:
+                names = [factor_name + '_'.join(n) for n in names]
+            else:
+                names = [n[0] for n in names ]
+            print(len(variants), len(names))
         else:
-            names = [n[0] for n in names ]
+            assert _variants is not None
+            assert base is None
 
+            _base = _variants.pop('_base', None)
+            names = []
+            variants = []
+            for k, v in _variants.items():
+                v = CN(v)
+                # priority: v > v._base > _base
+                if '_base' in v:
+                    var = extract_variant(v.pop('_base'), self.get_variants())
+                    var.set_new_allowed(True)
+                    merge_a_into_b(v, var)
+                    v = var
+
+                if _base is not None:
+                    var = CN(copy.deepcopy(_base))
+                    var.set_new_allowed(True)
+                    merge_a_into_b(v, var)
+                    v = var
+                names.append(k)
+                variants.append(v)
 
         if verbose:
             print("name", names)
@@ -314,10 +343,10 @@ class Experiment(Configurable):
 
         env_cfg = None
         if 'env_name' in self.env_configs:
+            
             env_cfg = self.env_configs[env_name]
 
         for name, k in zip(names, variants):
-            
             if '_base' in k:
                 var_cfg = self.base_config.clone()
                 var_cfg.defrost()
@@ -326,6 +355,7 @@ class Experiment(Configurable):
                 merge_a_into_b(var, var_cfg)
             else:
                 var_cfg = cfg.clone()
+            var_cfg.set_new_allowed(True)
 
             k = CN(k)
             kws = dict(env_name=env_name)
@@ -335,6 +365,7 @@ class Experiment(Configurable):
                 CN(kws), var_cfg
             )
             merge_a_into_b(k, var_cfg)
+            var_cfg.env_name = env_name
             cfg_name = f'{env_name}_{expname}_{name}'
 
             var_cfg.set_new_allowed(True)

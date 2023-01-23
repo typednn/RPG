@@ -463,9 +463,72 @@ class TreeMaze(LargeMaze):
         return reached.sum(axis=-1).float().detach().cpu().numpy()
 
 
+class CrossMaze(LargeMaze):
+    SIZE = 5
+
+    def __init__(self, cfg=None, low_steps=50, split=5, width_ratio=0.3, height_ratio=0.8, depth=2, action_scale=0.25) -> None:
+        END_POINTS.clear()
+
+        import random
+        state = random.getstate()
+        random.seed(0)
+        walls = self.get_wall()
+        random.setstate(state)
+
+        self.walls = torch.tensor(
+            np.array(walls)
+        )
+        super().__init__()
+    
+    def get_wall(self):
+        from envs.pacman.maze.maze import MazeGame
+        env = MazeGame(self.SIZE, self.SIZE)
+
+        mmap = env.maze
+        height, width = mmap.height, mmap.width
+
+        mmap = np.asarray([['' for j in range(height)] for i in range(width)])
+        for i, j in [[2, 1], [2, 3], [2, 4], [3, 0], [3,1], [3,3], [4, 0]]:
+            mmap[j][i] = mmap[j][i] + 'n'
+
+        for i, j in [[0, 1], [0, 2],  [1, 2], [1, 3], [1, 4], [3, 2], [3, 4], [4, 3], [4, 4]]:
+            mmap[j][i] = mmap[j][i] + 'w'
+
+        gap = 0.2
+        havegap = True
+        output = []
+        for i in range(width):
+            for j in range(height):
+                cell = mmap[i, j]
+                x = i
+                y = j
+                if y > 0:
+                    if 'n' in cell:
+                        output.append([[x, y], [x + 1, y]])
+                    elif havegap:
+                        output.append([[x, y], [x + 0.5-gap/2, y]])
+                        output.append([[x + 0.5+gap/2, y], [x+1, y]])
+            
+                if x > 0:
+                    if 'w' in cell:
+                        output.append([[x, y], [x, y + 1]])
+                    elif havegap:
+                        output.append([[x, y], [x, y + 0.5-gap/2]])
+                        output.append([[x, y+ 0.5+gap/2], [x, y+1]])
+                    
+        output += [
+            [[0, 0], [0, height]],
+            [[0, height], [width, height]],
+            [[width, height], [width, 0]],
+            [[width, 0], [0, 0]]
+        ]
+        output = np.array(output) * 2 - self.SIZE
+        return output.tolist()
+
     
 if __name__ == '__main__':
-    env = TreeMaze()
+    env = CrossMaze()
+    env.reset()
     import matplotlib.pyplot as plt
     plt.imshow(env.render('rgb_array'))
     plt.savefig('xx.png')

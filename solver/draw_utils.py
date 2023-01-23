@@ -168,7 +168,7 @@ def plot_grid_point_values(anchors, values, normalize=True):
 def plot_colored_embedding(z, points, **kwargs):
     # TODO:
     colors = np.array(
-        ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'C2', 'C3',
+        ['b', 'g', 'r', 'c', 'm', 'y', 'C2', 'C3',
             'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C0'] * 10,
     )
 

@@ -168,7 +168,7 @@ class AntCross(AntMaze):
     def get_occupancy_image(self, occupancy):
         #return super().get_occupancy_image(occupancy)
         occupancy = occupancy / occupancy.max()
-        # print(occupancy.argmax())
+        # print(occupancy.argmax()
         # print(occupancy.shape, self.anchors.shape)
         # print(occupancy)
         # print(self.anchors[occupancy.argmax()])

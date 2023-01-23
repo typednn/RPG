@@ -273,6 +273,10 @@ class TorchEnv(VecEnv):
             from envs.maze import TreeMaze
             self.goal_env = TreeMaze(**kwargs)
 
+        elif env_name == 'GapMaze':
+            from envs.maze import CrossMaze
+            self.goal_env = CrossMaze(**kwargs)
+
 
         elif env_name == 'MediumMaze':
             from envs.maze import MediumMaze
@@ -382,7 +386,7 @@ class TorchEnv(VecEnv):
 
         
 def make(env_name, n, **kwargs):
-    if env_name in ['LargeMaze', 'SmallMaze', 'MediumMaze', 'TripleMove', 'TreeMaze', 'MediumMazeR', 'SmallMaze2']:
+    if env_name in ['LargeMaze', 'SmallMaze', 'MediumMaze', 'TripleMove', 'TreeMaze', 'MediumMazeR', 'SmallMaze2', 'GapMaze']:
         return TorchEnv(env_name, n, **kwargs)
     else:
         return GymVecEnv(env_name, n, **kwargs)

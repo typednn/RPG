@@ -13,7 +13,7 @@ if __name__ == '__main__':
                 reward_scale=float((name=='reward'))*5.,
                 env_cfg=dict(n=5),
                 max_epoch=2000,
-                _base=['rpgdv3', 'mbsacv3', 'rewardrpg', 'rewardsac', 'mpc', 'sacgmm', 'sacflow', 'rpgcv2', 'rpgdelay'],
+                _base=['rpgdv3', 'mbsacv3', 'rewardrpg', 'rewardsac', 'mpc', 'sacgmm', 'sacflow', 'rpgcv2', 'rpgdelay', 'rpgdelay'],
                 save_video=0,
                 pi_z=dict(ent=dict(coef=10., target_mode='none')),
                 info=dict(coef=[0.1] * 7 + [0.02] * 2 + [0.1]),
@@ -22,6 +22,7 @@ if __name__ == '__main__':
             ),
             base=None, default_env='SmallMaze2',
         )
+
 
 
     exp.main()
