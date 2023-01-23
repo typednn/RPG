@@ -423,6 +423,7 @@ class Experiment(Configurable):
         configs = []
         for i in exps:
             configs.append(exp.build_configs(args.env_name, i, verbose=True)) # inherit from small
+            
         if args.runall is not None:
             # run on cluster
             import sys
@@ -517,6 +518,8 @@ class Experiment(Configurable):
 
                 exp.run_config(cfg)
             else:
+                for idx, i in enumerate(configs):
+                    print(idx, i.path)
                 if args.download:
                     for i in range(len(configs)):
                         os.system('kubectl cp hza-try:/cephfs/hza/models/{} {}'.format(configs[i].path, configs[i].path))

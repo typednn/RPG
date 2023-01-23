@@ -90,6 +90,28 @@ if __name__ == '__main__':
                 sacgmm=dict(_base='sacgmm'),
                 sacflow=dict(_base='sacflow'),
                 # compare with other heads
+
+                rnddim0=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    env_cfg=dict(obs_dim=0)
+                ),
+                rnddim2=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    env_cfg=dict(obs_dim=2),
+                ),
+                rndbuf=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    buffer=dict(max_capacity=2000,),
+                ),
+                rndnonorm=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    rnd=dict(normalizer='none'),
+                ),
+                #rnd=dict(),
             )
         ), 
         base=None, default_env='GapMaze',
