@@ -112,6 +112,16 @@ if __name__ == '__main__':
                     rnd=dict(density=dict(normalizer='none')),
                 ),
                 #rnd=dict(),
+
+                gaussian_save=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    path="/cephfs/hza/buffers/gaussian"
+                ),
+                mbsac_save=dict(
+                    _base='mbsacv3',
+                    path="/cephfs/hza/buffers/mbsac"
+                ),
             )
         ), 
         base=None, default_env='GapMaze',
