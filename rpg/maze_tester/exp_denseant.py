@@ -52,6 +52,12 @@ if __name__ == '__main__':
                     reward_schedule=None,
                     model=dict(gamma=0.995),
                 ),
+                seg4n1gamma=dict(
+                    _base='rewardrpg',
+                    env_cfg=dict(n=1),
+                    reward_schedule='2seg(0.01,400000,600000)',
+                    model=dict(gamma=0.995),
+                ),
             )
         ),
         base=None, 
