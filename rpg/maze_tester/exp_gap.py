@@ -22,7 +22,7 @@ if __name__ == '__main__':
                     info=dict(coef=0.1),
                 ),
                 gaussian=dict(
-                    _base='rpgcv2'
+                    _base='rpgcv2',
                     info=dict(coef=0.01),
                 ),
                 mbsac=dict(
