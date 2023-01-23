@@ -17,7 +17,7 @@ if __name__ == '__main__':
                     reward_schedule='40000',
                     z_delay=5,
                 ),
-                discirete=dict(
+                discrete=dict(
                     _base='rpgdv3',
                     info=dict(coef=0.1),
                 ),
@@ -27,6 +27,31 @@ if __name__ == '__main__':
                 ),
                 mbsac=dict(
                     _base='mbsacv3',
+                ),
+
+                mbsaclargestd0=dict(
+                    _base='mbsacv3',
+                    pi_a=dict(ent=dict(target=0.)),
+                ),
+                mbsaclargestd1=dict(
+                    _base='mbsacv3',
+                    pi_a=dict(ent=dict(target=-1.)),
+                ),
+                discrete05=dict(
+                    _base='rpgdv3',
+                    info=dict(coef=0.05),
+                ),
+                discrete01=dict(
+                    _base='rpgdv3',
+                    info=dict(coef=0.01),
+                ),
+                gaussian05=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.05),
+                ),
+                gaussian10=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.1),
                 ),
             )
         ), 
