@@ -159,7 +159,7 @@ def create_axes(T, envs):
     return axs
     
 if __name__ == '__main__':
-    envs = ['hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen', 'antpush'] #, 'antfall']
+    envs = ['hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen'] #, 'antfall']
 
     width = min(10, len(envs))
     n_rows = (len(envs) + width - 1)//width

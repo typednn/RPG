@@ -52,8 +52,8 @@ results = dict(
         mbsac=['9zrks8f2', 'row6vwfk', 'sglqybdb', '5rcqeg67'],
     ),
     basket=dict(
-        rpg=['br432idf', '5d9gqf69', 'v8cgw2k5', 'evdbrymj'],
-        mbsac=['3b1ah01n', 'ni4z9bqx', 'oa3eeu5v', '1o6la58u'],
+        rpg=['br432idf', '5d9gqf69', 'v8cgw2k5', 'evdbrymj', 'pasgvosg', 'g91nypp5'],
+        mbsac=['3b1ah01n', 'ni4z9bqx', 'oa3eeu5v', '1o6la58u', 'ws2fwbsx', 's1z1e1mw'],
     ),
 
 
