@@ -123,6 +123,9 @@ class GymVecEnv(VecEnv):
                 from envs.modem.kitchen import KitchenV3
                 return TimeLimit(KitchenV3(**kwargs), 200)
 
+            elif env_name == 'Kitchen4':
+                from envs.modem.kitchen import KitchenV4
+                return TimeLimit(KitchenV4(**kwargs), 120)
 
 
             elif env_name == 'MWStickPull':

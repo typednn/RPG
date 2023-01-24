@@ -29,7 +29,7 @@ OBS_ELEMENT_GOALS = {
     'microwave': np.array([-0.75]),
     'kettle': np.array([-0.23, 0.75, 1.62]),#, 0.99, 0., 0., -0.06]),
     }
-BONUS_THRESH = 0.3
+# BONUS_THRESH = 0.3
 
 @configurable(pickleable=True)
 class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
@@ -39,6 +39,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
     REMOVE_TASKS_WHEN_COMPLETE = False
     TERMINATE_ON_TASK_COMPLETE = False
     partial_reward=True
+
+    BONUS_THRESH = 0.3 
 
     def __init__(self, dataset_url=None, n_block=4, reward_type='sparse', obs_dim=6, ref_max_score=None, ref_min_score=None, **kwargs):
         self.TASK_ELEMENTS = self.TASK_ELEMENTS[:n_block]
@@ -113,7 +115,8 @@ class KitchenBase(KitchenTaskRelaxV1, OfflineEnv):
             distance = np.linalg.norm(
                 next_obj_obs[..., element_idx - idx_offset] -
                 next_goal[element_idx])
-            complete = distance < BONUS_THRESH
+            
+            complete = distance < self.BONUS_THRESH
             if complete:
                 completions.append(element)
 
@@ -219,13 +222,19 @@ class KitchenV3(KitchenBase):
     TASK_ELEMENTS = ['microwave', 'slide cabinet', 'hinge cabinet']
     partial_reward=False
 
+class KitchenV4(KitchenBase):
+    TASK_ELEMENTS = ['microwave', 'slide cabinet']
+    partial_reward=False
+    BONUS_THRESH = 0.1
+
 
 if __name__ == '__main__':
-    env = KitchenMicrowaveKettleLightSliderV0(n_block=1)
+    env = KitchenV4(n_block=1)
     env.reset()
     images = []
     for i in range(1000):
         _, r, done, info = env.step(env.action_space.sample())
+        
         images.append(env.render())
         
         assert not done
