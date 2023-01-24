@@ -146,8 +146,8 @@ def plot_env(ax: plt.Axes, env_name, index):
     ax.grid()
     
 
-def create_axes(n_rows, envs):
-    width = min(10, len(envs))
+def create_axes(T, envs):
+    width = min(T, len(envs))
     n_rows = (len(envs) + width - 1)//width
     fig, axs = plt.subplots(n_rows, width, figsize=(8 * width, 8 * n_rows))
     

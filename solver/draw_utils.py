@@ -198,7 +198,8 @@ def embedding2rgb(embedding: torch.Tensor):
         components[..., :embedding.shape[-1]] = tonumpy(embeddings)
         return components
     if embedding.shape[-1] == 3:
-        return (embedding - embedding.min(axis=0)) / (embedding.max(axis=0) - embedding.min(axis=0))
+        return embedding
+        #return (embedding - embedding.min(axis=0)) / (embedding.max(axis=0) - embedding.min(axis=0))
 
     pca = PCA(n_components=3) # to 3 dimension
 
