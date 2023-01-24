@@ -102,13 +102,14 @@ class AntHEnv(gym.Env):
         elif self.env_name == 'AntFall':
             movable = self.base_env.wrapped_env.get_body_com('moveable_2_2')
         else:
-            raise NotImplementedError
+            #raise NotImplementedError
+            movable = None
         
         if self.obs_dim > 1:
             inp = self.embedder(self._base_obs[:self.subgoal_dim]/10.)
             if self.env_name == 'AntPush':
                 inp = np.concatenate((inp, self.embedder(movable[:2] - np.array([0., 8.]) * 1.)))
-            else:
+            elif movable is not None:
                 inp = np.concatenate((inp, movable * 0.01))
             return np.r_[self._base_obs[:2] * 0.01, self._base_obs[2:] * 0.1,  inp]  # input the original goal..
         else:
@@ -170,7 +171,7 @@ class AntHEnv(gym.Env):
         return output
 
 if __name__ == '__main__':
-    env = AntHEnv('AntFall')
+    env = AntHEnv('AntMaze')
     env.reset()
     images = []
     for i in range(100):

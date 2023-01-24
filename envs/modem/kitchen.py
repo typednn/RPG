@@ -215,6 +215,10 @@ class KitchenV2(KitchenBase):
     partial_reward=False
 
 
+class KitchenV3(KitchenBase):
+    TASK_ELEMENTS = ['microwave', 'slide cabinet', 'hinge cabinet']
+    partial_reward=False
+
 
 if __name__ == '__main__':
     env = KitchenMicrowaveKettleLightSliderV0(n_block=1)

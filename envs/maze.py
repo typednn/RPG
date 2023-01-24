@@ -467,12 +467,13 @@ class TreeMaze(LargeMaze):
 class CrossMaze(LargeMaze):
     SIZE = 5
 
-    def __init__(self, cfg=None, low_steps=50, split=5, width_ratio=0.3, height_ratio=0.8, depth=2, action_scale=0.25) -> None:
+    def __init__(self, cfg=None, low_steps=50, split=5, width_ratio=0.3, height_ratio=0.8, depth=2, action_scale=0.25, version='v1') -> None:
         END_POINTS.clear()
 
         import random
         state = random.getstate()
         random.seed(0)
+        self.version = version
         walls = self.get_wall()
         random.setstate(state)
 
@@ -488,12 +489,20 @@ class CrossMaze(LargeMaze):
         mmap = env.maze
         height, width = mmap.height, mmap.width
 
-        mmap = np.asarray([['' for j in range(height)] for i in range(width)])
-        for i, j in [[2, 1], [2, 3], [2, 4], [3, 0], [3,1], [3,3], [4, 0]]:
-            mmap[j][i] = mmap[j][i] + 'n'
+        if self.version == 'v2':
+            mmap = np.asarray([['' for j in range(height)] for i in range(width)])
+            for i, j in [[2, 1], [2, 3], [2, 4], [3, 0], [3,1], [3,3], [4, 0]]:
+                mmap[j][i] = mmap[j][i] + 'n'
 
-        for i, j in [[0, 1], [0, 2],  [1, 2], [1, 3], [1, 4], [3, 2], [3, 4], [4, 3], [4, 4]]:
-            mmap[j][i] = mmap[j][i] + 'w'
+            for i, j in [[0, 1], [0, 2],  [1, 2], [1, 3], [1, 4], [3, 2], [3, 4], [4, 3], [4, 4]]:
+                mmap[j][i] = mmap[j][i] + 'w'
+        else:
+            mmap = np.asarray([['' for j in range(height)] for i in range(width)])
+            for i, j in [[2, 0], [2, 1],  [2, 3], [2, 4], [3,1], [3,3]]:
+                mmap[j][i] = mmap[j][i] + 'n'
+
+            for i, j in [[0, 1], [0, 2], [1, 3], [1, 4], [3, 2], [3, 4], [4, 1], [4, 2], [4, 3], [4, 4]]:
+                mmap[j][i] = mmap[j][i] + 'w'
 
         gap = 0.2
         havegap = True

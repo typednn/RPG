@@ -488,7 +488,7 @@ class Trainer(Configurable, RLAlgo):
             if self._cfg.save_buffer_epoch > 0 and epoch_id % self._cfg.save_buffer_epoch == 0:
                 logger.torch_save(self.buffer, 'buffer.pt')
 
-            if self._cfg.save_model_epoch > 0 and epoch_id % self._cfg.save_model_epoch == 0:
+            if self._cfg.save_model_epoch > 0 and epoch_id % self._cfg.save_model_epoch == 0 or epoch_id == 0:
                 env = self.env 
                 self.env = None
                 logger.torch_save(self, f'model{epoch_id}.pt')

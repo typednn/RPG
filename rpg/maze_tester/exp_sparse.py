@@ -4,8 +4,11 @@ configs = dict(
     env_name = dict(
         cabinet='EEArm',
         stickpull='MWStickPull',
+
         kitchen='Kitchen',
         kitchen2='Kitchen2',
+        kitchen3='Kitchen3',
+
         hammer='AdroitHammer',
         ant='AntPush',
         ant2='AntPush2',
@@ -20,7 +23,7 @@ configs = dict(
 if __name__ == '__main__':
     exp = build_exp(base_config)
 
-    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant', 'block', 'fall', 'block3', 'door', 'ball', 'ant2', 'kitchen2']: # ensure the experiments are finished ..
+    for env_name  in ['cabinet', 'stickpull', 'hammer', 'kitchen', 'ant', 'block', 'fall', 'block3', 'door', 'ball', 'ant2', 'kitchen2', 'kitchen3']: # ensure the experiments are finished ..
         exp.add_exps(
             f'{env_name}',
             dict(
