@@ -61,7 +61,7 @@ if __name__ == '__main__':
             )
         ),
         base=None, 
-        default_env ='AntPush',
+        default_env ='AntMaze',
     )
 
     exp.main()
