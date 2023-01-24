@@ -59,6 +59,14 @@ if __name__ == '__main__':
                     reward_schedule='2seg(0.01,400000,600000)',
                     model=dict(gamma=0.995),
                 ),
+                seg3mix=dict(
+                    _base='rpgmix',
+                    use_reward_schedule=True,
+                    env_cfg=dict(n=5),
+                    reward_schedule='2seg(0.1,400000,600000)',
+                    model=dict(gamma=0.995),
+                    info=dict(coef=1.),
+                ),
             )
         ),
         base=None, 
