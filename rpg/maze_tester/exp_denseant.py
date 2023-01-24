@@ -19,11 +19,18 @@ if __name__ == '__main__':
                 seg3=dict(
                     _base='rewardrpg',
                     reward_schedule='2seg(0.1,400000,600000)',
+                    info=dict(coef=1.),
+                ),
+                sac=dict(
+                    _base='mbsacv3',
+                    env_cfg=dict(n=5),
+                    reward_schedule=None,
                 ),
                 largestd=dict(
                     _base='rewardrpg',
                     pi_a=dict(ent=dict(coef=1., target=-4.)),
                     reward_schedule='2seg(0.1,400000,600000)',
+                    info=dict(coef=1.),
                 ),
                 noepsilon=dict(
                     _base='rewardrpg',
