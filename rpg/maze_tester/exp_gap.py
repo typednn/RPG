@@ -135,6 +135,17 @@ if __name__ == '__main__':
                     info=dict(coef=0.01),
                     path="data/buffers/gaussian",
                     save_model_epoch=50,
+                    
+                ),
+
+                mbsacn1=dict(
+                    _base='mbsacv3',
+                    env_cfg=dict(n=1),
+                ),
+                gaussiann1=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    env_cfg=dict(n=1),
                 ),
             )
         ), 
