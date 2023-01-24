@@ -165,7 +165,7 @@ def plot_grid_point_values(anchors, values, normalize=True):
     plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cm), cax=cbaxes)
 
     
-def plot_colored_embedding(z, points, **kwargs):
+def plot_colored_embedding(z, points, ax=None, **kwargs):
     # TODO:
     colors = np.array(
         ['b', 'g', 'r', 'c', 'm', 'y', 'C2', 'C3',
@@ -180,8 +180,12 @@ def plot_colored_embedding(z, points, **kwargs):
         z = z.reshape(-1)
         label_color = colors[z]
     else:
+        z = tonumpy(z)
         label_color = embedding2rgb(z).reshape(-1, 3)
-    plt.scatter(points[:, 0], points[:, 1], c=label_color, **kwargs)
+    if ax is None:
+        plt.scatter(points[:, 0], points[:, 1], c=label_color, **kwargs)
+    else:
+        ax.scatter(points[:, 0], points[:, 1], c=label_color, **kwargs)
 
 
 def embedding2rgb(embedding: torch.Tensor):
@@ -193,6 +197,8 @@ def embedding2rgb(embedding: torch.Tensor):
         embeddings = (embedding - embedding.min()) / (embedding.max() - embedding.min())
         components[..., :embedding.shape[-1]] = tonumpy(embeddings)
         return components
+    if embedding.shape[-1] == 3:
+        return (embedding - embedding.min(axis=0)) / (embedding.max(axis=0) - embedding.min(axis=0))
 
     pca = PCA(n_components=3) # to 3 dimension
 

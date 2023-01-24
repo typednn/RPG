@@ -121,6 +121,7 @@ class Trainer(Configurable, RLAlgo):
 
         fix_buffer=None, # offline training .. 
         save_buffer_epoch=0,
+        save_model_epoch=0,
 
         max_total_steps=None,
         cem=None,
@@ -486,6 +487,12 @@ class Trainer(Configurable, RLAlgo):
 
             if self._cfg.save_buffer_epoch > 0 and epoch_id % self._cfg.save_buffer_epoch == 0:
                 logger.torch_save(self.buffer, 'buffer.pt')
+
+            if self._cfg.save_model_epoch > 0 and epoch_id % self._cfg.save_model_epoch == 0:
+                env = self.env 
+                self.env = None
+                logger.torch_save(self, f'model{epoch_id}.pt')
+                self.env = env
 
             if self._cfg.max_total_steps is not None: 
                 if self.total >= self._cfg.max_total_steps:

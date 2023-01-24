@@ -231,10 +231,11 @@ class LargeMaze(Configurable):
         x = (x + self.SIZE) / (self.SIZE * 2) * 0.8 + 0.1
         return (x* self.RESOLUTION).astype(np.int32)
 
-    def render_wall(self):
+    def render_wall(self, linewidth=1, linecolor=(255, 255, 255), background_color=(0, 0, 0)):
         import cv2
         resolution = self.RESOLUTION
         self.screen = np.zeros((resolution, resolution, 3), dtype=np.uint8)
+        self.screen[:] = np.array(background_color)
         for wall in self.walls:
             left = wall[0].detach().cpu().numpy()
             right = wall[1].detach().cpu().numpy()
@@ -244,7 +245,7 @@ class LargeMaze(Configurable):
             # right = ((right + self.SIZE) / (self.SIZE * 2) * resolution).astype(np.int32)
             left = self.pos2pixel(left)
             right = self.pos2pixel(right)
-            cv2.line(self.screen, tuple(left), tuple(right), (255, 255, 255), 1)
+            cv2.line(self.screen, tuple(left), tuple(right), linecolor, linewidth)
 
         if self.reward_mapping:
             for k, v in self.reward_mapping:

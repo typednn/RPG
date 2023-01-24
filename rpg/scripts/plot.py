@@ -146,6 +146,17 @@ def plot_env(ax: plt.Axes, env_name, index):
     ax.grid()
     
 
+def create_axes(n_rows, envs):
+    width = min(10, len(envs))
+    n_rows = (len(envs) + width - 1)//width
+    fig, axs = plt.subplots(n_rows, width, figsize=(8 * width, 8 * n_rows))
+    
+    if isinstance(axs, np.ndarray):
+        if isinstance(axs[0], np.ndarray):
+            axs = sum([list(x) for x in axs], [])
+    else:
+        axs = [axs]
+    return axs
     
 if __name__ == '__main__':
     envs = ['hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen', 'antpush'] #, 'antfall']

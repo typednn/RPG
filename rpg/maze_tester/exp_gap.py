@@ -117,12 +117,24 @@ if __name__ == '__main__':
                     _base='rpgcv2',
                     info=dict(coef=0.01),
                     path="/cephfs/hza/buffers/gaussian",
-                    save_buffer_epoch=100,
+                    save_model_epoch=100,
                 ),
                 mbsac_save=dict(
                     _base='mbsacv3',
                     path="/cephfs/hza/buffers/mbsac",
                     save_buffer_epoch=100,
+                ),
+
+                mbsac_save_local=dict(
+                    _base='mbsacv3',
+                    path="data/buffers/mbsac",
+                    save_model_epoch=50,
+                ),
+                gaussian_save_local=dict(
+                    _base='rpgcv2',
+                    info=dict(coef=0.01),
+                    path="data/buffers/gaussian",
+                    save_model_epoch=50,
                 ),
             )
         ), 
