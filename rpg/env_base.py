@@ -150,6 +150,10 @@ class GymVecEnv(VecEnv):
                 from envs.ant_envs import AntHEnv
                 return TimeLimit(AntHEnv('AntPush', **kwargs), 200)
 
+            elif env_name == 'AntMaze':
+                from envs.ant_envs import AntHEnv
+                return TimeLimit(AntHEnv(env_name, **kwargs), 200)
+
 
             elif env_name == 'AntFall':
                 from envs.ant_envs import AntHEnv
