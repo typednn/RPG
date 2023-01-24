@@ -113,6 +113,8 @@ class AntHEnv(gym.Env):
                 inp = np.concatenate((inp, movable * 0.01))
             return np.r_[self._base_obs[:2] * 0.01, self._base_obs[2:] * 0.1,  inp]  # input the original goal..
         else:
+            if movable is None:
+                return self._base_obs
             return np.concatenate((self._base_obs, movable))
 
     def seed(self, seed=None):
