@@ -51,9 +51,9 @@ class GymVecEnv(VecEnv):
                 from envs.triple_ant import TripleAntEnv
                 return TimeLimit(TripleAntEnv( **kwargs), 100)
 
-            elif env_name == 'AntMaze':
-                from envs.ant_maze import AntMaze
-                return TimeLimit(AntMaze( **kwargs), 150)
+            # elif env_name == 'AntMaze':
+            #     from envs.ant_maze import AntMaze
+            #     return TimeLimit(AntMaze( **kwargs), 150)
 
             elif env_name == 'AntMaze2':
                 from envs.ant_maze import AntMaze
