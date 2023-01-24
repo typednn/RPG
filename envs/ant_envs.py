@@ -16,10 +16,10 @@ def get_goal_sample_fn(env_name, evaluate):
         # NOTE: When evaluating (i.e. the metrics shown in the paper,
         # we use the commented out goal sampling function.    The uncommented
         # one is only used for training.
-        if evaluate:
-            return lambda: np.array([0., 16.])
-        else:
-            return lambda: np.random.uniform((-4, -4), (20, 20))
+        #if evaluate:
+        return lambda: np.array([0., 16.])
+        #else:
+        #    return lambda: np.random.uniform((-4, -4), (20, 20))
     elif env_name == 'AntPush':
         return lambda: np.array([0., 19.])
     elif env_name == 'AntFall':
@@ -140,6 +140,9 @@ class AntHEnv(gym.Env):
         
         if self.reward_type == 'sparse':
             reward = float(negative_dist > -self.goal_threshold)
+
+        if negative_dist > -self.goal_threshold:
+            print(self.goal_threshold, negative_dist, self._base_obs, self.goal)
         return self._get_obs(), reward, done, {'success': negative_dist > -self.goal_threshold}
 
     def render(self, mode='rgb_array'):
@@ -176,9 +179,16 @@ if __name__ == '__main__':
     env = AntHEnv('AntMaze')
     env.reset()
     images = []
-    for i in range(100):
-        env.step(env.action_space.sample())
-        images.append(env.render('rgb_array'))
+    idx = 0
+    #for i in range(100):
+    while True:
+        info = env.step(env.action_space.sample())[-1]
+        if info['success']:
+            raise NotImplementedError
+        #images.append(env.render('rgb_array'))
+        idx += 1
+        if idx % 100 == 0:
+            env.reset()
     env.close()
 
     from tools.utils import animate
