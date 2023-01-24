@@ -34,7 +34,7 @@ def merge_curves(x_list, y_list, bin_width=1000, max_steps=None):
     std = np.sqrt(sy2/n - mean*mean)
     xx = xx / n
     idx = xx>0
-    return xx[idx], mean[idx], std[idx]
+    return xx[idx]/1e6, mean[idx], std[idx]
 
 
 def smooth(y, smoothingWeight=0.95):
@@ -159,7 +159,7 @@ def create_axes(T, envs):
     return axs
     
 if __name__ == '__main__':
-    envs = ['hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen'] #, 'antfall']
+    envs = ['densecabinet', 'hammer', 'door', 'basket', 'stickpull', 'block', 'cabinet', 'kitchen'] #, 'antfall']
 
     width = min(10, len(envs))
     n_rows = (len(envs) + width - 1)//width
@@ -175,13 +175,13 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.savefig('sparse.png', dpi=300)
 
-    envs = ['densecabinet', 'denseantpush', 'denseantfall']
-    fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
-    if len(envs) == 1:
-        axs = [axs]
-    id = ord('A')
-    for ax, env_name in zip(axs, envs):
-        plot_env(ax, env_name, chr(id))
-        id += 1
-    plt.tight_layout()
-    plt.savefig('dense.png', dpi=300)
+    # envs = ['densecabinet', 'denseantpush', 'denseantfall']
+    # fig, axs = plt.subplots(1, len(envs), figsize=(6 * len(envs), 6))
+    # if len(envs) == 1:
+    #     axs = [axs]
+    # id = ord('A')
+    # for ax, env_name in zip(axs, envs):
+    #     plot_env(ax, env_name, chr(id))
+    #     id += 1
+    # plt.tight_layout()
+    # plt.savefig('dense.png', dpi=300)
