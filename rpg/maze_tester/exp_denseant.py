@@ -74,6 +74,15 @@ if __name__ == '__main__':
                     model=dict(gamma=0.995),
                     info=dict(coef=1.),
                 ),
+
+                seg4save=dict(
+                    _base='rewardrpg',
+                    env_cfg=dict(n=10),
+                    reward_schedule='2seg(0.05,400000,600000)',
+                    model=dict(gamma=0.995),
+                    save_eval_results=True,
+                    path='data/trajs/ant/seg4save',
+                ),
             )
         ),
         base=None, 
