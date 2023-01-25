@@ -124,6 +124,7 @@ class Trainer(Configurable, RLAlgo):
         save_model_epoch=0,
 
         max_total_steps=None,
+        save_eval_results=False,
         cem=None,
     ):
         if seed is not None:
@@ -433,7 +434,17 @@ class Trainer(Configurable, RLAlgo):
         if len(images) > 0:
             logger.animate(images, 'eval.mp4')
 
-        return Trajectory(transitions, len(obs), n_step)
+
+        traj =Trajectory(transitions, len(obs), n_step)
+        if self._cfg.save_eval_results is not None:
+            #os.makedirs(self._cfg.save_eval_results, exist_ok=True)
+            import os
+            path = logger.dir_path(f"eval{self.epoch_id}")
+            os.makedirs(path, exist_ok=True)
+            assert len(images) > 0
+            logger.animate(images, f'eval{self.epoch_id}/video.mp4')
+            torch.save(traj, os.path.join(path, 'traj.pt'))
+        return traj
 
     def setup_logger(self):
         format_strs = ["stdout", "log", "csv"]
@@ -468,6 +479,7 @@ class Trainer(Configurable, RLAlgo):
         while True:
             if max_epoch is not None and epoch_id >= max_epoch:
                 break
+            self.epoch_id = epoch_id
 
             traj = self.inference(steps)
 
