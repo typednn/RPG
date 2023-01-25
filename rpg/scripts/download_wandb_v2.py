@@ -26,23 +26,25 @@ results = dict(
         rpg=['l74istv9', 'a1mwbhc2', 'mxk0e15e', 'nezxnnsm'],
         mbsac=['czbmv6kz', '80fo7yfs', 'rdbxkafw', 's098uexc', 'zmr3ajup', 'j1e5wnf6'],
     ),
-    denseantpush=dict(
-        mbsac=['qrk7pms9', 'imuhdlx3', 'rologrt9', 'y6f90qiv', '2vaesy7r', '0i8xrgw0'],
-        rpg=['c7t6092a', '80bll73c', 'igkxhusp', 'pofu2kez'],
+    antpush=dict(
+        #mbsac=['qrk7pms9', 'imuhdlx3', 'rologrt9', 'y6f90qiv', '2vaesy7r', '0i8xrgw0'],
+        #rpg=['c7t6092a', '80bll73c', 'igkxhusp', 'pofu2kez'],
+        mbsac=['foue1cf4', '2jbunkd5', 't6vguprk', 'n0ue7iab'],
+        rpg=['y4ot020f', 'ofefoygb', '1y9rz0xf', 'amv8bz45', 'ka4b1fpj', '2z9gxbdd', 'qgyz3obq', 'wximojwd'],
     ),
     denseantfall=dict(
         mbsac=['ymbql7z2', '0avkweg1', 'yr7fqyns', 'nmdap4k3'],
         rpg= [],
     ),
     kitchen=dict(
-        rpg=['kuoq1sgj', 'esn4a9dc', 'jk5klnmk', '7z71xou5'],
-        mbsac=['wgwnxg18', 'cjl9c2jh', 'sugg7aly', 'uqlwi5jl'],
+        rpg=['o3y61upt', '4hgdmoke', 't3ba69m3', '1trfxtyf', '1qhqmeyz'],
+        mbsac=['efr4td02', 'afsmvy3m', '3uz2n6wn', 't5avyo4e', 'ymzi5e2m'],
     ),
-    antpush=dict(
-        mbsac=['208y8mza', '6dw1lmn3'],
-        #rpg=['vwppvqay', 'obbvdzv7']
-        rpg = ['d9w7ftjd', '7k1g89ok']
-    ),
+    # antpush=dict(
+    #     mbsac=['208y8mza', '6dw1lmn3'],
+    #     #rpg=['vwppvqay', 'obbvdzv7']
+    #     rpg = ['d9w7ftjd', '7k1g89ok']
+    # ),
     antfall=dict(
         rpg=['tp8vynv0', 'szm0fdhi'],
         mbsac=['dg8eqb43', 'rdux2as3'],
