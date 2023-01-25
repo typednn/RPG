@@ -32,7 +32,7 @@ if __name__ == '__main__':
                 _base='rpgcv2',
                 info = dict(coef=0.005),
                 save_eval_results=True,
-                path=[None, "/cephfs/hza/buffers/draw/"]
+                path=[None, f"/cephfs/hza/buffers/draw{env_name}/"]
             ),
             names=['drawlocal', 'drawremote'],
             base='mbsacv3', 
