@@ -436,14 +436,15 @@ class Trainer(Configurable, RLAlgo):
 
 
         traj =Trajectory(transitions, len(obs), n_step)
-        if self._cfg.save_eval_results is not None:
-            #os.makedirs(self._cfg.save_eval_results, exist_ok=True)
-            import os
-            path = logger.dir_path(f"eval{self.epoch_id}")
-            os.makedirs(path, exist_ok=True)
-            assert len(images) > 0
-            logger.animate(images, f'eval{self.epoch_id}/video.mp4')
-            torch.save(traj, os.path.join(path, 'traj.pt'))
+        if mode != 'training':
+            if self._cfg.save_eval_results is not None:
+                #os.makedirs(self._cfg.save_eval_results, exist_ok=True)
+                import os
+                path = logger.dir_path(f"eval{self.epoch_id}")
+                os.makedirs(path, exist_ok=True)
+                assert len(images) > 0
+                logger.animate(images, f'eval{self.epoch_id}/video.mp4')
+                torch.save(traj, os.path.join(path, 'traj.pt'))
         return traj
 
     def setup_logger(self):
