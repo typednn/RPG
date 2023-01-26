@@ -233,6 +233,9 @@ class Trainer(Configurable, RLAlgo):
         else:
             self.exploration = None
 
+        # from IPython import embed; embed()
+        # exit(0)
+
     def relabel_z(self, seg, relabel_z=True):
         z = seg.z
         if self._cfg.fix_buffer:
@@ -437,11 +440,13 @@ class Trainer(Configurable, RLAlgo):
 
         traj =Trajectory(transitions, len(obs), n_step)
         if mode != 'training':
-            if self._cfg.save_eval_results is not None:
+            if hasattr(self._cfg, 'save_eval_results') and self._cfg.save_eval_results:
                 #os.makedirs(self._cfg.save_eval_results, exist_ok=True)
                 import os
                 path = logger.dir_path(f"eval{self.epoch_id}")
                 os.makedirs(path, exist_ok=True)
+                # if len(images) == 0:
+                #     from IPython import embed; embed()
                 assert len(images) > 0
                 logger.animate(images, f'eval{self.epoch_id}/video.mp4')
                 torch.save(traj, os.path.join(path, 'traj.pt'))
