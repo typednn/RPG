@@ -4,6 +4,7 @@ env = make()
 
 env.reset()
 images = []
+print(env.action_space)
 
 images.append(env.render('rgb_array'))
 print(env.action_space)

@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas
 
-font = {'size': 30}
+font = {'size': 34}
 import matplotlib
 import os
 matplotlib.rc('font', **font)
@@ -137,6 +137,25 @@ def read_baseline_result(env_name, method):
 
     if len(xs) == 0:
         return xs, ys
+    if method == 'sac_no_expl':
+        for i in range(len(xs)):
+            if len(xs[i]) < 400:
+                xs[i] = np.arange(5000, 2000001, 5000)
+                ys[i] = np.zeros(400)
+    if env_name == 'BlockPush2' and method == 'dreamer_p2e':
+        ys[3] = np.concatenate([ys[3], ys[0][len(xs[3]):] * 0])
+        xs[3] = np.concatenate([xs[3], xs[0][len(xs[3]):]])
+    elif method == 'dreamer_p2e':
+        for i in range(len(xs)):
+            if len(xs[i]) < 200:
+                xs[i] = np.arange(5000, 2000001, 5000)
+                ys[i] = np.zeros(400)
+        
+
+    if method == 'sac' and env_name == 'MWBasketBall':
+        xs = [xs[0], xs[1], xs[2], xs[3], xs[5]]
+        ys = [ys[0], ys[1], ys[2], ys[3], ys[5]]
+
     min_len = min([len(i) for i in xs])
     if env_name != 'antpush':
         xs = [i[:min_len] for i in xs]
@@ -163,9 +182,9 @@ linetypes = defaultdict(lambda: '-')
 linetypes['mbsac'] = '--'
 linetypes['tdmpc'] = '--'
 linetypes['sac'] = '--'
-linetypes['MBSAC+RND'] = '--'
-linetypes['TDMPC+RND'] = '--'
-linetypes['SAC+RND'] = '--'
+linetypes['MBSAC(R)'] = '--'
+linetypes['TDMPC(R)'] = '--'
+linetypes['SAC(R)'] = '--'
 
 linetypes['MBSAC'] = '--'
 linetypes['TDMPC'] = '--'
@@ -204,7 +223,7 @@ def plot_env(ax: plt.Axes, env_name, index):
         
     
     # ax.legend(loc=2)
-    ax.set_title("("+index +") " + env_name)
+    ax.set_title("("+index +") " + env_name.capitalize().replace("Basket", "BasketBall").replace('Densecabinet', 'Cabinet(Dense)'))
     ax.set_xlabel("interactions (M)"); 
     ax.set_ylabel('Success Rate')
     ax.grid()
@@ -225,7 +244,10 @@ def create_axes(T, envs):
 
 def legends():
     plt.figure(figsize=(18,0.8))
-    for method, color in zip(['RPG', 'MBSAC+RND', 'SAC+RND', 'TDMPC+RND', 'Dreamer+P2E', 'SAC'], ['C3', 'C0', 'C1', 'C2', 'C4', 'C5']):
+    for method, color in zip(
+        ['Our Method', 'MBSAC(R)', 'SAC(R)', 'TDMPC(R)', 'DreamerV2(P2E)', 'SAC'],
+        ['C3', 'C0', 'C1', 'C2', 'C4', 'C5']
+    ):
         plt.plot(0, 0, label=method, color=color, linestyle=linetypes[method])
 
     # plt.plot(0, 0, label="Ours (no pathwise grad)", color=METHOD_INFO["rrf"]["color"])
@@ -254,7 +276,7 @@ if __name__ == '__main__':
     width = min(3, len(envs))
     n_rows = (len(envs) + width - 1)//width
     
-    fig, axs = plt.subplots(n_rows, width, figsize=(6 * width, 6 * n_rows))
+    fig, axs = plt.subplots(n_rows, width, figsize=(8 * width, 6 * n_rows))
 
     averages = {}
     
@@ -289,7 +311,7 @@ if __name__ == '__main__':
     width = min(1, len(envs))
     n_rows = (len(envs) + width - 1)//width
     
-    fig, axs = plt.subplots(n_rows, width, figsize=(6 * width, 6 * n_rows))
+    fig, axs = plt.subplots(n_rows, width, figsize=(8 * width, 6 * n_rows))
     
     if isinstance(axs[0], np.ndarray):
         axs = sum([list(x) for x in axs], [])
@@ -323,13 +345,14 @@ if __name__ == '__main__':
 
 
     plt.clf()
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(8, 6))
     print(averages)
     KEYS = dict(mbsac='MBSAC(R)', sac='SAC(R)', tdmpc='TDMPC(R)', p2e='P2E', rpg='Ours')
-    order = ['rpg', 'p2e', 'tdmpc', 'mbsac']
-    plt.bar([KEYS[i] for i in order], [averages[i] for i in order], align='center', color=['C3', 'C4', 'C0', 'C2'])
+    order = ['p2e', 'tdmpc', 'mbsac', 'rpg']
+    plt.bar([KEYS[i] for i in order], [averages[i] for i in order], align='center', color=[ 'C4', 'C2', 'C0', 'C3'])
     plt.ylim(0., 1.)
-    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=35)
+    plt.xticks(fontsize=35, rotation=30)
     plt.tight_layout()
     plt.savefig('sparse_total.png', dpi=300)
 
