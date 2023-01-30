@@ -147,7 +147,6 @@ class VariableArgs(Type):
         return ()
     
 
-
 class PType(Type):
     # probablistic distribution of the base_type
     def __init__(self, base_type) -> None:

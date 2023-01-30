@@ -157,15 +157,6 @@ def unify(tpA: Type, tpB: Type, query: Type):
 
 
 
-def test():
-    TN = Type('\'N')
-    TM = Type('\'M')
-    TN1 = Type('\'N1')
-    Array2D_A = ArrayType(TN, TM)
-    Array2D_B = ArrayType(TN1, TM)
-
-
-
 
 if __name__ == '__main__':
     pass
