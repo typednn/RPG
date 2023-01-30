@@ -124,8 +124,13 @@ def unify(tpA: Type, tpB: Type, query: Type):
     TID = 0
 
     def substitute(x: Type):
+        if not x.polymorphism:
+            return x
+
         nonlocal TID
+
         if len(x.children) > 0:
+            # can't be type variable
             out = []
             for i in x.children:
                 if isinstance(i, VariableArgs):
@@ -137,19 +142,12 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 else:
                     out.append(substitute(i))
             return x.__class__(*out)
-
-        if not x.polymorphism:
-            return x
-
-        # the following code substitutes all type variables
+        assert x.is_type_variable
         p = findp(x)
-        if p.is_type_variable:
-            if p._type_name not in allocator:
-                allocator[p._type_name] = p.__class__(f'\'T{TID}')
-                TID += 1
-            out = allocator[p._type_name]
-        else:
-            out = substitute(p)
+        if p._type_name not in allocator:
+            allocator[p._type_name] = p.__class__(f'\'T{TID}')
+            TID += 1
+        out = allocator[p._type_name]
         return out
 
     tpA = substitute(tpA)
