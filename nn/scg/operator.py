@@ -6,6 +6,9 @@ from torch.nn import Module
 #   - (num1, num2, IMG_TYPE)
 #   - each num can be '?' that matches any other shapes or a type symbol
 
+#   shape can be viewed as a way to compose type class 
+# we don't support broadcast ..
+
 
 
 class Operator(Module):

@@ -1,7 +1,6 @@
-# https://github.com/rob-smallshire/hindley-milner-python/blob/07e5db9ee8428dfc8ef603ae1fe862d600e89f2c/inference.py#L316
-from .types import TypeInferenceFailure, Arrow, List, Type, Tuple
-
-
+# https://github.com/hzaskywalker/TaskAnnotator/blob/main/llm/pl/unification.py
+#from .types import TypeInferenceFailure, Arrow, List, Type, Tuple
+from .basetypes import TupleType
 
 
 class TypeInferenceFailure(Exception):
@@ -26,7 +25,7 @@ def check_occurs(a, b):
 TID = 0
 
 
-def unify(tpA, tpB, out, queries):
+def unify(tpA, tpB, queries):
     def update_name(tp):
         if not hasattr(tp, '_type_name'):
             return tp
@@ -34,14 +33,12 @@ def unify(tpA, tpB, out, queries):
 
     tpB = map_type(tpB, update_name)
 
-    def is_type_variable(x):
-        return hasattr(x, '_type_name')
     pa = {} # map str to type in the end ..
 
     def findp(a):
         #if len(a.children) > 0:
         #    return a.__class__(*[findp(i) for i in a.children])
-        if is_type_variable(a):
+        if a.is_type_variable:
             s = str(a)
             if s not in pa:
                 pa[s] = a
@@ -54,12 +51,12 @@ def unify(tpA, tpB, out, queries):
     def resolve(a, b):
         a = findp(a)
         b = findp(b)
-        if is_type_variable(a):
+        if a.is_type_variable:
             if str(a) != str(b):
                 if check_occurs(a, b):
                     raise TypeInferenceFailure("Recursive type ..")
                 pa[str(a)] = b
-        elif is_type_variable(b):
+        elif b.is_type_variable:
             resolve(b, a)
         else:
             if len(a.children) == 0:
@@ -105,11 +102,11 @@ def unify(tpA, tpB, out, queries):
                 def resolve2(D, C):
                     if len(C) > 0:
                         assert not C[0].match_many(), "can not match two variable arguments now."
-                    if not is_type_variable(D[0]):
+                    if not D[0].is_type_variable:
                         for i in C:
                             resolve(D[0].base_type, i)
                     else:
-                        resolve(D[0], Tuple(*C))
+                        resolve(D[0], TupleType(*C))
 
                 if len(C) > 1:
                     assert len(D) == 1 and D[0].match_many()
@@ -124,7 +121,7 @@ def unify(tpA, tpB, out, queries):
         if len(x.children) > 0:
             out = []
             for i in x.children:
-                if i.match_many() and is_type_variable(i):
+                if i.match_many() and i.is_type_variable:
                     y = substitute(i).elements
                     out += y # requires this is a tuple
                 else:
@@ -135,7 +132,8 @@ def unify(tpA, tpB, out, queries):
             return x
 
         p = findp(x)
-        if is_type_variable(p):
+        #if is_type_variable(p):
+        if p.is_type_variable:
             if p._type_name not in allocator:
                 global TID
                 allocator[p._type_name] = p.__class__(f'\'T{TID}')
@@ -148,20 +146,13 @@ def unify(tpA, tpB, out, queries):
         return out
 
     substitute(tpA); substitute(tpB)
-    if queries is None or len(queries) == 0:
-        return substitute(out)
-    else:
-        out = [update_name(i) for i in queries] + [out]
-        return Arrow(*[substitute(i) for i in out])
 
 
-def type_inference(tp, arg_types, queries=None):
-    from .unification import unify
-    if not isinstance(tp, Arrow):
-        raise NotImplementedError
+    queries = [update_name(i) for i in queries]
+    return [substitute(i) for i in queries]
 
-    tps = arg_types
-    for k in tps:
-        if k is None:
-            raise TypeInferenceFailure(f"Not enough arguments for {tp}.")
-    return unify(Tuple(*tp.arguments), Tuple(*tps), tp.out, queries)
+
+
+
+if __name__ == '__main__':
+    pass
