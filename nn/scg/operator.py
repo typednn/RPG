@@ -28,13 +28,15 @@ class Operator(Module):
 
     def register_types(self, *args, **kwargs):
         assert len(kwargs) == 0, NotImplementedError
-        if self.arrow is not None:
-            self._inp_type, _, self._oup_type = self.arrow.unify(
-                *map(get_type_from_op_or_type, args)
-            )
+        assert self.arrow is not None, f"arrow is not defined for class {self.__class__}"
+        self._inp_type, _, self._oup_type = self.arrow.unify(
+            *map(get_type_from_op_or_type, args)
+        )
 
     @property
     def out(self): # out type when input are feed ..
+        if not hasattr(self, '_oup_type'):
+            raise NotImplementedError(f"the register_types function is not called for class {self.__class__}")
         return self._oup_type
 
     def _get_type(self):
