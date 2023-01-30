@@ -19,10 +19,10 @@ class Type:
 
     @property
     def is_type_variable(self):
-        return hasattr(self, '_type_variable') and self._type_name.startswith('\'')
+        return hasattr(self, '_type_name')
 
     def __eq__(self, other):
-        return str(self) == str(other)
+        return self.__repr__() == other.__repr__()
 
     def __repr__(self):
         return self.__str__()
@@ -31,12 +31,13 @@ class Type:
         return self._type_name
 
     def update_name(self, fn) -> "Type":
+        if not self.polymorphism:
+            return self
         args = []
         if self.is_type_variable:
             args.append(fn(self._type_name))
-        return self.__class__(*args, *map(fn, self.children))
+        return self.__class__(*args, *[i.update_name(fn) for i in self.children()])
 
-    @property
     def children(self) -> typing.Tuple["Type"]:
         return ()
     
@@ -46,11 +47,15 @@ class Type:
     @property
     def polymorphism(self):
         #TODO: accelerate this ..
+        if hasattr(self, '_polymorphism'):
+            return self._polymorphism
+        self._polymorphism = True
         if self.is_type_variable:
             return True
-        for i in self.children:
+        for i in self.children():
             if i.polymorphism:
                 return True
+        self._polymorphism = False
         return False
 
     def instance(self, x):
@@ -127,8 +132,8 @@ class VariableArgs(Type):
 
     def __str__(self):
         if self.base_type is None:
-            return self._type_name + "(...)"
-        return self._type_name + "(" + str(self.base_type) + ", ...)"
+            return self._type_name + "*"
+        return self._type_name + ":" + str(self.base_type) + "*"
 
     def instance(self, x):
         if not iterable(x):
@@ -140,9 +145,8 @@ class VariableArgs(Type):
                 return False
         return True
 
-    @property
     def children(self):
-        if self.base_type is None:
+        if self.base_type is not None:
             return (self.base_type,)
         return ()
     
@@ -166,6 +170,44 @@ class DataType(Type):
     def instance(self, x):
         return isinstance(x, self.data_cls)
 
-    @property
     def children(self):
         return ()
+
+        
+class Arrow(Type):
+    def __init__(self, *args) -> None:
+        self.args = args[:-1]
+        self.out = args[-1]
+
+    def __str__(self):
+        return '->'.join(str(e) for e in self.children())
+
+    def children(self) -> typing.Tuple["Type"]:
+        return list(self.args) + [self.out]
+
+    def unify(self, *args):
+        from .unification import unify
+        return unify(TupleType(*args), TupleType(*self.args), self.out)
+
+    def test_unify(self, gt, *args):
+        from .unification import TypeInferenceFailure
+        print("testing unify", self)
+        print("INPUT:")
+        for i in args:
+            print(" " + str(i))
+        print("Output:")
+        if gt != 'error':
+            output = str(self.unify(*args)[-1])
+            assert output == gt, "unify failed: " + output + " != " + gt
+            print("unify succeed! ", output + ' == ' + gt)
+            print("\n\n")
+        else:
+            try:
+                self.unify(*args)
+                assert False, "unify should fail!"
+            except TypeInferenceFailure:
+                print("unify failed as expected.")
+                print("\n\n")
+
+    def instance(self, x):
+        raise NotImplementedError("Arrow is not a simple type, it's a function type.")

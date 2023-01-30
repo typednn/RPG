@@ -9,30 +9,30 @@ class TypeInferenceFailure(Exception):
 
 
 def map_type(tp: Type, f):
-    if len(tp.children) > 0:
-        return tp.__class__(*[map_type(i, f) for i in tp.children])
+    if len(tp.children()) > 0:
+        return tp.__class__(*[map_type(i, f) for i in tp.children()])
     else:
         return f(tp)
 
 def check_occurs(a, b):
     if str(a) == str(b):
         return True
-    for i in b.children:
+    for i in b.children():
         if check_occurs(a, i):
             return True
     return False
 
 
 def contain_many(X):
-    s = sum([i.match_many() for i in X.children])
+    s = sum([i.match_many() for i in X.children()])
     assert s <= 1, "can not have two variable arguments."
     return s > 0
 
     
 
 def unify(tpA: Type, tpB: Type, query: Type):
-    tpB = tpB.update_name(lambda x: x + '__right__')
-    query = tpB.update_name(lambda x: x + '__right__')
+    tpB = tpB.update_name(lambda x: x + '\'')
+    query = query.update_name(lambda x: x + '\'')
 
     pa = {} # map str to type in the end ..
     def findp(a: Type):
@@ -58,7 +58,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
             resolve(b, a)
         else:
             # a, b both are not type variable 
-            if len(a.children) == 0:
+            if len(a.children()) == 0:
                 # two normal types mismatch
                 if str(a) != str(b):
                     raise TypeInferenceFailure(f"type {a} != type {b}.")
@@ -69,12 +69,13 @@ def unify(tpA: Type, tpB: Type, query: Type):
             # now we assume a must contain ... or there is no ...
             if not contain_many(a):
                 # no ..., directly match two lists
-                if len(a) != len(b):
+                a_children, b_children = a.children(), b.children()
+                if len(a_children) != len(b_children):
                     raise TypeInferenceFailure(f"type {a} has a different number of children with type {b}.")
-                for x, y in zip(a, b):
+                for x, y in zip(a_children, b_children):
                     resolve(x, y)
             else:
-                C, D = a.children, b.children
+                C, D = a.children(), b.children()
                 def match_prefix(C, D):
                     idx = 0
                     while True:
@@ -127,14 +128,14 @@ def unify(tpA: Type, tpB: Type, query: Type):
         if not x.polymorphism:
             return x
 
-        if not x.is_type_variable and len(x.children) > 0:
+        if not x.is_type_variable and len(x.children()) > 0:
             # can't be type variable
             out = []
-            for i in x.children:
+            for i in x.children():
                 if isinstance(i, VariableArgs):
                     y = substitute(i)
                     if isinstance(y, TupleType):
-                        out += y.children
+                        out += y.children()
                     else:
                         out.append(y)
                 else:
@@ -143,10 +144,13 @@ def unify(tpA: Type, tpB: Type, query: Type):
 
         assert x.is_type_variable
         p = findp(x)
-        if p._type_name not in allocator:
-            nonlocal TID
-            allocator[p._type_name] = p.__class__(f'\'T{TID}', *[substitute(i) for i in p.children()])
-            TID += 1
+        if p.is_type_variable:
+            if p._type_name not in allocator:
+                nonlocal TID
+                allocator[p._type_name] = p.__class__(f'\'T{TID}', *[substitute(i) for i in p.children()])
+                TID += 1
+        else:
+            return p
         out = allocator[p._type_name]
         return out
 
@@ -154,8 +158,3 @@ def unify(tpA: Type, tpB: Type, query: Type):
     tpB = substitute(tpB)
     query = substitute(query)
     return tpA, tpB, query
-
-
-
-if __name__ == '__main__':
-    pass
