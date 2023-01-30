@@ -1,38 +1,17 @@
-"""
-type system of neural networks
- a type is actually similar to the gym Box
- typed_builder is a builder that is able to select the default config based on the type of the input and output 
-
- the major use case is to specify the type of the input and output of the neural network 
- ideally, when we specify the type of the data, we can automatically generate the neural network based on some high-level specification
-   instead of choosing the networks by ourselves.
-   for example: we can define a seq(a) -> seq(a) network, and the type of the input and output is seq, then we can automatically generate the network based on the element of the seq(a)
-
- another things to choose is that if we need to use the dynamic types? Infer the input and select the result? 
-
-
- abstract operators for datas:
-   - stack (generate sequence)
-   - UNet (transformation)
-   - batchify a sequence (sparse, or dense mode)
-   - reshape a batch of data back in to packed sequences
-   - Encoding, Decoding
-   - reshape (only reshape the batch dimension)
-  Also, we can support different ways of fusion different things. 
-
-
- for probabilistic distributions, we have the operators
-   - sample (size, ...) -> data, logp, entropy
-   - rsample if possible (size, ...)
-   - log_prob (evaluate the log prob of the data, ...) (if supported)
-
- we build the stochastic computation graph for all elements
-  - we can sample a element by sampling its all ancestors
-  - we can condition a element by conditioning its all ancestors
-  - one can evaluate the log prob of a element (together with conditions and sampled results) by evaluating the log prob of its all sampled ancestors
-"""
-
 # we can also support infering the auxiliary data information from the input data information; for example, the shape and dtypes.
+import typing
+
+def match_list(A, B: typing.List["Type"]):
+    if len(A) != len(B):
+        return False
+    for a, b in zip(A, B):
+        if not b.instance(a):
+            return False
+    return True
+
+def iterable(x):
+    return isinstance(x, typing.Iterable)
+
 
 class Type:
     def __init__(self, type_name) -> None:
@@ -51,8 +30,14 @@ class Type:
     def __str__(self):
         return self._type_name
 
+    def update_name(self, fn) -> "Type":
+        args = []
+        if self.is_type_variable:
+            args.append(fn(self._type_name))
+        return self.__class__(*args, *map(fn, self.children))
+
     @property
-    def children(self):
+    def children(self) -> typing.Tuple["Type"]:
         return ()
     
     def match_many(self):
@@ -61,13 +46,112 @@ class Type:
     @property
     def polymorphism(self):
         #TODO: accelerate this ..
-        if len(self.children) > 0:
-            for i in self.children:
-                if i.polymorphism:
-                    return True
+        if self.is_type_variable:
+            return True
+        for i in self.children:
+            if i.polymorphism:
+                return True
+        return False
+
+    def instance(self, x):
+        return True
+
+
+class TupleType(Type):
+    # let's not consider named tuple for now ..
+    def __init__(self, *args: typing.List[Type]) -> None:
+        self.elements = []
+        self.dot = None
+        for idx, i in enumerate(args):
+            if i.match_many():
+                assert self.dot is None, NotImplementedError("only one ellipsis is allowed.")
+                self.dot = idx
+            self.elements.append(i)
+
+    def __str__(self):
+        return f"({', '.join(str(e) for e in self.children())})"
+
+    def children(self):
+        return tuple(self.elements) # + tuple(self.elements_kwargs.values())
+
+    def instance(self, inps):
+        #assert isinstance(inps, tuple) or isinstance(inps, list)
+        if not iterable(inps):
             return False
+
+        if self.dot is None and len(inps) != len(self.elements):
+            return False
+        if self.dot is not None and len(inps) < len(self.elements):
+            return False
+
+        if self.dot is None:
+            return match_list(inps, self.elements)
         else:
-            return hasattr(self, '_type_name')
+            l = self.dot
+            r = len(self.elements) - l
+            if l > 0 and not match_list(inps[:l], self.elements[:l]):
+                return False
+            if r > 0 and not match_list(inps[-r:], self.elements[-r:]):
+                return False
+            return match_list(inps[l:-r], self.elements[l])
+
+
+
+class ListType(Type): # sequence of data type, add T before the batch
+    def __init__(self, base_type: Type) -> None:
+        self.base_type = base_type
+
+    def __str__(self):
+        return f"List({self.base_type})"
+
+    def children(self):
+        return (self.base_type,)
+
+    def instance(self, x):
+        if not (isinstance(x, list) or isinstance(x, tuple)):
+            return False
+        for i in x:
+            if not self.base_type.instance(i):
+                return False
+        return True
+
+
+class VariableArgs(Type):
+    # something that can match arbitrary number of types
+    def __init__(self, type_name, based_type: typing.Optional["Type"]=None):
+        self._type_name = type_name
+        self.base_type = based_type
+
+    def match_many(self):
+        return True
+
+    def __str__(self):
+        if self.base_type is None:
+            return self._type_name + "(...)"
+        return self._type_name + "(" + str(self.base_type) + ", ...)"
+
+    def instance(self, x):
+        if not iterable(x):
+            return False
+        if self.base_type is None:
+            return True
+        for i in x:
+            if not self.base_type.instance(i):
+                return False
+        return True
+
+    @property
+    def children(self):
+        if self.base_type is None:
+            return (self.base_type,)
+        return ()
+    
+
+
+class PType(Type):
+    # probablistic distribution of the base_type
+    def __init__(self, base_type) -> None:
+        raise NotImplementedError
 
 
 class DataType(Type):
@@ -86,26 +170,3 @@ class DataType(Type):
     @property
     def children(self):
         return ()
-        
-
-class TupleType(Type):
-    # can be named later
-    def __init__(self, *args, **kwargs) -> None:
-        assert len(args) is None or kwargs is None
-
-        
-class TensorType(Type):
-    # multi-dimenional array
-    def __init__(self, type_name) -> None:
-        super().__init__(type_name)
-    
-
-class PType(Type):
-    # probablistic distribution of the base_type
-    def __init__(self, base_type) -> None:
-        super().__init__()
-
-
-class ListType(Type): # sequence of data type, add T before the batch
-    def __init__(self, type_name) -> None:
-        super().__init__(type_name)

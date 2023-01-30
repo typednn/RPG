@@ -9,11 +9,18 @@ from torch.nn import Module
 #   shape can be viewed as a way to compose type class 
 # we don't support broadcast ..
 
+# operator can take multiple types .. but during type inference, the results must be the same ..
+
 
 
 class Operator(Module):
+    Arrow = None # TYPE annotation of the forward funciton
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
+
+    def register_types(self, *args, **kwargs):
+        pass
 
     @property
     def out(self): # out type when input are feed ..
