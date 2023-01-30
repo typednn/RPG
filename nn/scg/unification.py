@@ -127,9 +127,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
         if not x.polymorphism:
             return x
 
-        nonlocal TID
-
-        if len(x.children) > 0:
+        if not x.is_type_variable and len(x.children) > 0:
             # can't be type variable
             out = []
             for i in x.children:
@@ -142,10 +140,12 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 else:
                     out.append(substitute(i))
             return x.__class__(*out)
+
         assert x.is_type_variable
         p = findp(x)
         if p._type_name not in allocator:
-            allocator[p._type_name] = p.__class__(f'\'T{TID}')
+            nonlocal TID
+            allocator[p._type_name] = p.__class__(f'\'T{TID}', *[substitute(i) for i in p.children()])
             TID += 1
         out = allocator[p._type_name]
         return out
@@ -154,7 +154,6 @@ def unify(tpA: Type, tpB: Type, query: Type):
     tpB = substitute(tpB)
     query = substitute(query)
     return tpA, tpB, query
-
 
 
 
