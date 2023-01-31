@@ -28,13 +28,12 @@ from ..types.tensor import TensorType, Arrow
 #         return inp_type.new(Type("*"), int(np.prod(inp_type.data_shape())))
 
 
-class FlattenBatch(nn.Module):
+class FlattenBatch(Operator):
     def forward(self, x):
         return x.reshape(-1, self.inp_types[0].data_shape())
 
-
     def _type_inference(self, inp_type):
-        raise NotImplementedError
+        return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
 
     
 class Flatten(Operator):

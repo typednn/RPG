@@ -1,7 +1,7 @@
 from torch import nn
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
-from ..functors import Flatten, Seq, Linear
+from ..functors import Flatten, Seq, Linear, FlattenBatch
 
 
 # TD = Type('D')
@@ -22,6 +22,10 @@ class ConvNet(Operator):
         )
 
     def build_modules(self, inp_type):
+        try:
+            int(inp_type.data_shape().total())
+        except TypeError:
+            raise TypeError(f'ConvNet requires a fixed input shape but receives {str(inp_type)}')
         assert inp_type.data_dims is 3
         C = inp_type.channel_dim
 
@@ -39,9 +43,10 @@ def test_conv():
     #inp = TensorType('N', 3, 224, 224, data_dims=3)
     inp = TensorType('...', 3, 224, 224, data_dims=3)
     #inp = ImageType
-    conv = ConvNet(inp, layer=4)
+    flattenb = FlattenBatch(inp)
+    conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
-    seq = Seq(conv, flatten, Linear(flatten))
+    seq = Seq(flattenb, conv, flatten, Linear(flatten))
     print(seq)
     # print(seq)
 
