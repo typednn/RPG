@@ -63,14 +63,27 @@ class Seq(Operator):
         out += str(self.out)
         return out
 
+
 class Linear(Operator):
-    #arrow = Arrow(TensorType('...', 'N'), TensorType("X", "X"))
-    
-    def _type_inference(self, inp_type):
+    arrow = "none" 
+
+    @classmethod
+    def _new_config(cls):
+        return dict(
+            dim=256,
+        )
+
+    def build_modules(self, inp_type):
         assert isinstance(inp_type, TensorType)
         assert inp_type.data_dims == 1
-        # print(inp_type.data_shape())
-        return inp_type.new(*inp_type.batch_shape(), int(np.prod(inp_type.data_shape())))
+        self.main = nn.Linear(inp_type.channel_dim, self.config.dim)
+    
+    def _type_inference(self, inp_type):
+        return inp_type.new(*inp_type.batch_shape(), self.config.dim)
+
+    def forward(self, *args, **kwargs):
+        return self.main(*args, **kwargs)
+
 
 if __name__ == '__main__':
     pass
