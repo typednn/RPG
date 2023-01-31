@@ -20,7 +20,7 @@ class UIntType(Type):
         return "Unit(" + str(self.a) + ")"
 
     def __int__(self):
-        return self.a
+        return int(self.a)
 
         
 
@@ -37,7 +37,12 @@ class SizeType(TupleType):
         super().__init__(*self.size)
 
     def __getitem__(self, index):
-        return int(self.size[index])
+        out = self.size[index]
+        if isinstance(out, UIntType):
+            return int(out)
+        elif isinstance(out, list):
+            out = [int(i) if isinstance(out, UIntType) else i  for i in out]
+        return out
 
     def sample(self):
         #return super().sample()
@@ -63,8 +68,17 @@ class SizeType(TupleType):
 
 
 class TensorType(Type):
-    def __init__(self, *size, dtype=None, device=None):
-        size = SizeType(*size)
+    def __init__(self, *size, dtype=None, device=None, data_dims=None):
+        _size = []
+        for i in size:
+            if isinstance(i, str):
+                if i == '...':
+                    i = VariableArgs(i)
+                else:
+                    i = Type(i)
+            _size.append(i)
+
+        size = SizeType(*_size)
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
         self.size = size
         self.data_cls = torch.Tensor
@@ -72,9 +86,14 @@ class TensorType(Type):
 
         self.dtype = dtype or torch.float32
         self.device = device or 'cuda:0'
+        assert data_dims is not None, "data_dims must be specified for batch tensor"
+        self.data_dims = data_dims
 
     def new(self, *size):
-        return TensorType(*size, dtype=self.dtype, device=self.device)
+        return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=self.data_dims)
+
+    def batch_shape(self):
+        return self.size[:-self.data_dims]
 
     def instance(self, value):
         if not (isinstance(value, self.data_cls)):
