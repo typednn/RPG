@@ -11,7 +11,6 @@ ImageType = TensorType(VariableArgs('...'), TD, TN, TM)
 
 
 class ConvNet(Operator):
-
     @classmethod
     def _new_config(cls):
         return dict(

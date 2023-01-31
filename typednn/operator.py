@@ -71,3 +71,10 @@ class Operator(Module, OptBase):
     def __str__(self) -> str:
         out = super().__str__()
         return out + f"\nOutputType: {self.out}"
+
+        
+        
+class TypeFactory(Operator):
+    @classmethod
+    def register(cls, name, type):
+        raise NotImplementedError
