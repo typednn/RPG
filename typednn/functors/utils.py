@@ -45,7 +45,7 @@ class Flatten(Operator):
 
     def _type_inference(self, inp_type):
         # print(inp_type.data_shape())
-        return inp_type.new(*inp_type.batch_shape(), int(np.prod(inp_type.data_shape())), data_dims=1)
+        return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
 
 
 class Seq(Operator):

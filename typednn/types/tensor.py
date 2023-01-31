@@ -7,16 +7,7 @@ from .size import SizeType, UIntType
 
 class TensorType(Type):
     def __init__(self, *size, dtype=None, device=None, data_dims=None):
-        _size = []
-        for i in size:
-            if isinstance(i, str):
-                if i == '...':
-                    i = VariableArgs(i)
-                else:
-                    i = Type(i)
-            _size.append(i)
-
-        size = SizeType(*_size)
+        size = SizeType(*size)
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
         self.size = size
         self.data_cls = torch.Tensor
@@ -34,7 +25,7 @@ class TensorType(Type):
         return self.size[:-self.data_dims]
 
     def data_shape(self):
-        return tuple([int(i) for i in self.size[-self.data_dims:]])
+        return self.size[-self.data_dims:]
 
     @property
     def channel_dim(self):
