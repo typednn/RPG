@@ -1,5 +1,9 @@
 # type system of neural networks
 
+The goal of the system is to simplify the coding of  
+
+----
+
 a type is actually similar to the gym Box. typed_builder is a builder that is able to select the default config based on the type of the input and output 
 objects will be configed as 
 

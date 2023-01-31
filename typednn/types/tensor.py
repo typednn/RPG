@@ -1,4 +1,5 @@
 import typing
+import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow
 
@@ -8,11 +9,20 @@ class UIntType(Type):
         self.a = a
     def __str__(self):
         return str(self.a)
+
     def instance(self, value):
         return isinstance(value, int) and value == self.a 
 
+    def sample(self):
+        return self.a
+
     def __repr__(self):
         return "Unit(" + str(self.a) + ")"
+
+    def __int__(self):
+        return self.a
+
+        
 
 class SizeType(TupleType):
     def __init__(self, *size: typing.List[Type]):
@@ -26,6 +36,25 @@ class SizeType(TupleType):
             self.size.append(i)
         super().__init__(*self.size)
 
+    def __getitem__(self, index):
+        return int(self.size[index])
+
+    def sample(self):
+        #return super().sample()
+        outs = []
+        for i in self.size:
+            if isinstance(i, UIntType):
+                outs.append(i.sample())
+            else:
+                if isinstance(i, VariableArgs):
+                    n = np.random.randint(3)
+                else:
+                    n = 1
+                for i in range(n):
+                    outs.append(np.random.randint(1, 10))
+        return tuple(outs)
+                
+
     def __str__(self):
         return '(' + ', '.join(map(str, self.size)) + ')'
 
@@ -34,12 +63,18 @@ class SizeType(TupleType):
 
 
 class TensorType(Type):
-    def __init__(self, *size):
+    def __init__(self, *size, dtype=None, device=None):
         size = SizeType(*size)
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
         self.size = size
         self.data_cls = torch.Tensor
         self.type_name = 'Tensor' + str(size)
+
+        self.dtype = dtype or torch.float32
+        self.device = device or 'cuda:0'
+
+    def new(self, *size):
+        return TensorType(*size, dtype=self.dtype, device=self.device)
 
     def instance(self, value):
         if not (isinstance(value, self.data_cls)):
@@ -50,7 +85,15 @@ class TensorType(Type):
         return self.size.children()
 
     def __str__(self):
-        return self.type_name
+        out = self.type_name
+        if self.dtype != torch.float32:
+            out = 'D' + out
+        if self.device != 'cuda:0':
+            out = 'Cpu' + out
+        return out
+
+    def sample(self):
+        return torch.randn(*self.size.sample(), device=self.device, dtype=self.dtype)
         
 
 def test():

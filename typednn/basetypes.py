@@ -44,6 +44,9 @@ class Type:
     def match_many(self):
         return False
 
+    def sample(self):
+        raise NotImplementedError("sample is not implemented for type %s" % self.__class__.__name__)
+
     @property
     def polymorphism(self):
         #TODO: accelerate this ..

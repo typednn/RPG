@@ -1,7 +1,7 @@
 import typing
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf as C
 from torch.nn import Module
-from .basetypes import Arrow
+from .basetypes import Arrow, Type
 
 
 def get_type_from_op_or_type(op_or_type):
@@ -11,7 +11,12 @@ def get_type_from_op_or_type(op_or_type):
         return op_or_type
 
 
-class Operator(Module):
+class OptBase:
+    def default_config(self) -> C:
+        return C.create()
+
+class Operator(Module, OptBase):
+    INFER_SHAPE_FROM_MODULE = False
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
 
     def __init__(self, *args, **kwargs) -> None:
@@ -19,24 +24,43 @@ class Operator(Module):
         self.init(*args, **kwargs)
         
     def init(self, *args, **kwargs):
-        self.register_config(**kwargs)
-        self.register_types(*args, **kwargs)
+        self.build_config(**kwargs)
+        self.build_modules(*args)
+        self.type_inference(*args)
 
-    def default_config(self) -> OmegaConf:
-        if isinstance(self, Operator):
-            return OmegaConf.create()
-        else:
-            return super().default_config() # by default return the parameters' default config
+    def build_modules(self, *args):
+        self.main = None
+    
+    @classmethod
+    def _new_config(cls)->C:
+        return C.create()
 
-    def register_config(self, **kwargs) -> OmegaConf:
-        self.cfg = OmegaConf.merge(self.default_config(), kwargs)
-
-    def register_types(self, *args, **kwargs):
-        assert len(kwargs) == 0, NotImplementedError
-        assert self.arrow is not None, f"arrow is not defined for class {self.__class__}"
-        self._inp_type, _, self._oup_type = self.arrow.unify(
-            *map(get_type_from_op_or_type, args)
+    @classmethod
+    def default_config(cls) -> C:
+        return C.merge(
+            super().default_config(cls),
+            cls._new_config()
         )
+
+    def forward(self, *args, **kwargs):
+        assert self.main is not None, "please either override this function or set the module of the class"
+        return self.main(*args, **kwargs)
+
+    def build_config(self, **kwargs) -> C:
+        self.config = C.merge(self.default_config(), C.create(kwargs))
+
+    def _get_type_from_output(self, output, *args):
+        raise NotImplementedError("please either override this function or set the arrow attribute of the class")
+
+    def type_inference(self, *args):
+        if self.arrow is None:
+            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in args]
+            output = self.forward(*shapes)
+            self._oup_type = self._get_type_from_output(output, *args)
+        else:
+            self._inp_type, _, self._oup_type = self.arrow.unify(
+                *map(get_type_from_op_or_type, args)
+            )
 
     @property
     def out(self): # out type when input are feed ..
@@ -44,12 +68,6 @@ class Operator(Module):
             raise NotImplementedError(f"the register_types function is not called for class {self.__class__}")
         return self._oup_type
 
-    def _get_type(self):
-        if not hasattr(self, '_type'):
-            self._type = self.get_type()
-        return self._type
-
-
     def __str__(self) -> str:
         out = super().__str__()
-        return out + f" {self.arrow}: {self.out}"
+        return out + f"\nOutputType: {self.out}"

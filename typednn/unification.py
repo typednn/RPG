@@ -31,7 +31,6 @@ def contain_many(X):
     s = sum([i.match_many() for i in X.children()])
     assert s <= 1, "can not have two variable arguments."
     return s > 0
-
     
 
 def unify(tpA: Type, tpB: Type, query: Type):
@@ -50,7 +49,8 @@ def unify(tpA: Type, tpB: Type, query: Type):
         else:
             return a
 
-    def resolve(a, b):
+    def resolve(a, b, dir):
+        # if dir is 1, we want to unify a into b
         a = findp(a)
         b = findp(b)
         if a.is_type_variable:
@@ -59,16 +59,21 @@ def unify(tpA: Type, tpB: Type, query: Type):
                     raise TypeInferenceFailure("Recursive type ..")
                 pa[str(a)] = b
         elif b.is_type_variable:
-            resolve(b, a)
+            resolve(b, a, dir=1-dir)
         else:
             # a, b both are not type variable 
             if len(a.children()) == 0:
                 # two normal types mismatch
-                if str(a) != str(b):
+                #if str(a) != str(b):
+                #    raise TypeInferenceFailure(f"type {a} != type {b}.")
+                if dir == 1:
+                    a, b = b, a
+                if str(a) != str(b) and not issubclass(a.__class__, b.__class__):
                     raise TypeInferenceFailure(f"type {a} != type {b}.")
                 return
             if contain_many(b):
                 a, b = b, a
+                dir = 1 - dir
                 
             # now we assume a must contain ... or there is no ...
             if not contain_many(a):
@@ -77,7 +82,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 if len(a_children) != len(b_children):
                     raise TypeInferenceFailure(f"type {a} has a different number of children with type {b}.")
                 for x, y in zip(a_children, b_children):
-                    resolve(x, y)
+                    resolve(x, y, dir)
             else:
                 C, D = a.children(), b.children()
                 def match_prefix(C, D):
@@ -87,7 +92,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
                             C = C[idx:]
                             D = D[idx:]
                             break
-                        resolve(C[idx], D[idx])
+                        resolve(C[idx], D[idx], dir)
                         idx += 1
                     return C, D
 
@@ -98,13 +103,14 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 # make C start with ...
                 if len(D) > 0 and D[0].match_many():
                     C, D = D, C
+                    dir = 1 - dir
                 assert C[0].match_many()
 
-                def resolve_many(arg_types, types):
+                def resolve_many(arg_types, types, dir):
                     if arg_types.base_type is not None:
                         for i in types:
-                            resolve(arg_types.base_type, i)
-                    resolve(arg_types, TupleType(*types))
+                            resolve(arg_types.base_type, i, dir)
+                    resolve(arg_types, TupleType(*types), dir)
 
                 if C[0].match_many() and D[0].match_many():
                     # the most difficult case
@@ -113,17 +119,18 @@ def unify(tpA: Type, tpB: Type, query: Type):
                         if len(D) != 1:
                             raise TypeInferenceFailure
                         C, D = D, C
+                        dir = 1 - dir
                     # C is ...; D is ... blabla
-                    resolve_many(C[0], D)
+                    resolve_many(C[0], D, dir)
                 else:
                     if len(C) != 1:
                         raise TypeInferenceFailure
                     # associate C[0] to the remaining element of D
-                    resolve_many(C[0], D)
+                    resolve_many(C[0], D, dir)
 
 
 
-    resolve(tpA, tpB)
+    resolve(tpA, tpB, 0)
 
     allocator = {}
     TID = 0
