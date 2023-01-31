@@ -2,7 +2,6 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
-from ..basetypes import Type
 from ..types.tensor import TensorType, Arrow
 
 #class Concat(Operator):
@@ -28,10 +27,17 @@ from ..types.tensor import TensorType, Arrow
 #                 total = Type("X")
 #         return inp_type.new(Type("*"), int(np.prod(inp_type.data_shape())))
 
+
+class FlattenBatch(nn.Module):
+    def forward(self, x):
+        return x.reshape(-1, self.inp_types[0].data_shape())
+
+
+    def _type_inference(self, inp_type):
+        raise NotImplementedError
+
     
 class Flatten(Operator):
-    arrow = 'none'
-
     def forward(self, x):
         dims = self.inp_types[0].data_dims
         return x.reshape(*x.shape[:-dims], -1)
@@ -43,8 +49,6 @@ class Flatten(Operator):
 
 
 class Seq(Operator):
-    arrow = 'none'
-
     def __init__(self, *modules) -> None:
         self.op_list = modules
         super().__init__()
@@ -65,8 +69,6 @@ class Seq(Operator):
 
 
 class Linear(Operator):
-    arrow = "none" 
-
     @classmethod
     def _new_config(cls):
         return dict(

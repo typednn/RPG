@@ -11,6 +11,8 @@ ImageType = TensorType('...', 'D', 'N', 'M', data_dims=3)
 
 
 class ConvNet(Operator):
+    INFER_SHAPE_BY_FORWARD=True
+
     @classmethod
     def _new_config(cls):
         return dict(

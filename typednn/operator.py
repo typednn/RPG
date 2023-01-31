@@ -16,7 +16,9 @@ class OptBase:
         return C.create()
 
 class Operator(Module, OptBase):
+    INFER_SHAPE_BY_FORWARD=False
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
+
     INPUT_ARGS = None
 
     def __init__(self, *args, **kwargs) -> None:
@@ -62,23 +64,26 @@ class Operator(Module, OptBase):
     def build_config(self, **kwargs) -> C:
         self.config = C.merge(self.default_config(), C.create(kwargs))
 
-    def _type_inference(self, *inp_types):
-        self._inp_type, _, self._oup_type = self.arrow.unify(inp_types)
-        return self._oup_type
+    def _infer_by_arrow(self, *inp_types):
+        self._inp_type, _, self._out_type = self.arrow.unify(inp_types)
+        return self._out_type
 
     def type_inference(self, *inp_types):
-        if self.arrow is None:
+        if self.INFER_SHAPE_BY_FORWARD:
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in inp_types]
             output = self.forward(*shapes)
-            self._oup_type = self._get_type_from_output(output, *inp_types)
+            self._out_type = self._get_type_from_output(output, *inp_types)
+        elif self.arrow is not None:
+            self._out_type = self._infer_by_arrow(*inp_types)
         else:
-            self._oup_type = self._type_inference(*inp_types)
+            assert hasattr(self, '_type_inference'), f"please either override the type_inference function or set the arrow of the class"
+            self._out_type = self._type_inference(*inp_types)
 
     @property
     def out(self): # out type when input are feed ..
-        if not hasattr(self, '_oup_type'):
+        if not hasattr(self, '_out_type'):
             raise NotImplementedError(f"the type_inference function is not called for class {self.__class__}")
-        return self._oup_type
+        return self._out_type
 
     def __str__(self) -> str:
         out = super().__str__()

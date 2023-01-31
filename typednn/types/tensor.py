@@ -2,73 +2,7 @@ import typing
 import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow
-
-
-class UIntType(Type):
-    def __init__(self, a):
-        self.a = a
-    def __str__(self):
-        return str(self.a)
-
-    def instance(self, value):
-        return isinstance(value, int) and value == self.a 
-
-    def sample(self):
-        return self.a
-
-    def __repr__(self):
-        return "Unit(" + str(self.a) + ")"
-
-    def __int__(self):
-        return int(self.a)
-        
-
-class SizeType(TupleType):
-    def __init__(self, *size: typing.List[Type]):
-        self.dot = None # (int, ..., int) something like this ..
-        self.size = []
-        for i in size:
-            if isinstance(i, int):
-                i = UIntType(i)
-            else:
-                assert i.match_many() or isinstance(i, UIntType) or i.is_type_variable, f"{i} of {type(i)}"
-                
-            self.size.append(i)
-        super().__init__(*self.size)
-
-    def __getitem__(self, index):
-        out = self.size[index]
-        if isinstance(out, UIntType):
-            return int(out)
-        elif isinstance(out, list):
-            out = [int(i) if isinstance(out, UIntType) else i  for i in out]
-        return out
-
-    def dims(self):
-        if self.dot is None:
-            return len(self.size)
-        return None
-
-    def sample(self):
-        #return super().sample()
-        outs = []
-        for i in self.size:
-            if isinstance(i, UIntType):
-                outs.append(i.sample())
-            else:
-                if isinstance(i, VariableArgs):
-                    n = np.random.randint(3)
-                else:
-                    n = 1
-                for i in range(n):
-                    outs.append(np.random.randint(1, 10))
-        return tuple(outs)
-                
-    def __str__(self):
-        return '(' + ', '.join(map(str, self.size)) + ')'
-
-    def __repr__(self):
-        return 'Size'+self.__str__()
+from .size import SizeType, UIntType
 
 
 class TensorType(Type):
