@@ -57,8 +57,6 @@ class Operator(Module, OptBase):
     def build_config(self, **kwargs) -> C:
         self.config = C.merge(self.default_config(), C.create(kwargs))
 
-    def _get_type_from_output(self, output, *args):
-        raise NotImplementedError("please either override this function or set the arrow attribute of the class")
 
     def type_inference(self, *inp_types):
         if self.arrow is None:
@@ -77,6 +75,12 @@ class Operator(Module, OptBase):
     def __str__(self) -> str:
         out = super().__str__()
         return out + f"\nOutputType: {self.out}"
+
+
+    def _get_type_from_output(self, output, *args):
+        inp = self.inp_types[0]
+        out_shape = inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
+        return out_shape
 
         
         

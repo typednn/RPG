@@ -95,6 +95,15 @@ class TensorType(Type):
     def batch_shape(self):
         return self.size[:-self.data_dims]
 
+    @property
+    def channel_dim(self):
+        C = self.size[-self.data_dims]
+        try:
+            C = int(C)
+        except TypeError as e:
+            raise TypeError(str(e) + f"\n    The actual channel is Type {C}")
+        return C
+
     def instance(self, value):
         if not (isinstance(value, self.data_cls)):
             return False
