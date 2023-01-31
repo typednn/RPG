@@ -1,6 +1,7 @@
 from torch import nn
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
+from ..functors import Flatten, Seq
 
 
 # TD = Type('D')
@@ -35,9 +36,10 @@ def test_conv():
     #from nn.scg import *
     inp = TensorType('...', 3, 224, 224, data_dims=3)
     #inp = ImageType
-    print(inp.size)
     conv = ConvNet(inp, layer=4)
-    print(conv)
+    flatten = Flatten(conv)
+    seq = Seq(conv, flatten)
+    print(seq)
 
 
 if __name__ == '__main__':

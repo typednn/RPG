@@ -21,7 +21,6 @@ class UIntType(Type):
 
     def __int__(self):
         return int(self.a)
-
         
 
 class SizeType(TupleType):
@@ -59,7 +58,6 @@ class SizeType(TupleType):
                     outs.append(np.random.randint(1, 10))
         return tuple(outs)
                 
-
     def __str__(self):
         return '(' + ', '.join(map(str, self.size)) + ')'
 
@@ -89,11 +87,14 @@ class TensorType(Type):
         assert data_dims is not None, "data_dims must be specified for batch tensor"
         self.data_dims = data_dims
 
-    def new(self, *size):
-        return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=self.data_dims)
+    def new(self, *size, data_dims=None):
+        return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=data_dims or self.data_dims)
 
     def batch_shape(self):
         return self.size[:-self.data_dims]
+
+    def data_shape(self):
+        return tuple([int(i) for i in self.size[-self.data_dims:]])
 
     @property
     def channel_dim(self):
@@ -152,7 +153,6 @@ def test():
     arrow.test_unify("Tensor(2, 2, 1)", TensorType(1, 4, 5), TensorType(2, 2, 1))
 
     # arrow.test_unify("error", TensorType(1, 4, 5), TensorType(2, 2, 2))
-
         
         
 if __name__ == '__main__':

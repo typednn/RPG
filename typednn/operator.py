@@ -19,12 +19,19 @@ class Operator(Module, OptBase):
     INFER_SHAPE_FROM_MODULE = False
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
 
+    INPUT_ARGS = None
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
         self.init(*args, **kwargs)
         
     def init(self, *args, **kwargs):
         self.inp_types = list(map(get_type_from_op_or_type, args))
+
+        if self.INPUT_ARGS is not None:
+            assert len(self.INPUT_ARGS) == len(self.inp_types), f"expected {len(self.INPUT_ARGS)} inputs but got {len(self.inp_types)}"
+            self.inp_dict = dict(zip(self.INPUT_ARGS, self.inp_types))
+
         not_Types = False
         for i in self.inp_types:
             if not isinstance(i, Type):
@@ -57,6 +64,9 @@ class Operator(Module, OptBase):
     def build_config(self, **kwargs) -> C:
         self.config = C.merge(self.default_config(), C.create(kwargs))
 
+    def _type_inference(self, *inp_types):
+        self._inp_type, _, self._oup_type = self.arrow.unify(inp_types)
+        return self._oup_type
 
     def type_inference(self, *inp_types):
         if self.arrow is None:
@@ -64,18 +74,17 @@ class Operator(Module, OptBase):
             output = self.forward(*shapes)
             self._oup_type = self._get_type_from_output(output, *inp_types)
         else:
-            self._inp_type, _, self._oup_type = self.arrow.unify(inp_types)
+            self._oup_type = self._type_inference(*inp_types)
 
     @property
     def out(self): # out type when input are feed ..
         if not hasattr(self, '_oup_type'):
-            raise NotImplementedError(f"the register_types function is not called for class {self.__class__}")
+            raise NotImplementedError(f"the type_inference function is not called for class {self.__class__}")
         return self._oup_type
 
     def __str__(self) -> str:
         out = super().__str__()
         return out + f"\nOutputType: {self.out}"
-
 
     def _get_type_from_output(self, output, *args):
         inp = self.inp_types[0]
