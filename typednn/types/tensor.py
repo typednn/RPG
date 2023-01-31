@@ -32,6 +32,7 @@ class SizeType(TupleType):
                 i = UIntType(i)
             else:
                 assert i.match_many() or isinstance(i, UIntType) or i.is_type_variable, f"{i} of {type(i)}"
+                
             self.size.append(i)
         super().__init__(*self.size)
 
@@ -42,6 +43,11 @@ class SizeType(TupleType):
         elif isinstance(out, list):
             out = [int(i) if isinstance(out, UIntType) else i  for i in out]
         return out
+
+    def dims(self):
+        if self.dot is None:
+            return len(self.size)
+        return None
 
     def sample(self):
         #return super().sample()
@@ -80,12 +86,12 @@ class TensorType(Type):
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
         self.size = size
         self.data_cls = torch.Tensor
-        self.type_name = 'Tensor' + str(size)
 
         self.dtype = dtype or torch.float32
         self.device = device or 'cuda:0'
         assert data_dims is not None, "data_dims must be specified for batch tensor"
         self.data_dims = data_dims
+
 
     def new(self, *size, data_dims=None):
         return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=data_dims or self.data_dims)
@@ -114,7 +120,8 @@ class TensorType(Type):
         return self.size.children()
 
     def __str__(self):
-        out = self.type_name
+        #out = self.type_name
+        out = 'Tensor(' + ','.join(map(str, self.batch_shape())) + ' : ' + ','.join(map(str, self.data_shape())) + ')'
         if self.dtype != torch.float32:
             out = 'D' + out
         if self.device != 'cuda:0':

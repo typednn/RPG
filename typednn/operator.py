@@ -16,9 +16,7 @@ class OptBase:
         return C.create()
 
 class Operator(Module, OptBase):
-    INFER_SHAPE_FROM_MODULE = False
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
-
     INPUT_ARGS = None
 
     def __init__(self, *args, **kwargs) -> None:

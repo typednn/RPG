@@ -34,7 +34,8 @@ class ConvNet(Operator):
 
 def test_conv():
     #from nn.scg import *
-    inp = TensorType('N', 3, 224, 224, data_dims=3)
+    #inp = TensorType('N', 3, 224, 224, data_dims=3)
+    inp = TensorType('...', 3, 224, 224, data_dims=3)
     #inp = ImageType
     conv = ConvNet(inp, layer=4)
     flatten = Flatten(conv)

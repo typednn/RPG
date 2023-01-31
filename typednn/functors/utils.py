@@ -30,8 +30,8 @@ from ..types.tensor import TensorType, Arrow
 
     
 class Flatten(Operator):
-    """Flattens its input to a (batched) vector."""
     arrow = 'none'
+
     def forward(self, x):
         dims = self.inp_types[0].data_dims
         return x.reshape(*x.shape[:-dims], -1)
