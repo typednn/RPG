@@ -24,9 +24,17 @@ class Operator(Module, OptBase):
         self.init(*args, **kwargs)
         
     def init(self, *args, **kwargs):
+        self.inp_types = list(map(get_type_from_op_or_type, args))
+        not_Types = False
+        for i in self.inp_types:
+            if not isinstance(i, Type):
+                not_Types = True
+            elif not_Types:
+                raise TypeError(f"inputs must be a list of Type or Operator then followed by other attributes..")
+
         self.build_config(**kwargs)
-        self.build_modules(*args)
-        self.type_inference(*args)
+        self.build_modules(*self.inp_types)
+        self.type_inference(*self.inp_types)
 
     def build_modules(self, *args):
         self.main = None
@@ -52,15 +60,13 @@ class Operator(Module, OptBase):
     def _get_type_from_output(self, output, *args):
         raise NotImplementedError("please either override this function or set the arrow attribute of the class")
 
-    def type_inference(self, *args):
+    def type_inference(self, *inp_types):
         if self.arrow is None:
-            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in args]
+            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in inp_types]
             output = self.forward(*shapes)
-            self._oup_type = self._get_type_from_output(output, *args)
+            self._oup_type = self._get_type_from_output(output, *inp_types)
         else:
-            self._inp_type, _, self._oup_type = self.arrow.unify(
-                *map(get_type_from_op_or_type, args)
-            )
+            self._inp_type, _, self._oup_type = self.arrow.unify(inp_types)
 
     @property
     def out(self): # out type when input are feed ..
@@ -74,7 +80,30 @@ class Operator(Module, OptBase):
 
         
         
-class TypeFactory(Operator):
+class TypedFactory(Operator):
+    factory = {}
+    def build_modules(self, *args):
+        #return super().build_modules(*args)
+        from .unification import unify, TypeInferenceFailure
+        inp_types = [i for i in self.inp_types if isinstance(i, Type)]
+        op = None
+        for types, op in self.factory.items():
+            try:
+                unify(inp_types, types, inp_types)[-1]
+            except TypeInferenceFailure:
+                continue
+            op = op
+            break
+
+        if op is None:
+            raise TypeError(f"no matching operator for {self.inp_types} in {self.__class__.__name__}\n Factory: {self.factory}")
+        
+        self.op = op
+
+
     @classmethod
-    def register(cls, name, type):
+    def register(cls, opt, inp_types):
+        raise NotImplementedError
+        
+    def forward(self, *args, **kwargs):
         raise NotImplementedError

@@ -34,6 +34,14 @@ def contain_many(X):
     
 
 def unify(tpA: Type, tpB: Type, query: Type):
+
+    if isinstance(tpA, list):
+        tpA = TupleType(*tpA)
+    if isinstance(tpB, list):
+        tpB = TupleType(*tpB)
+    if isinstance(query, list):
+        query = TupleType(*query)
+
     tpB = tpB.update_name(lambda x: x + '\'')
     query = query.update_name(lambda x: x + '\'')
 
@@ -68,7 +76,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 #    raise TypeInferenceFailure(f"type {a} != type {b}.")
                 if dir == 1:
                     a, b = b, a
-                if str(a) != str(b) and not issubclass(a.__class__, b.__class__):
+                if str(a) != str(b):
                     raise TypeInferenceFailure(f"type {a} != type {b}.")
                 return
             if contain_many(b):
