@@ -43,6 +43,22 @@ class Operator(Module, OptBase):
         self.build_modules(*self.inp_types)
         self.type_inference(*self.inp_types)
 
+    def __call__(self, *args, **kwargs):
+        for a, b in zip(self.inp_types, args):
+            if isinstance(a, Type) and not a.instance(b):
+                raise TypeError(f"input type {a} does not match the input {b} for {self}")
+        return super().__call__(*args, **kwargs)
+
+    def collect_modules(self):
+        if hasattr(self, '_all_modules'):
+            if self._all_modules is None:
+                raise Exception("collect_modules() is called twice for one module; there are probably some circular dependencies in the module tree.")
+            return self._all_modules
+
+        if not hasattr('_all_modules'):
+            self._all_modules = None
+
+
     def build_modules(self, *args):
         self.main = None
     
