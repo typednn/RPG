@@ -4,37 +4,12 @@ from torch import nn
 from ..operator import Operator
 from ..types.tensor import TensorType, Arrow
 
-#class Concat(Operator):
-#    def type_inference(self, *args):
-#        self._oup_type = args[-1].out
-    
-
-# class FlattenBatch(Operator):
-#     def __init__(self, modules) -> None:
-#         super().__init__(*args, **kwargs)
-#     def forward(self, x):
-#         dims = self.inp_types[0].data_dims
-#         return x.reshape(-1, *x.shape[-dims:])
-
-#     def _type_inference(self, inp_type):
-#         batch_shape = inp_type.batch_shape()
-#         total = 1 
-#         for i in batch_shape:
-#             try:
-#                 b = int(i)
-#                 total *= b
-#             except TypeError:
-#                 total = Type("X")
-#         return inp_type.new(Type("*"), int(np.prod(inp_type.data_shape())))
-
-
 class FlattenBatch(Operator):
     def forward(self, x):
         return x.reshape(-1, self.inp_types[0].data_shape())
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
-
     
 class Flatten(Operator):
     def forward(self, x):
@@ -45,7 +20,6 @@ class Flatten(Operator):
     def _type_inference(self, inp_type):
         # print(inp_type.data_shape())
         return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
-
 
 class Seq(Operator):
     def __init__(self, *modules) -> None:
@@ -65,7 +39,6 @@ class Seq(Operator):
             out += '  ' + str(i).replace('\n', '\n   ') + '\n'
         out += str(self.out)
         return out
-
 
 class Linear(Operator):
     @classmethod

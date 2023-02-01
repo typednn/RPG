@@ -1,4 +1,5 @@
 import typing
+import torch
 from omegaconf import OmegaConf as C
 from torch.nn import Module
 from .basetypes import Arrow, Type
@@ -23,31 +24,47 @@ class Operator(Module, OptBase):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
-        self.init(*args, **kwargs)
+        self._lazy_init = False
+        self._init_args, self._init_kwargs = args, kwargs
         
-    def init(self, *args, **kwargs):
-        self.inp_types = list(map(get_type_from_op_or_type, args))
+    def init(self):
+        if not self._lazy_init:
+            self._lazy_init = True
+            args, kwargs = self._init_args, self._init_kwargs
 
-        if self.INPUT_ARGS is not None:
-            assert len(self.INPUT_ARGS) == len(self.inp_types), f"expected {len(self.INPUT_ARGS)} inputs but got {len(self.inp_types)}"
-            self.inp_dict = dict(zip(self.INPUT_ARGS, self.inp_types))
+            self.inp_types = [get_type_from_op_or_type(i) for i in args]
 
-        not_Types = False
-        for i in self.inp_types:
-            if not isinstance(i, Type):
-                not_Types = True
-            elif not_Types:
-                raise TypeError(f"inputs must be a list of Type or Operator then followed by other attributes..")
+            if self.INPUT_ARGS is not None:
+                assert len(self.INPUT_ARGS) == len(self.inp_types), f"expected {len(self.INPUT_ARGS)} inputs but got {len(self.inp_types)}"
+                self.inp_dict = dict(zip(self.INPUT_ARGS, self.inp_types))
 
-        self.build_config(**kwargs)
-        self.build_modules(*self.inp_types)
-        self.type_inference(*self.inp_types)
+            not_Types = False
+            for i in self.inp_types:
+                if not isinstance(i, Type):
+                    not_Types = True
+                elif not_Types:
+                    raise TypeError(f"inputs must be a list of Type or Operator then followed by other attributes..")
+
+            self.build_config(**kwargs)
+            self.build_modules(*self.inp_types)
+            self.type_inference(*self.inp_types)
 
     def __call__(self, *args, **kwargs):
+        if not self._lazy_init:
+            self.init()
         for a, b in zip(self.inp_types, args):
             if isinstance(a, Type) and not a.instance(b):
                 raise TypeError(f"input type {a} does not match the input {b} for {self}")
         return super().__call__(*args, **kwargs)
+
+    def parameters(self, recurse: bool = True):
+        self.init()
+        return super().parameters(recurse)
+
+    def to(self, *args, **kwargs):
+        self.init()
+        return super().to(*args, **kwargs)
+
 
     def collect_modules(self):
         if hasattr(self, '_all_modules'):
@@ -97,12 +114,15 @@ class Operator(Module, OptBase):
 
     @property
     def out(self): # out type when input are feed ..
+        self.init()
         if not hasattr(self, '_out_type'):
             raise NotImplementedError(f"the type_inference function is not called for class {self.__class__}")
         return self._out_type
 
     def __str__(self) -> str:
-        out = super().__str__()
+        #out = super().__str__()
+        self.init()
+        out = torch.nn.Module.__str__(self)
         return out + f"\nOutputType: {self.out}"
 
     def _get_type_from_output(self, output, *args):

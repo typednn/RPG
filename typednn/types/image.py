@@ -42,7 +42,7 @@ def test_conv():
     #from nn.scg import *
     #inp = TensorType('N', 3, 224, 224, data_dims=3)
     #inp = TensorType('...', 3, 224, 224, data_dims=3)
-    inp = TensorType(3, 4, 5,224,224, data_dims=3)
+    inp = TensorType('N', 5,224,224, data_dims=3)
     #inp = ImageType
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
