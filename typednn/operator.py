@@ -1,5 +1,6 @@
 import typing
 import torch
+from torch import nn
 from omegaconf import OmegaConf as C
 from torch.nn import Module
 from .basetypes import Arrow, Type
@@ -12,11 +13,42 @@ def get_type_from_op_or_type(op_or_type):
         return op_or_type
 
 
-class OptBase:
+class OptBase(Module):
     def default_config(self) -> C:
         return C.create()
 
-class Operator(Module, OptBase):
+
+class ModuleGraph(OptBase):
+    def __init__(self, modules, inps) -> None:
+        super().__init__()
+        self.inp_types = inps
+        self.main = nn.ModuleList(modules)
+
+    def forward(self, *inps):
+        assert len(self.inp_types) == 1, "only support one input for now"
+        context = {}
+        for a, b in zip(self.inp_types, inps):
+            assert a.instance(b)
+            context[a] = b
+
+        for module in self.main:
+            inps = []
+            for k in module._init_args:
+                if isinstance(k, Type) or isinstance(k, Operator):
+                    inps.append(context[k])
+                else:
+                    inps.append(k)
+            last = context[module] = module(*inps)
+        return last
+
+    def __str__(self) -> str:
+        out = 'Input: ' + ', '.join(map(str, self.inp_types)) + '\n'
+        for idx, i in enumerate(self.main):
+            out += f' ({idx}): ' + str(i).replace('\n', '\n   ') + '\n'
+        return out
+    
+
+class Operator(OptBase):
     INFER_SHAPE_BY_FORWARD=False
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
 
@@ -66,14 +98,37 @@ class Operator(Module, OptBase):
         return super().to(*args, **kwargs)
 
 
-    def collect_modules(self):
+    def collect_modules(self, build=True):
         if hasattr(self, '_all_modules'):
-            if self._all_modules is None:
+            _all_modules = getattr(self, '_all_modules')
+            if _all_modules is None:
                 raise Exception("collect_modules() is called twice for one module; there are probably some circular dependencies in the module tree.")
-            return self._all_modules
+            return _all_modules
+        if not hasattr(self, '_all_modules'):
+            setattr(self, '_all_modules', None)
 
-        if not hasattr('_all_modules'):
-            self._all_modules = None
+        modules = []
+        inps = []
+        for i in self._init_args:
+            if isinstance(i, Operator):
+                sub_modules, sub_inps = i.collect_modules(build=False)
+                for j in sub_modules:
+                    if j not in modules:
+                        modules.append(j)
+                for j in sub_inps: 
+                    if j not in inps:
+                        inps.append(j)
+            else:
+                if i not in inps:
+                    inps.append(i)
+
+        modules.append(self)
+                    
+        if not build:
+            setattr(self, '_all_modules', (modules, inps))
+            return modules, inps
+        else:
+            return ModuleGraph(modules, inps)
 
 
     def build_modules(self, *args):

@@ -6,7 +6,7 @@ from ..types.tensor import TensorType, Arrow
 
 class FlattenBatch(Operator):
     def forward(self, x):
-        return x.reshape(-1, self.inp_types[0].data_shape())
+        return x.reshape(-1, *self.inp_types[0].data_shape().as_int())
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
@@ -27,8 +27,14 @@ class Seq(Operator):
         super().__init__()
 
     def build_modules(self, *args):
-        from tools.utils import Seq
-        self.main = Seq(*self._modules)
+        #self.main = Seq(*self._modules)
+        pass
+
+    def forward(self, *args, **kwargs):
+        out = args
+        for i in self.op_list:
+            out = [i(*out)]
+        return out[0] 
 
     def _type_inference(self, *args, **kwargs):
         return self.op_list[-1].out
@@ -50,7 +56,7 @@ class Linear(Operator):
     def build_modules(self, inp_type):
         assert isinstance(inp_type, TensorType)
         assert inp_type.data_dims == 1
-        self.main = nn.Linear(inp_type.channel_dim, self.config.dim)
+        self.main = nn.Linear(inp_type.channel_dim, self.config.dim).to(inp_type.device)
     
     def _type_inference(self, inp_type):
         return inp_type.new(*inp_type.batch_shape(), self.config.dim)

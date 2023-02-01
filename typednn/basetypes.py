@@ -30,6 +30,9 @@ class Type:
     def __str__(self):
         return self._type_name
 
+    def __hash__(self) -> int:
+        return hash(self.__repr__())
+
     def update_name(self, fn) -> "Type":
         if not self.polymorphism:
             return self

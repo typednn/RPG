@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
 from ..functors import Flatten, Seq, Linear, FlattenBatch
@@ -47,9 +48,19 @@ def test_conv():
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
-    seq = Seq(flattenb, conv, flatten, Linear(flatten))
-    print(seq)
+    linear = Linear(flatten, dim=20)
+    #print(seq)
     # print(seq)
+    #print(flatten.collect_modules())
+    
+    # print(linear.out)
+    graph = linear.collect_modules()
+    seq = Seq(flattenb, conv, flatten, linear)
+
+    image = inp.sample()
+    print(graph(image).shape)
+    print(seq(image).shape)
+    assert torch.allclose(graph(image), seq(image))
 
 
 if __name__ == '__main__':
