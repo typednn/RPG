@@ -1,4 +1,5 @@
 from torch import nn
+
 import torch
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
@@ -40,26 +41,20 @@ class ConvNet(Operator):
 
 
 def test_conv():
-    #from nn.scg import *
-    #inp = TensorType('N', 3, 224, 224, data_dims=3)
-    #inp = TensorType('...', 3, 224, 224, data_dims=3)
     inp = TensorType('N', 5,224,224, data_dims=3)
-    #inp = ImageType
+
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
     linear = Linear(flatten, dim=20)
-    #print(seq)
-    # print(seq)
-    #print(flatten.collect_modules())
-    
-    # print(linear.out)
+
     graph = linear.collect_modules()
     seq = Seq(flattenb, conv, flatten, linear)
 
     image = inp.sample()
-    print(graph(image).shape)
-    print(seq(image).shape)
+    from omegaconf import OmegaConf as C
+
+    print(C.to_yaml(graph.config()))
     assert torch.allclose(graph(image), seq(image))
 
 

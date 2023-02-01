@@ -22,7 +22,8 @@ class ModuleGraph(OptBase):
     def __init__(self, modules, inps) -> None:
         super().__init__()
         self.inp_types = inps
-        self.main = nn.ModuleList(modules)
+        #self.main = nn.ModuleList(modules)
+        raise NotImplementedError()
 
     def forward(self, *inps):
         assert len(self.inp_types) == 1, "only support one input for now"
@@ -46,6 +47,14 @@ class ModuleGraph(OptBase):
         for idx, i in enumerate(self.main):
             out += f' ({idx}): ' + str(i).replace('\n', '\n   ') + '\n'
         return out
+
+    def config(self):
+        config = dict(
+        )
+        for idx, module in enumerate(self.main):
+            config[idx] = module.config
+            config[idx]['_type'] = module.__class__.__name__
+        return C.create(config)
     
 
 class Operator(OptBase):
@@ -54,10 +63,12 @@ class Operator(OptBase):
 
     INPUT_ARGS = None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, name=None, **kwargs) -> None:
         super().__init__()
         self._lazy_init = False
+        self._lazy_config = False
         self._init_args, self._init_kwargs = args, kwargs
+        self._name = name or self.__class__.__name__
         
     def init(self):
         if not self._lazy_init:
@@ -77,13 +88,18 @@ class Operator(OptBase):
                 elif not_Types:
                     raise TypeError(f"inputs must be a list of Type or Operator then followed by other attributes..")
 
-            self.build_config(**kwargs)
+            self.build_config()
             self.build_modules(*self.inp_types)
             self.type_inference(*self.inp_types)
 
+    @property
+    def config(self):
+        if not hasattr(self, '_config'):
+            self.build_config()
+        return self._config
+
     def __call__(self, *args, **kwargs):
-        if not self._lazy_init:
-            self.init()
+        self.init()
         for a, b in zip(self.inp_types, args):
             if isinstance(a, Type) and not a.instance(b):
                 raise TypeError(f"input type {a} does not match the input {b} for {self}")
@@ -98,7 +114,7 @@ class Operator(OptBase):
         return super().to(*args, **kwargs)
 
 
-    def collect_modules(self, build=True):
+    def collect_modules(self, build=True, context=None, config=None):
         if hasattr(self, '_all_modules'):
             _all_modules = getattr(self, '_all_modules')
             if _all_modules is None:
@@ -107,14 +123,13 @@ class Operator(OptBase):
         if not hasattr(self, '_all_modules'):
             setattr(self, '_all_modules', None)
 
-        modules = []
+        if build:
+            context = {'_name_count': {}}
+
         inps = []
         for i in self._init_args:
             if isinstance(i, Operator):
-                sub_modules, sub_inps = i.collect_modules(build=False)
-                for j in sub_modules:
-                    if j not in modules:
-                        modules.append(j)
+                sub_inps = i.collect_modules(build=False, context=context)
                 for j in sub_inps: 
                     if j not in inps:
                         inps.append(j)
@@ -122,13 +137,18 @@ class Operator(OptBase):
                 if i not in inps:
                     inps.append(i)
 
-        modules.append(self)
+        val_count = context['_name_count'][self._name] = context['_name_count'].get(self._name, 0) + 1
+        name = self._name
+        if val_count > 1:
+            name = self._name + '_' + str(val_count)
+        context[name] = self
+
                     
         if not build:
-            setattr(self, '_all_modules', (modules, inps))
-            return modules, inps
+            setattr(self, '_all_modules', inps)
+            return inps
         else:
-            return ModuleGraph(modules, inps)
+            return ModuleGraph(context, inps)
 
 
     def build_modules(self, *args):
@@ -149,8 +169,10 @@ class Operator(OptBase):
         assert self.main is not None, "please either override this function or set the module of the class"
         return self.main(*args, **kwargs)
 
-    def build_config(self, **kwargs) -> C:
-        self.config = C.merge(self.default_config(), C.create(kwargs))
+    def build_config(self) -> C:
+        if not hasattr(self, '_config'):
+            kwargs = self._init_kwargs
+            self._config = C.merge(self.default_config(), C.create(kwargs))
 
     def _infer_by_arrow(self, *inp_types):
         self._inp_type, _, self._out_type = self.arrow.unify(inp_types)
