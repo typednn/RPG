@@ -58,8 +58,12 @@ def test_conv():
     seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()
     from omegaconf import OmegaConf as C
+    
     assert torch.allclose(graph(image)[1], seq(image))
 
+
+    img = torch.tensor([1., 2., 3.])
+    print(graph(img))
     print("OK!")
     
 

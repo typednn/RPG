@@ -55,7 +55,10 @@ class Operator(OptBase):
         self.init()
         for a, b in zip(self.inp_types, args):
             if isinstance(a, Type) and not a.instance(b):
-                raise TypeError(f"input type {a} does not match the input {b} for {self}")
+                info = '\n' + str(self)
+                info = info.replace('\n', '\n' + '>' * 10)
+                
+                raise TypeError(f"input type {a} does not match the input {b} for {info}")
         return super().__call__(*args, **kwargs)
 
     def parameters(self, recurse: bool = True):
