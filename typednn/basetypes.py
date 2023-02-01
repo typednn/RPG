@@ -109,6 +109,9 @@ class TupleType(Type):
     def __iter__(self):
         return iter(self.elements)
 
+    def __len__(self):
+        return len(self.elements)
+
 
 
 class ListType(Type): # sequence of data type, add T before the batch

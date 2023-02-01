@@ -1,8 +1,10 @@
 from torch import nn
+import termcolor
 
 import torch
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
+from ..node import Node
 from ..functors import Flatten, Seq, Linear, FlattenBatch, Tuple
 
 
@@ -42,7 +44,7 @@ class ConvNet(Operator):
 
 
 def test_conv():
-    inp = TensorType('N', 5,224,224, data_dims=3)
+    inp = Node(TensorType('N', 5,224,224, data_dims=3))
 
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
@@ -54,6 +56,7 @@ def test_conv():
 
     graph = Tuple(linear, linear2).configure()
     
+    print(graph.config)
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()
@@ -63,7 +66,10 @@ def test_conv():
 
 
     img = torch.tensor([1., 2., 3.])
-    print(graph(img))
+    try:
+        graph(img)
+    except TypeError as e:
+        print(termcolor.colored(str(e), 'red'))
     print("OK!")
     
 
