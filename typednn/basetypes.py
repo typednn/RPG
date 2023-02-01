@@ -105,6 +105,9 @@ class TupleType(Type):
             if r > 0 and not match_list(inps[-r:], self.elements[-r:]):
                 return False
             return match_list(inps[l:-r], self.elements[l])
+    
+    def __iter__(self):
+        return iter(self.elements)
 
 
 

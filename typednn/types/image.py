@@ -3,7 +3,8 @@ from torch import nn
 import torch
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
-from ..functors import Flatten, Seq, Linear, FlattenBatch
+from ..functors import Flatten, Seq, Linear, FlattenBatch, Tuple
+
 
 
 # TD = Type('D')
@@ -46,16 +47,21 @@ def test_conv():
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
+    
     linear = Linear(flatten, dim=20)
+    linear3, _ = Tuple(linear, flatten)
+    linear2 = Linear(linear3, dim=10, name='output')
 
-    graph = linear.collect_modules()
-    seq = Seq(flattenb, conv, flatten, linear)
+    graph = Tuple(linear, linear2).configure()
+    
 
+    seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()
     from omegaconf import OmegaConf as C
+    assert torch.allclose(graph(image)[1], seq(image))
 
-    print(C.to_yaml(graph.config()))
-    assert torch.allclose(graph(image), seq(image))
+    print("OK!")
+    
 
 
 if __name__ == '__main__':

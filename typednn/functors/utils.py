@@ -2,7 +2,7 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
-from ..types.tensor import TensorType, Arrow
+from ..types.tensor import TensorType, Arrow, TupleType
 
 class FlattenBatch(Operator):
     def forward(self, x):
@@ -46,6 +46,27 @@ class Seq(Operator):
         out += str(self.out)
         return out
 
+        
+class Concat(Operator):
+    def forward(self, *args):
+        import torch
+        return torch.cat(args, dim=self.dim)
+
+    def _type_inference(self, *args, **kwargs):
+        assert len(args) > 1
+        out = args[0]
+        for i in args[1:]:
+            out = out.new(*out.batch_shape(), *out.data_shape().concat(i.data_shape(), self.dim))
+        return out
+
+class Tuple(Operator):
+    def forward(self, *args):
+        return args
+
+    def _type_inference(self, *args):
+        return TupleType(*args)
+
+
 class Linear(Operator):
     @classmethod
     def _new_config(cls):
@@ -54,7 +75,7 @@ class Linear(Operator):
         )
 
     def build_modules(self, inp_type):
-        assert isinstance(inp_type, TensorType)
+        assert isinstance(inp_type, TensorType), "Linear only support TensorType but got: " + str(inp_type)
         assert inp_type.data_dims == 1
         self.main = nn.Linear(inp_type.channel_dim, self.config.dim).to(inp_type.device)
     
