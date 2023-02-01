@@ -44,19 +44,18 @@ class ConvNet(Operator):
 
 
 def test_conv():
-    inp = Node(TensorType('N', 5,224,224, data_dims=3))
+    inp = TensorType('N', 5,224,224, data_dims=3)
 
     flattenb = FlattenBatch(inp)
     conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
     
     linear = Linear(flatten, dim=20)
-    linear3, _ = Tuple(linear, flatten)
+    linear3, other = Tuple(linear, flatten)
     linear2 = Linear(linear3, dim=10, name='output')
 
-    graph = Tuple(linear, linear2).configure()
-    
-    print(graph.config)
+    out = Tuple(linear, linear2)
+    graph = out.configure()
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()

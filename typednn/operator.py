@@ -26,6 +26,8 @@ class Operator(OptBase):
         self._lazy_config = False
         self._init_args, self._init_kwargs = args, C.create(kwargs)
         self._name = name or self.__class__.__name__
+
+        self.default_inp_nodes = [Node.from_val(i) for i in args]
         self._default_out = None
 
 
@@ -35,16 +37,17 @@ class Operator(OptBase):
             args = self._init_args
             self.build_config() # configure it
 
-            self.default_inp_nodes = [Node.from_val(i) for i in args]
-            if self.main is None:
+            try:
+                self.main
+                has_main = True
+            except AttributeError:
+                has_main = False
+            if not has_main:
                 self.build_modules(*nodes_to_types(self.default_inp_nodes))
-            self.execute(*self.default_inp_nodes)
 
     # get the output node of the operator based on input nodes ..
-    def execute(self, *input_nodes: typing.List[Node]) -> Node:
-        # construct a shadow node
-        input_types = nodes_to_types(input_nodes)
-        return Node(parent=self, n_childs=self.get_n_output(*input_nodes), inp_types=input_types)
+    def shadow(self, *input_nodes: typing.List[Node]) -> Node:
+        return Node(parent=self, n_childs=self.get_n_output(*input_nodes), input_nodes=input_nodes)
 
     """ type inference """
     def _infer_by_arrow(self, *inp_types):
@@ -63,30 +66,31 @@ class Operator(OptBase):
         raise NotImplementedError
 
     # required for infering the output type
-    def get_output_type_by_input(self, *inp_types):
+    def get_output_type_by_input(self, *input_nodes):
         assert not hasattr(self, '_out_type'), "type_inference can only be called once"
+        input_types = nodes_to_types(input_nodes)
 
         if self.INFER_SHAPE_BY_FORWARD:
-            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in inp_types]
+            self.init() # init the module so that we can infer the output type ..
+            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)
-            _out_type = self._get_type_from_output(output, *inp_types)
+            _out_type = self._get_type_from_output(output, *input_types)
         elif self.arrow is not None:
-            _out_type = self._infer_by_arrow(*inp_types)
+            _out_type = self._infer_by_arrow(*input_types)
         else:
             assert hasattr(self, '_type_inference'), f"please either override the type_inference function or set the arrow of the class {self.__class__}"
-            _out_type = self._type_inference(*inp_types)
+            _out_type = self._type_inference(*input_types)
         return _out_type
 
     # wrappers
-    @property
-    def out(self) -> Node: # out type when input are feed ..
+    def get_output(self) -> Node: # out type when input are feed ..
         #return Node(self._out_type, self, None)
         if self._default_out is None:
-            self._default_out = self.execute(*self.default_inp_nodes)
+            self._default_out = self.shadow(*self.default_inp_nodes)
         return self._default_out
 
     def __iter__(self):
-        return iter(self.out)
+        return iter(self.get_output())
 
 
     """ calling, this is not for the graph construct """
@@ -151,59 +155,18 @@ class Operator(OptBase):
     def reconfig(self, **kwargs):
         self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
 
-
-    def configure(self, build=True, context=None, config=None):
-        """
-        search backward to collect all modules
-        """
-        if hasattr(self, '_configured'):
-            _all_modules = getattr(self, '_configured')
-            if _all_modules is None:
-                raise Exception("configure() is called twice for one module; there are probably some circular dependencies in the module tree.")
-            return _all_modules
-        if not hasattr(self, '_configured'):
-            setattr(self, '_configured', None)
-
-        if build:
-            context = {'_name_count': {}, '_inps':  []}
-
-        inps = context['_inps']
-        for i in self._init_args:
-            if isinstance(i, Operator):
-                # TODO: configure
-                i.configure(build=False, context=context)
-            else:
-                if hasattr(i, '_trace'):
-                    i._trace['module'].configure(False, context=context)
-                else:
-                    if i not in inps:
-                        inps.append(i)
-
-        val_count = context['_name_count'][self._name] = context['_name_count'].get(self._name, 0) + 1
-        name = self._name
-        if val_count > 1:
-            name = self._name + '_' + str(val_count)
-        context[name] = self
-        self._name = name # rename the module to avoid name conflict
-        
-                    
-        if not build:
-            setattr(self, '_configured', inps)
-            return inps
-        else:
-            context.pop('_name_count')
-            return ModuleGraph(context, context.pop('_inps'))
-    
+    def compile(self, *args, **kwargs):
+        return self.get_output().compile(*args, **kwargs)
 
     """ path """
     def __str__(self) -> str:
         #out = super().__str__()
         self.init()
         out = torch.nn.Module.__str__(self)
-        return out + f"\nOutputType: {self.out_type}"
+        return out + f"\nOutputType: {self.get_output().get_type()}"
 
     def _get_type_from_output(self, output, *args):
-        inp = self.inp_types[0]
+        inp = args[0]
         out_shape = inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
         return out_shape
 

@@ -63,6 +63,9 @@ class Tuple(Operator):
     def forward(self, *args):
         return args
 
+    def get_n_output(self, *input_nodes):
+        return len(input_nodes)
+
     def _type_inference(self, *args):
         return TupleType(*args)
 

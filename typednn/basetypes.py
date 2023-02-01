@@ -112,6 +112,11 @@ class TupleType(Type):
     def __len__(self):
         return len(self.elements)
 
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return TupleType(*self.elements[idx])
+        return self.elements[idx]
+
 
 
 class ListType(Type): # sequence of data type, add T before the batch
