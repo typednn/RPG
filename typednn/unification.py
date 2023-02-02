@@ -70,6 +70,7 @@ def unify(
 
     def resolve(a, b, dir):
         # if dir (direction) is 1, we want to unify b into a; so we call b to check compatibility with a
+        error = None
         try: 
             a = findp(a)
             b = findp(b)
@@ -85,7 +86,10 @@ def unify(
                 for x, y in zip(a_children, b_children):
                     resolve(x, y, dir) 
         except TypeInferenceFailure as e:
-            raise TypeInferenceFailure(str(e) + f" when unifying {a} and {b}\n")
+            error = TypeInferenceFailure(str(e) + f" when unifying {a} and {b}\n")
+
+        if error is not None:
+            raise error
 
 
     resolve(tpA, tpB, 0)

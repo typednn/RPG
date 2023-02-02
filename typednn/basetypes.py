@@ -20,7 +20,6 @@ def match_list(A, B: typing.List["Type"]):
     return outs
 
 
-
 class Type:
     def __init__(self, type_name) -> None:
         self._type_name = type_name
@@ -103,6 +102,10 @@ class Type:
             children = self.instantiate_children(x)
         except InstantiationFailure:
             return None
+
+        for i in children:
+            if i is None:
+                return None
 
         out = self._test_unify(*children)
         return out
@@ -235,24 +238,27 @@ class TupleType(Type):
             def resolve_many(arg_types, types, dir):
                 if arg_types.base_type is not None:
                     for i in types:
-                        resolve(arg_types.base_type, i, dir)
+                        if not i.match_many(): # for case 1
+                            resolve(arg_types.base_type, i, dir)
                 resolve(arg_types, TupleType(*types), dir)
+            # print(C, D, self, other)
 
-            if C[0].match_many() and D[0].match_many():
-                # the most difficult case
-                # ... blabla
-                if len(C) > 1:
-                    if len(D) != 1:
+            if len(D) > 0:
+                if C[0].match_many() and D[0].match_many():
+                    # case1: the most difficult case
+                    # ... blabla
+                    if len(C) > 1:
+                        if len(D) != 1:
+                            raise TypeInferenceFailure
+                        C, D = D, C
+                        dir = 1 - dir
+                    # C is ...; D is ... blabla
+                    resolve_many(C[0], D, dir)
+                else:
+                    if len(C) != 1:
                         raise TypeInferenceFailure
-                    C, D = D, C
-                    dir = 1 - dir
-                # C is ...; D is ... blabla
-                resolve_many(C[0], D, dir)
-            else:
-                if len(C) != 1:
-                    raise TypeInferenceFailure
-                # associate C[0] to the remaining element of D
-                resolve_many(C[0], D, dir)
+                    # case2: associate C[0] to the remaining element of D
+                    resolve_many(C[0], D, dir)
 
             return (A, B)
 

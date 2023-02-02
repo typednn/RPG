@@ -68,10 +68,11 @@ def test_conv():
 
 
     img = torch.tensor([1., 2., 3.])
-    try:
-        graph(img)
-    except TypeError as e:
-        print(termcolor.colored(str(e), 'red'))
+
+    #try:
+    graph(img)
+    #except TypeError as e:
+    #    print(termcolor.colored(str(e), 'red'))
     print("OK!")
 
     print('conv parameters', len(list(conv.parameters())))
