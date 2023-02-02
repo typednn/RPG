@@ -1,4 +1,5 @@
 # the basic class of building modules from configs based on the input types
+import termcolor
 from .operator import Operator, nodes_to_types
 from .unification import unify, TypeInferenceFailure
 from .basetypes import TupleType
@@ -11,6 +12,8 @@ def match_types(input_node, type_lists):
             unify(input_node, types, input_node)[-1]
         except TypeInferenceFailure:
             continue
+
+        print(termcolor.colored(str(input_node) + ' matches ' + str(types) + ' of index ' + str(idx), 'green'))
         return idx
     return -1
 
@@ -19,6 +22,12 @@ class Factory(Operator):
     KEYS = []
     OPERATORS = []
     NAMES = []
+    
+
+    def find_caller(self):
+        out = super().find_caller()
+        return out
+
 
     def build_modules(self, *input_types):
         #return super().build_modules(*args)
@@ -26,15 +35,20 @@ class Factory(Operator):
             input_types = input_types[0]
 
         idx = match_types(input_types, self.KEYS)
+        self.input_types = input_types
+        
 
         if idx == -1:
-            raise TypeError(f"no matching operator for {self.inp_types} in {self.__class__.__name__}\n Factory: {self.KEYS}")
-        self.main = self.OPERATORS[idx](*self.default_inp_nodes, **self._init_kwargs)
+            raise TypeError(f"no matching operator for {self.inp_types} in"
+                            " {self.__class__.__name__}\n Factory: {self.KEYS}")
+
+        get_trace = lambda : f'Factory of {self.OPERATORS[idx]} for input type {input_types} built at' + self.get_trace()
+        self.main = self.OPERATORS[idx](*self.default_inp_nodes, _trace_history=get_trace, **self._init_kwargs)
 
     @classmethod
     def _new_config(cls):
         outs = {}
-        for k, v, name in zip(cls.KEYS, cls.OPERATORS, cls.NAMES):
+        for v, name in zip(cls.OPERATORS, cls.NAMES):
             outs[name] = v.default_config()
         return C.create(outs)
 
@@ -58,6 +72,11 @@ class Factory(Operator):
         #return self.OPERATORS._type_inference(*inp_types)
         return self.main.get_output().get_type()
 
+    def __str__(self) -> str:
+        self.init()
+        main_str = str(self.main).replace('\n', '\n  ')
+        return f'Factory of {self.__class__.__name__} for input type {self.input_types}  (\n  {main_str}\n)'
+
 def test():
     class Encoder(Factory):
         pass
@@ -65,13 +84,25 @@ def test():
     from .types.tensor import MLP, Tensor1D, TensorType
     from .types.image import ConvNet, ImageType
 
-    Encoder.register(MLP, ImageType, 'mlp')
-    Encoder.register(ConvNet, Tensor1D, 'conv')
+    Encoder.register(MLP, Tensor1D, 'mlp')
+    Encoder.register(ConvNet, ImageType, 'conv')
 
-    inp = TensorType(4, 3, 32, 32, data_dims=3)
+
+    try:
+        inp = TensorType(4, 3, 32, 32, data_dims=3)
+        encoder = Encoder(inp)
+        print(encoder)
+    except RuntimeError as e:
+        print('failed')
+        print('error message', termcolor.colored(e, 'red'))
+    print('ok')
+
+
+    inp = TensorType(4, 3, 224, 224, data_dims=3)
     print(C.to_yaml(Encoder.default_config()))
     encoder = Encoder(inp)
     print(encoder)
+    
 
         
 if __name__ == '__main__':

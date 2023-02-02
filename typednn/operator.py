@@ -1,6 +1,6 @@
 # https://www.notion.so/Typed-Dynamics-Graph-316d4c6d9509489ebc97a50e698867a2
-
 import inspect
+import copy
 import typing
 import torch
 from torch import nn
@@ -28,7 +28,7 @@ class Operator(OptBase):
     arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
     N_OUTPUT=None
 
-    def __init__(self, *args, name=None, **kwargs) -> None:
+    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
         super().__init__()
         # TODO: store the lineno for debugging
         self._init_args, self._init_kwargs = args, C.create(kwargs)
@@ -40,16 +40,21 @@ class Operator(OptBase):
         self._id = OPID
         OPID += 1
 
-        self.call_frmae = self.find_caller()
-        self.left_value = get_left_value(self.call_frmae)
+        from .utils import exception_with_traceback
+        self.call_frame = self.find_caller()
+        self.left_value = get_left_value(self.call_frame)
+        self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
 
     def find_caller(self):
         # find the caller of this function
         for frame in inspect.stack():
             # hack ..
-            if self.__class__.__name__ in frame[4][0] or 'OPERATORS' in frame[4][0]:
+            if (self.__class__.__name__ in frame[4][0] or 'OPERATORS' in frame[4][0]):
                 return frame
         raise ValueError("cannot find the caller of this function")
+
+    def get_trace(self):
+        return self._trace_history
 
     def clear(self):
         self._lazy_init = False
@@ -75,7 +80,7 @@ class Operator(OptBase):
     # get the output node of the operator based on input nodes ..
     def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
         # TODO: for replicate operators.
-        frame_assert(self.call_frmae[0], default, "left value inference is not implemneted")
+        frame_assert(default, "left value inference is not implemneted", self.get_trace)
         name = self.left_value
         if ',' in name:
             name = '[' + name + ']'
@@ -137,7 +142,7 @@ class Operator(OptBase):
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
                 from .utils import tensor2error
-                frame_assert(self.call_frmae[0], False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", TypeError)
+                frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
         out = super().__call__(*args, **kwargs)
         # TODO: check output type
         out_type = self.get_output().get_type()
@@ -169,7 +174,19 @@ class Operator(OptBase):
 
     def forward(self, *args, **kwargs):
         assert self.main is not None, "please either override this function or set the module of the class"
-        return self.main(*args, **kwargs)
+        try:
+            return self.main(*args, **kwargs)
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+
+            # print(self.call_frame)
+            
+            frame_assert(False,
+                         f"error in forward function of {self.__class__}:\n{e} with\n {str(tb)}",
+                         self.get_trace,
+                         e.__class__)
+            
 
     def build_config(self) -> C:
         self._config = C.merge(self.default_config(), self._init_kwargs)

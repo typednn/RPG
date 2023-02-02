@@ -34,6 +34,12 @@ class ModuleGraph(Operator):
             assert len(input_order) == len(self.input_nodes), "input order should be the same as input nodes"
             self.default_inp_nodes = input_order
         
+    def find_caller(self):
+        import inspect
+        for frame in inspect.stack():
+            if 'compile' in frame[4][0] and 'self' not in frame[4][0]:
+                return frame
+        raise ValueError("cannot find the caller of this function")
 
     def init(self):
         if not self._lazy_init:

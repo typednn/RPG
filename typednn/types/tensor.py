@@ -137,4 +137,4 @@ def test_mlp():
         
 if __name__ == '__main__':
     test()
-    #test_mlp()
+    test_mlp()
