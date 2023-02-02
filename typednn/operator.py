@@ -78,7 +78,6 @@ class Operator(OptBase):
         if ',' in name:
             name = '[' + name + ']'
 
-
         return Node(parent=self, n_childs=self.get_n_output(*input_nodes), name=name, input_nodes=input_nodes)
 
     """ type inference """
@@ -208,6 +207,13 @@ class Operator(OptBase):
 
     def __hash__(self) -> int:
         return hash(f'THISISANOPWITHID:{self._id}')
+
+        
+    def __copy__(self):
+        raise NotImplementedError
+
+    def __deepcopy__(self):
+        raise NotImplementedError("deepcopy is not supported for now")
 
 
         

@@ -3,6 +3,7 @@
 
 import abc
 import typing
+import copy
 from .basetypes import Type
 
 
@@ -51,6 +52,22 @@ class NodeBase(abc.ABC):
 
     def __hash__(self) -> int:
         return hash(f'THISISANODEWITHID:{self._id}')
+
+    def __copy__(self):
+        raise NotImplementedError("copy is not supported for Nodes")
+
+    def __deepcopy__(self, memo):
+        deepcopy_method = self.__deepcopy__
+        self.__deepcopy__ = None
+        #node = super().__deepcopy__(memo)
+        node = copy.deepcopy(self)
+        self.__deepcopy__ = deepcopy_method
+        node.__deepcopy__ = deepcopy_method
+
+        global NODEID
+        node._id = NODEID
+        NODEID += 1
+        return node
 
 
 class InputNode(NodeBase):
@@ -122,3 +139,15 @@ class Node(NodeBase):
     def compile(self, *args, **kwargs):
         from .compiler import compile
         return compile(self, *args, **kwargs)
+
+
+
+if __name__ == '__main__':
+    node = ValNode(1)
+    import copy
+    node2 = copy.deepcopy(node)
+    node2 = copy.deepcopy(node)
+    assert hash(node2) != hash(node)
+    print(node._id)
+    print(node2._id)
+    print(NODEID)

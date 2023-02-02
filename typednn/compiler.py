@@ -108,6 +108,9 @@ class ModuleGraph(Operator):
             config[name]['_type'] = module.__class__.__name__
         self._config = C.create(config)
 
+    
+    def __deepcopy__(self):
+        raise NotImplementedError("deepcopy is not supported for ModuleGraph")
 
 
 def compile(node: Node, context=None, config=None, build=True, **kwargs) -> ModuleGraph:
