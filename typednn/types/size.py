@@ -1,18 +1,24 @@
 import typing
 import numpy as np
-from ..basetypes import Type, TupleType, VariableArgs
+from ..basetypes import Type, TupleType, VariableArgs, InstantiationFailure
+from ..unification import TypeInferenceFailure
 
 
 class UIntType(Type):
     def __init__(self, a):
         self.a = a
+
     def __str__(self):
         return str(self.a)
 
     def instance(self, value):
-        return isinstance(value, int) and value == self.a 
+        if isinstance(value, int) and (self.a == '?' or value == self.a):
+            return self
+        return None
 
     def sample(self):
+        if self.a == '?':
+            raise NotImplementedError("Cannot sample a variable from ?")
         return self.a
 
     def __repr__(self):
@@ -20,6 +26,17 @@ class UIntType(Type):
 
     def __int__(self):
         return int(self.a)
+
+    def check_compatibility(self, other):
+        if other.__class__ != self.__class__:
+            raise TypeInferenceFailure
+        if self.a == '?':
+            return [], []
+        elif other.a == '?':
+            raise TypeInferenceFailure
+        elif int(other.a) == int(self.a):
+            return [], []
+        raise TypeInferenceFailure
         
 
 class SizeType(TupleType):
@@ -28,7 +45,7 @@ class SizeType(TupleType):
         for i in size:
             if isinstance(i, str):
                 if i.startswith('...'):
-                    i = VariableArgs(i)
+                    i = VariableArgs(i, based_type=UIntType('?'))
                 else:
                     i = Type(i)
             _size.append(i)

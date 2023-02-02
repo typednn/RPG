@@ -2,16 +2,23 @@
 # we can also support infering the auxiliary data information from the input data information; for example, the shape and dtypes.
 import typing
 
-def match_list(A, B: typing.List["Type"]):
-    if len(A) != len(B):
-        return False
-    for a, b in zip(A, B):
-        if not b.instance(a):
-            return False
-    return True
-
 def iterable(x):
     return isinstance(x, typing.Iterable)
+
+
+class InstantiationFailure(Exception):
+    """Error in type inference"""
+
+def match_list(A, B: typing.List["Type"]):
+    if len(A) != len(B):
+        raise InstantiationFailure("length mismatch")
+    outs = []
+    for a, b in zip(A, B):
+        outs.append(b.instance(a))
+        if outs[-1] is None:
+            raise InstantiationFailure("type mismatch")
+    return outs
+
 
 
 class Type:
@@ -46,6 +53,7 @@ class Type:
         if not self.polymorphism:
             return self
         args = []
+        
         if self.is_type_variable:
             args.append(fn(self._type_name))
         return self.reinit(*args, *[i.update_name(fn) for i in self.children()])
@@ -73,8 +81,31 @@ class Type:
         self._polymorphism = False
         return False
 
+
+    def _test_unify(self, *args):
+        from .unification import unify, TypeInferenceFailure
+        if self.is_type_variable:
+            args = [self._type_name] + list(args)
+
+        new_type = self.reinit(*args)
+        try:
+            out = unify(new_type, self, None)
+            out = out[0]
+        except TypeInferenceFailure:
+            raise InstantiationFailure
+        return out
+
+    def instantiate_children(self, x) -> "Type":
+        return []
+
     def instance(self, x):
-        return True
+        try:
+            children = self.instantiate_children(x)
+        except InstantiationFailure:
+            return None
+
+        out = self._test_unify(*children)
+        return out
 
     def check_compatibility(self, other):
         # by default we must match the type class and the 
@@ -111,27 +142,28 @@ class TupleType(Type):
     def children(self):
         return tuple(self.elements) # + tuple(self.elements_kwargs.values())
 
-    def instance(self, inps):
-        #assert isinstance(inps, tuple) or isinstance(inps, list)
+    def instantiate_children(self, inps) -> "Type":
         if not iterable(inps):
-            return False
+            raise InstantiationFailure("input is not iterable")
+            
         inps = list(inps)
-
         if self.dot is None and len(inps) != len(self.elements):
-            return False
+            raise InstantiationFailure("input length does not match")
         if self.dot is not None and len(inps) < len(self.elements)-1:
-            return False
+            raise InstantiationFailure("input length does not match")
 
         if self.dot is None:
             return match_list(inps, self.elements)
         else:
             l = self.dot
             r = len(self.elements) - l - 1
-            if l > 0 and not match_list(inps[:l], self.elements[:l]):
-                return False
-            if r > 0 and not match_list(inps[-r:], self.elements[-r:]):
-                return False
-            return self.elements[l].instance(inps[l:-r])
+            A, B, C = [], [], []
+            if l > 0:
+                A = match_list(inps[:l], self.elements[:l])
+            if r > 0:
+                C = match_list(inps[-r:], self.elements[-r:])
+            B = self.elements[l].instance(inps[l:-r])
+            return A + B + C
     
     def __iter__(self):
         return iter(self.elements)
@@ -235,20 +267,18 @@ class ListType(Type): # sequence of data type, add T before the batch
     def children(self):
         return (self.base_type,)
 
-    def instance(self, x):
+    def instantiate_children(self, x):
         if not (isinstance(x, list) or isinstance(x, tuple)):
-            return False
-        for i in x:
-            if not self.base_type.instance(i):
-                return False
-        return True
+            return None
+        return [self.base_type.instance(i) for i in x]
 
 
 class VariableArgs(Type): # is in fact the ListType with unknown length
     # something that can match arbitrary number of types
-    def __init__(self, type_name, based_type: typing.Optional["Type"]=None):
+    def __init__(self, type_name, based_type: typing.Optional["Type"]):
         self._type_name = type_name
         self.base_type = based_type
+        assert self.base_type is not None 
 
     def match_many(self):
         return True
@@ -256,17 +286,30 @@ class VariableArgs(Type): # is in fact the ListType with unknown length
     def __str__(self):
         if self.base_type is None:
             return self._type_name + "*"
-        return self._type_name + ":" + str(self.base_type) + "*"
+        return self._type_name + "(" + str(self.base_type) + ")"
+
+    def instantiate_children(self, x):
+        if not iterable(x):
+            raise InstantiationFailure(f"can not instantiate {self} with {x}.")
+        return [self.base_type.instance(i) for i in x]
 
     def instance(self, x):
-        if not iterable(x):
-            return False
-        if self.base_type is None:
-            return True
-        for i in x:
-            if not self.base_type.instance(i):
-                return False
-        return True
+        from .unification import unify, TypeInferenceFailure
+        try:
+            children = self.instantiate_children(x)
+        except InstantiationFailure:
+            return None
+        if len(children) == 0:
+            return []
+        try:
+            base_type = self.base_type
+            outs = []
+            for i in children:
+                i, base_type, _ = unify(i, base_type, None)
+                outs.append(i)
+            return outs
+        except TypeInferenceFailure as e:
+            return None
 
     def children(self):
         if self.base_type is not None:
@@ -277,16 +320,7 @@ class VariableArgs(Type): # is in fact the ListType with unknown length
         
 class UnionType(Type):
     def __init__(self, *types) -> None:
-        self.types = tuple(types)
-
-    def __str__(self):
-        return f"Union({', '.join(str(e) for e in self.children())})"
-
-    def instance(self, x):
-        return any(i.instance(x) for i in self.types)
-
-    def children(self) -> typing.Tuple["Type"]:
-        return self.types
+        raise NotImplementedError
 
         
 class Arrow(Type):
@@ -347,13 +381,21 @@ class AttrType(Type):
     def reinit(self, *children):
         return self.__class__(**dict(zip(self.kwargs.keys(), children)))
 
-    def instance(self, x):
+    # def instance(self, x):
+    #     for k, v in self.kwargs.items():
+    #         if not hasattr(x, k):
+    #             return False
+    #         if not v.instance(getattr(x, k)):
+    #             return False
+    #     return True
+
+    def instantiate_children(self, x) -> "Type":
+        outs = []
         for k, v in self.kwargs.items():
             if not hasattr(x, k):
-                return False
-            if not v.instance(getattr(x, k)):
-                return False
-        return True
+                raise InstantiationFailure(f"can not instantiate {self} with {x}.")
+            outs.append(v.instance(getattr(x, k)))
+        return outs
     
     def __str__(self):
         return self.__class__.__name__ + "(" + ", ".join(f"{k}={v}" for k, v in self.kwargs.items()) + ")"
@@ -380,7 +422,9 @@ class DataType(AttrType):
         return self.type_name
 
     def instance(self, x):
-        return isinstance(x, self.data_cls)
+        if isinstance(x, self.data_cls):
+            return self
+        return None
 
     def children(self):
         return ()

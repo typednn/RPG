@@ -1,7 +1,7 @@
 import typing
 import numpy as np
 import torch
-from ..basetypes import Type, VariableArgs, TupleType, Arrow
+from ..basetypes import Type, VariableArgs, TupleType, Arrow, InstantiationFailure
 from ..operator import Operator
 from .size import SizeType, UIntType
 from torch import nn
@@ -28,6 +28,7 @@ class TensorType(Type):
         }
 
     def reinit(self, *children):
+        
         return self.__class__(*children[0], data_dims=int(children[-1]), **self._get_extra_info())
 
     def new(self, *size, data_dims=None):
@@ -48,10 +49,10 @@ class TensorType(Type):
             raise TypeError(str(e) + f"\n    The actual channel is Type {C}")
         return C
 
-    def instance(self, value):
+    def instantiate_children(self, value):
         if not (isinstance(value, self.data_cls)):
-            return False
-        return self.size.instance(value.shape)
+            raise InstantiationFailure
+        return [self.size.instance(value.shape), self.data_dims]
 
     def children(self):
         return [self.size, self._data_dims]
@@ -108,27 +109,31 @@ def test():
     N = Type('N')
     M = Type('M')
     shapeA = TensorType(3, N, M,)
-    shapeB = TensorType(VariableArgs('...'), 4, 5)
+    shapeB = TensorType('...', 4, 5)
     
-    shapeC = TensorType(N, M, VariableArgs('...'))
+    shapeC = TensorType(N, M, '...')
     arrow = Arrow(shapeA, shapeB, shapeC)
     print(arrow)
 
     X = TensorType(3, 4, 5)
+
+    print(X.size.instance(torch.zeros(3,4,5, device='cuda:0').shape))
+    assert X.instance(torch.zeros(3,4,5, device='cuda:0')) is not None
+
     B = TensorType(10, 10, 4, 5)
 
     arrow.test_unify("Tensor(4,5,10 : 10)", X, B)
 
 
-    shapeA = TensorType(VariableArgs('...'), 4, 5)
-    shapeB = TensorType(N, M, VariableArgs('...'))
-    shapeC = TensorType(N, M, VariableArgs('...'))
+    shapeA = TensorType('...', 4, 5)
+    shapeB = TensorType(N, M, '...')
+    shapeC = TensorType(N, M, '...')
     arrow = Arrow(shapeA, shapeB, shapeC)
 
     #print(arrow.unify(X, B))
     arrow.test_unify("error", X, B)
 
-    arrow.test_unify("Tensor(4,5,4 : 5)", TensorType(4, 5, 4, 5), TensorType(4, 5, VariableArgs('...')))
+    arrow.test_unify("Tensor(4,5,4 : 5)", TensorType(4, 5, 4, 5), TensorType(4, 5, '...'))
 
     arrow.test_unify("Tensor(2,2 : 1)", TensorType(1, 4, 5), TensorType(2, 2, 1))
 

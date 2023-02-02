@@ -141,7 +141,7 @@ class Operator(OptBase):
         #TODO: this only checks for the default input nodes ..
         for a, b in zip(self.default_inp_nodes, args):
             a = a.get_type()
-            if isinstance(a, Type) and not a.instance(b):
+            if isinstance(a, Type) and a.instance(b) is None:
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
                 from .utils import tensor2error
@@ -149,7 +149,7 @@ class Operator(OptBase):
         out = super().__call__(*args, **kwargs)
         # TODO: check output type
         out_type = self.get_output().get_type()
-        assert out_type.instance(out), f"output {out} does not match the required output type {out_type}"
+        assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
 
         

@@ -29,7 +29,10 @@ def check_occurs(a, b):
 def check_compatibility(a: Type, b: Type, dir):
     if dir:
         a, b = b, a
-    return b.check_compatibility(a)
+    B, A = b.check_compatibility(a)
+    if dir:
+        A, B = B, A
+    return A, B
     
 
 def unify(
@@ -44,12 +47,14 @@ def unify(
         tpA = TupleType(*tpA)
     if isinstance(tpB, list):
         tpB = TupleType(*tpB)
-    if isinstance(query, list):
+    if query is not None and isinstance(query, list):
         query = TupleType(*query)
 
     if update_name:
         tpB = tpB.update_name(lambda x: x + '\'')
-        query = query.update_name(lambda x: x + '\'')
+
+        if query is not None:
+            query = query.update_name(lambda x: x + '\'')
 
     pa = {} # map str to type in the end ..
     def findp(a: Type):
@@ -65,22 +70,22 @@ def unify(
 
     def resolve(a, b, dir):
         # if dir (direction) is 1, we want to unify b into a; so we call b to check compatibility with a
-        a = findp(a)
-        b = findp(b)
-        if a.is_type_variable:
-            if str(a) != str(b):
-                if check_occurs(a, b):
-                    raise TypeInferenceFailure("Recursive type ..")
-                pa[str(a)] = b
-
-        elif b.is_type_variable:
-            resolve(b, a, dir=1-dir)
-
-        else:
-            (a_children, b_children) = check_compatibility(a, b, dir)
-            for x, y in zip(a_children, b_children):
-                resolve(x, y, dir) 
-            # now we assume a must contain ... or there is no ...
+        try: 
+            a = findp(a)
+            b = findp(b)
+            if a.is_type_variable:
+                if str(a) != str(b):
+                    if check_occurs(a, b):
+                        raise TypeInferenceFailure("Recursive type ..")
+                    pa[str(a)] = b
+            elif b.is_type_variable:
+                resolve(b, a, dir=1-dir)
+            else:
+                (a_children, b_children) = check_compatibility(a, b, dir)
+                for x, y in zip(a_children, b_children):
+                    resolve(x, y, dir) 
+        except TypeInferenceFailure as e:
+            raise TypeInferenceFailure(str(e) + f" when unifying {a} and {b}\n")
 
 
     resolve(tpA, tpB, 0)
@@ -118,7 +123,8 @@ def unify(
 
     tpA = substitute(tpA)
     tpB = substitute(tpB)
-    query = substitute(query)
+    if query is not None:
+        query = substitute(query)
     return tpA, tpB, query
 
 
