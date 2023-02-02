@@ -42,18 +42,34 @@ class Factory(Operator):
             raise TypeError(f"no matching operator for {self.inp_types} in"
                             " {self.__class__.__name__}\n Factory: {self.KEYS}")
 
-        get_trace = lambda : f'Factory of {self.OPERATORS[idx]} for input type {input_types} built at' + self.get_trace()
-        self.main = self.OPERATORS[idx](*self.default_inp_nodes, _trace_history=get_trace, **self._init_kwargs)
+        get_trace = lambda: f'Factory of {self.OPERATORS[idx]} for input type {input_types} built at' + self.get_trace()
+        import copy
+        config = copy.deepcopy(self.config)
+        module_config = config.get(self.NAMES[idx])
+        for i in self.NAMES:
+            config.pop(i)
+        config = C.merge(config, module_config)
+        self.main = self.OPERATORS[idx](
+            *self.default_inp_nodes, _trace_history=get_trace, 
+            **config,
+        )
+
+    @classmethod
+    def _common_config(cls):
+        return {}
 
     @classmethod
     def _new_config(cls):
+        common = cls._common_config()
+
         outs = {}
         for v, name in zip(cls.OPERATORS, cls.NAMES):
             outs[name] = v.default_config()
+            for k in common:
+                if k in outs[name]:
+                    outs[name].pop(k)
+        outs.update(common)
         return C.create(outs)
-
-    def build_config(self):
-        return super().build_config()
 
     @classmethod
     def register(cls, module, type, name=None):
@@ -77,16 +93,20 @@ class Factory(Operator):
         main_str = str(self.main).replace('\n', '\n  ')
         return f'Factory of {self.__class__.__name__} for input type {self.input_types}  (\n  {main_str}\n)'
 
+
 def test():
     class Encoder(Factory):
-        pass
+        @classmethod
+        def _common_config(cls):
+            return {
+                'out_dim': 64,
+            }
 
     from .types.tensor import MLP, Tensor1D, TensorType
     from .types.image import ConvNet, ImageType
 
     Encoder.register(MLP, Tensor1D, 'mlp')
     Encoder.register(ConvNet, ImageType, 'conv')
-
 
     try:
         inp = TensorType(4, 3, 32, 32, data_dims=3)
@@ -103,7 +123,6 @@ def test():
     encoder = Encoder(inp)
     print(encoder)
     
-
         
 if __name__ == '__main__':
     test()
