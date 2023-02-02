@@ -67,8 +67,9 @@ class Operator(OptBase):
             except AttributeError:
                 has_main = False
 
+            self.inp_types = nodes_to_types(self.default_inp_nodes)
             if not has_main:
-                self.build_modules(*nodes_to_types(self.default_inp_nodes))
+                self.build_modules(*self.inp_types)
 
     # get the output node of the operator based on input nodes ..
     def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
@@ -127,11 +128,14 @@ class Operator(OptBase):
     """ calling, this is not for the graph construct """
     def __call__(self, *args, **kwargs):
         self.init()
-        for a, b in zip(self.inp_types, args):
+
+        #TODO: this only checks for the default input nodes ..
+        for a, b in zip(self.default_inp_nodes, args):
+            a = a.get_type()
             if isinstance(a, Type) and not a.instance(b):
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
-                raise TypeError(f"input type {a} does not match the input {b} for {info}")
+                frame_assert(self.call_frmae[0], False, f"input {b} does not match the required input type {a} for {info}", TypeError)
         out = super().__call__(*args, **kwargs)
         # TODO: check output type
         return out
@@ -208,7 +212,6 @@ class Operator(OptBase):
     def __hash__(self) -> int:
         return hash(f'THISISANOPWITHID:{self._id}')
 
-        
     def __copy__(self):
         raise NotImplementedError
 

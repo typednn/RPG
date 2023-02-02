@@ -20,10 +20,10 @@ def exception_with_traceback(frame, exception_cls, message):
     return exception_cls(message + termcolor.colored(errors, 'yellow'))
 
 
-def frame_assert(frame, cond, msg):
+def frame_assert(frame, cond, msg, errorType=ValueError):
     if not cond:
         #source, firstline = inspect.findsource(frame.f_code)
         #code = source[frame.f_lineno].strip()
         #error_message = f"\n    {code} at {frame}."
         #raise ValueError(msg + f" in {self._name} from frame {error_message}")
-        raise exception_with_traceback(frame, ValueError, msg)
+        raise exception_with_traceback(frame, errorType, msg)

@@ -32,6 +32,7 @@ class ModuleGraph(Operator):
         else:
             assert len(input_order) == len(self.input_nodes), "input order should be the same as input nodes"
             self.default_inp_nodes = input_order
+        
 
     def init(self):
         if not self._lazy_init:
@@ -39,33 +40,20 @@ class ModuleGraph(Operator):
             self.build_config()
             for i in self.submodules:
                 i.init()
+            self.inp_types = [i.get_type() for i in self.default_inp_nodes]
             
 
-    def forward(self, *inps):
+    def forward(self, *inps, **kwargs):
+        assert len(kwargs) == 0, "not support kwargs for now; we need map kwargs to input nodes"
         assert len(self.inp_types) == 1, "only support one input for now"
         context = {}
-        for a, b in zip(self.inp_types, inps):
-            assert a.instance(b)
+        for a, b in zip(self.default_inp_nodes, inps):
             context[a] = b
-
-        for module_name, module in self.models.items():
-            inps = []
-            for k in module._init_args:
-                if isinstance(k, Operator):
-                    val = context[k._name]
-                elif isinstance(k, Type):
-                    if hasattr(k, '_trace'):
-                        trace = k._trace
-                        val = context[trace['module']._name]
-                        if 'index' in trace and trace['index'] is not None:
-                            val = val[trace['index']]
-                    else:
-                        val = context[k]
-                else:
-                    val = k
-                inps.append(val)
-            out = context[module_name] = module(*inps)
-        return out
+        for node in self.nodes:
+            if isinstance(node, InputNode):
+                continue
+            context[node] = node.evaluate(context)
+        return context[self.output_node]
 
     def __str__(self) -> str:
         #TODO: output nodes; (with input and output types)

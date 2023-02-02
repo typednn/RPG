@@ -58,8 +58,6 @@ def test_conv():
 
     out = Tuple(linear, linear2)
     graph = out.compile()
-    print(graph)
-    exit(0)
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()

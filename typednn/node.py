@@ -69,6 +69,10 @@ class NodeBase(abc.ABC):
         NODEID += 1
         return node
 
+    @abc.abstractmethod
+    def evaluate(self, context):
+        pass
+
 
 class InputNode(NodeBase):
     # TODO: remove input node ...
@@ -79,6 +83,9 @@ class InputNode(NodeBase):
     def get_type(self):
         return self._type
 
+    def evaluate(self, context):
+        return context[self]
+
 
 class ValNode(NodeBase):
     def __init__(self, val, **kwargs) -> None:
@@ -86,6 +93,9 @@ class ValNode(NodeBase):
         self.val = val
 
     def get_type(self):
+        return self.val
+
+    def evaluate(self, context):
         return self.val
 
 
@@ -139,6 +149,12 @@ class Node(NodeBase):
     def compile(self, *args, **kwargs):
         from .compiler import compile
         return compile(self, *args, **kwargs)
+
+    def evaluate(self, context):
+        if isinstance(self._parent, NodeBase):
+            return self._parent.evaluate(context)[self._index]
+        else:
+            return self._parent(*[context[i] for i in self.input_nodes])
 
 
 
