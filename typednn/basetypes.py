@@ -19,6 +19,13 @@ class Type:
         self._type_name = type_name
         assert self.__class__ == Type, "Type should not be instantiated directly."
 
+    def reinit(self, *children):
+        # create new types based on the provided chidren
+        return self.__class__(*children, **self._get_extra_info())
+
+    def _get_extra_info(self):
+        return {}
+
     @property
     def is_type_variable(self):
         return hasattr(self, '_type_name')
@@ -41,7 +48,7 @@ class Type:
         args = []
         if self.is_type_variable:
             args.append(fn(self._type_name))
-        return self.__class__(*args, *[i.update_name(fn) for i in self.children()])
+        return self.reinit(*args, *[i.update_name(fn) for i in self.children()])
 
     def children(self) -> typing.Tuple["Type"]:
         return ()

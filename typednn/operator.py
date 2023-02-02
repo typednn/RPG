@@ -46,9 +46,10 @@ class Operator(OptBase):
     def find_caller(self):
         # find the caller of this function
         for frame in inspect.stack():
-            if self.__class__.__name__ in frame[4][0]:
+            # hack ..
+            if self.__class__.__name__ in frame[4][0] or 'OPERATORS' in frame[4][0]:
                 return frame
-        return None
+        raise ValueError("cannot find the caller of this function")
 
     def clear(self):
         self._lazy_init = False

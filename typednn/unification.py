@@ -14,7 +14,7 @@ class TypeInferenceFailure(Exception):
 
 def map_type(tp: Type, f):
     if len(tp.children()) > 0:
-        return tp.__class__(*[map_type(i, f) for i in tp.children()])
+        return tp.reinit([map_type(i, f) for i in tp.children()])
     else:
         return f(tp)
 
@@ -159,14 +159,14 @@ def unify(tpA: Type, tpB: Type, query: Type):
                         out.append(y)
                 else:
                     out.append(substitute(i))
-            return x.__class__(*out)
+            return x.reinit(*out)
 
         assert x.is_type_variable
         p = findp(x)
         if p.is_type_variable:
             if p._type_name not in allocator:
                 nonlocal TID
-                allocator[p._type_name] = p.__class__(f'\'T{TID}', *[substitute(i) for i in p.children()])
+                allocator[p._type_name] = p.reinit(f'\'T{TID}', *[substitute(i) for i in p.children()])
                 TID += 1
         else:
             return p

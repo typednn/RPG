@@ -8,7 +8,7 @@ from torch import nn
 
 
 class TensorType(Type):
-    def __init__(self, *size, dtype=None, device=None, data_dims=None):
+    def __init__(self, *size, data_dims=1, dtype=None, device=None):
         size = SizeType(*size)
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
         self.size = size
@@ -16,9 +16,18 @@ class TensorType(Type):
 
         self.dtype = dtype or torch.float32
         self.device = device or 'cuda:0'
-        assert data_dims is not None, "data_dims must be specified for batch tensor"
-        self.data_dims = data_dims
 
+        self.data_dims = data_dims
+        self._data_dims = UIntType(data_dims)
+
+    def _get_extra_info(self):
+        return {
+            'dtype': self.dtype,
+            'device': self.device,
+        }
+
+    def reinit(self, *children):
+        return self.__class__(*children[:-1], data_dims=int(children[-1]), **self._get_extra_info())
 
     def new(self, *size, data_dims=None):
         return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=data_dims or self.data_dims)
@@ -44,11 +53,14 @@ class TensorType(Type):
         return self.size.instance(value.shape)
 
     def children(self):
-        return self.size.children()
+        return list(self.size.children()) + [self._data_dims]
 
     def __str__(self):
         #out = self.type_name
-        out = 'Tensor(' + ','.join(map(str, self.batch_shape())) + ' : ' + ','.join(map(str, self.data_shape())) + ')'
+        out = '(' + ','.join(map(str, self.batch_shape())) + ' : ' + ','.join(map(str, self.data_shape())) + ')'
+        if self.data_dims != 1:
+            out = f'{self.data_dims}D' + out
+        out = 'Tensor' + out
         if self.dtype != torch.float32:
             out = 'D' + out
         if self.device != 'cuda:0':
@@ -58,6 +70,8 @@ class TensorType(Type):
     def sample(self):
         return torch.randn(*self.size.sample(), device=self.device, dtype=self.dtype)
 
+
+Tensor1D = TensorType('...', 'N', data_dims=1)
 
 class MLP(Operator):
     INFER_SHAPE_BY_FORWARD=True
@@ -87,8 +101,9 @@ class MLP(Operator):
 def test():
     N = Type('N')
     M = Type('M')
-    shapeA = TensorType(3, N, M)
+    shapeA = TensorType(3, N, M,)
     shapeB = TensorType(VariableArgs('...'), 4, 5)
+    
     shapeC = TensorType(N, M, VariableArgs('...'))
     arrow = Arrow(shapeA, shapeB, shapeC)
     print(arrow)
@@ -96,7 +111,7 @@ def test():
     X = TensorType(3, 4, 5)
     B = TensorType(10, 10, 4, 5)
 
-    arrow.test_unify("Tensor(4, 5, 10, 10)", X, B)
+    arrow.test_unify("Tensor(4,5,10 : 10)", X, B)
 
 
     shapeA = TensorType(VariableArgs('...'), 4, 5)
@@ -107,19 +122,19 @@ def test():
     #print(arrow.unify(X, B))
     arrow.test_unify("error", X, B)
 
-    arrow.test_unify("Tensor(4, 5, 4, 5)", TensorType(4, 5, 4, 5), TensorType(4, 5, VariableArgs('...')))
+    arrow.test_unify("Tensor(4,5,4 : 5)", TensorType(4, 5, 4, 5), TensorType(4, 5, VariableArgs('...')))
 
-    arrow.test_unify("Tensor(2, 2, 1)", TensorType(1, 4, 5), TensorType(2, 2, 1))
+    arrow.test_unify("Tensor(2,2 : 1)", TensorType(1, 4, 5), TensorType(2, 2, 1))
 
     # arrow.test_unify("error", TensorType(1, 4, 5), TensorType(2, 2, 2))
         
 def test_mlp():
     inp = TensorType(3, 4, 5, data_dims=1)
 
-    mlp = MLP(inp, layer=3, hidden=512, out_dim=32)
+    mlp = MLP(inp, layer=5, hidden=512, out_dim=32)
     print(mlp)
-    print(mlp(inp.sample()).shape)
+    mlp(inp.sample())
         
 if __name__ == '__main__':
-    #test()
-    test_mlp()
+    test()
+    #test_mlp()
