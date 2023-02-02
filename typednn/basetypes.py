@@ -76,6 +76,17 @@ class Type:
     def instance(self, x):
         return True
 
+    def check_compatibility(self, other):
+        # by default we must match the type class and the 
+        A = self.children()
+        if len(A) == 0:
+            return str(self) == str(other), ([], [])
+
+        B = other.children()
+        if len(A) != len(B):
+            return False, (None, None)
+        return self.__class__ == other.__class__, (A, B)
+
 
 class TupleType(Type):
     # let's not consider named tuple for now ..
@@ -127,6 +138,85 @@ class TupleType(Type):
             return TupleType(*self.elements[idx])
         return self.elements[idx]
 
+    def check_compatibility(self, other):
+        def contain_many(type_list):
+            s = sum([i.match_many() for i in type_list])
+            assert s <= 1, "can not have two variable arguments."
+            return s > 0
+        from .unification import TypeInferenceFailure
+        a_children = self.children()
+        b_children = other.children()
+        # return super().check_compatibility(other)
+
+        class_compability = issubclass(other.__class__, self.__class__)
+        if not class_compability:
+            return False, (None, None)
+
+        if not contain_many(a_children) and not contain_many(b_children):
+            # no ..., directly match two lists
+            if len(a_children) != len(b_children):
+                raise TypeInferenceFailure(f"type {self} has a different number of children with type {other}.")
+            return class_compability, (a_children, b_children)
+        else:
+            if not contain_many(a_children):
+                C, D, dir = b_children, a_children, 1
+                dir = 1
+            else:
+                C, D, dir = a_children, b_children, 0
+
+            A = []
+            B = []
+            def resolve(x, y, dir):
+                if dir == 1:
+                    x, y = y, x
+                A.append(x)
+                B.append(y)
+
+            def match_prefix(C, D):
+                idx = 0
+                while True:
+                    if C[idx].match_many() or D[idx].match_many():
+                        C = C[idx:]
+                        D = D[idx:]
+                        break
+                    resolve(C[idx], D[idx], dir)
+                    idx += 1
+                return C, D
+
+            # we now remove the common prefix or suffix until meet a ... or the end
+            C, D = match_prefix(C, D)
+            C, D = match_prefix(C[::-1], D[::-1]); C, D = C[::-1], D[::-1]
+
+            # make C start with ...
+            if len(D) > 0 and D[0].match_many():
+                C, D = D, C
+                dir = 1 - dir
+            assert C[0].match_many()
+
+            def resolve_many(arg_types, types, dir):
+                if arg_types.base_type is not None:
+                    for i in types:
+                        resolve(arg_types.base_type, i, dir)
+                resolve(arg_types, TupleType(*types), dir)
+
+            if C[0].match_many() and D[0].match_many():
+                # the most difficult case
+                # ... blabla
+                if len(C) > 1:
+                    if len(D) != 1:
+                        raise TypeInferenceFailure
+                    C, D = D, C
+                    dir = 1 - dir
+                # C is ...; D is ... blabla
+                resolve_many(C[0], D, dir)
+            else:
+                if len(C) != 1:
+                    raise TypeInferenceFailure
+                # associate C[0] to the remaining element of D
+                resolve_many(C[0], D, dir)
+
+            return class_compability, (A, B)
+
 
 
 class ListType(Type): # sequence of data type, add T before the batch
@@ -177,28 +267,6 @@ class VariableArgs(Type): # is in fact the ListType with unknown length
             return (self.base_type,)
         return ()
     
-
-class PType(Type):
-    # probablistic distribution of the base_type
-    def __init__(self, base_type) -> None:
-        raise NotImplementedError
-
-
-class DataType(Type):
-    # data_cls could be anything ..
-    def __init__(self, data_cls, type_name=None):
-        self.data_cls = data_cls
-        self.type_name = type_name or self.data_cls.__name__
-
-    def __str__(self):
-        #return self.data_cls.__name__
-        return self.type_name
-
-    def instance(self, x):
-        return isinstance(x, self.data_cls)
-
-    def children(self):
-        return ()
 
         
 class UnionType(Type):
@@ -252,3 +320,53 @@ class Arrow(Type):
 
     def instance(self, x):
         raise NotImplementedError("Arrow is not a simple type, it's a function type.")
+
+        
+        
+class AttrType(Type):
+    # type that supports attributes
+    def __init__(self, type_name=None, **kwargs) -> None:
+        self.kwargs = kwargs
+        self.type_name = type_name or "AttrType"
+
+    def __getattr__(self, name):
+        if name in self.kwargs:
+            return self.kwargs[name]
+        raise AttributeError(name)
+
+    def children(self) -> typing.Tuple["Type"]:
+        return tuple(self.kwargs.values())
+
+    def instance(self, x):
+        for k, v in self.kwargs.items():
+            if not hasattr(x, k):
+                return False
+            if not v.instance(getattr(x, k)):
+                return False
+        return True
+    
+    def __str__(self):
+        return self.type_name + "(" + ", ".join(f"{k}={v}" for k, v in self.kwargs.items()) + ")"
+
+
+class DataType(AttrType):
+    # data_cls could be anything ..
+    def __init__(self, data_cls, type_name=None):
+        self.data_cls = data_cls
+        self.type_name = type_name or self.data_cls.__name__
+
+    def __str__(self):
+        #return self.data_cls.__name__
+        return self.type_name
+
+    def instance(self, x):
+        return isinstance(x, self.data_cls)
+
+    def children(self):
+        return ()
+
+
+class PType(Type):
+    # probablistic distribution of the base_type
+    def __init__(self, base_type) -> None:
+        raise NotImplementedError

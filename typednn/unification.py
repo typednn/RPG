@@ -27,13 +27,20 @@ def check_occurs(a, b):
     return False
 
 
-def contain_many(X):
-    s = sum([i.match_many() for i in X.children()])
+def contain_many(type_list):
+    s = sum([i.match_many() for i in type_list])
     assert s <= 1, "can not have two variable arguments."
     return s > 0
+
+    
+def check_compatibility(a: Type, b: Type, dir):
+    if dir:
+        a, b = b, a
+    return b.check_compatibility(a)
     
 
 def unify(tpA: Type, tpB: Type, query: Type):
+    # https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
 
     if isinstance(tpA, list):
         tpA = TupleType(*tpA)
@@ -58,7 +65,7 @@ def unify(tpA: Type, tpB: Type, query: Type):
             return a
 
     def resolve(a, b, dir):
-        # if dir is 1, we want to unify a into b
+        # if dir (direction) is 1, we want to unify b into a; so we call b to check compatibility with a
         a = findp(a)
         b = findp(b)
         if a.is_type_variable:
@@ -66,33 +73,32 @@ def unify(tpA: Type, tpB: Type, query: Type):
                 if check_occurs(a, b):
                     raise TypeInferenceFailure("Recursive type ..")
                 pa[str(a)] = b
+
         elif b.is_type_variable:
             resolve(b, a, dir=1-dir)
+
         else:
-            # a, b both are not type variable 
-            if len(a.children()) == 0:
-                # two normal types mismatch
-                #if str(a) != str(b):
-                #    raise TypeInferenceFailure(f"type {a} != type {b}.")
-                if dir == 1:
-                    a, b = b, a
-                if str(a) != str(b):
-                    raise TypeInferenceFailure(f"type {a} != type {b}.")
-                return
-            if contain_many(b):
-                a, b = b, a
-                dir = 1 - dir
+            compatible, (a_children, b_children) = check_compatibility(a, b, dir)
+            if not compatible:
+                raise TypeInferenceFailure(f"type {str(a)} is not compatible with type {str(b)}.")
+            for x, y in zip(a_children, b_children):
+                resolve(x, y, dir) 
+            return
                 
             # now we assume a must contain ... or there is no ...
-            if not contain_many(a):
+            if not contain_many(a_children) and not contain_many(b_children):
                 # no ..., directly match two lists
-                a_children, b_children = a.children(), b.children()
                 if len(a_children) != len(b_children):
                     raise TypeInferenceFailure(f"type {a} has a different number of children with type {b}.")
                 for x, y in zip(a_children, b_children):
                     resolve(x, y, dir)
             else:
-                C, D = a.children(), b.children()
+                if not contain_many(a_children):
+                    a_children, b_children = b_children, a_children
+                    dir = 1 - dir
+
+                #C, D = a.children(), b.children()
+                C, D = a_children, b_children
                 def match_prefix(C, D):
                     idx = 0
                     while True:
@@ -177,3 +183,11 @@ def unify(tpA: Type, tpB: Type, query: Type):
     tpB = substitute(tpB)
     query = substitute(query)
     return tpA, tpB, query
+
+
+def test_inheritance():
+    raise NotImplementedError
+    
+
+if __name__ == '__main__':
+    test_inheritance()

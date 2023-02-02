@@ -27,7 +27,7 @@ class TensorType(Type):
         }
 
     def reinit(self, *children):
-        return self.__class__(*children[:-1], data_dims=int(children[-1]), **self._get_extra_info())
+        return self.__class__(*children[0], data_dims=int(children[-1]), **self._get_extra_info())
 
     def new(self, *size, data_dims=None):
         return TensorType(*size, dtype=self.dtype, device=self.device, data_dims=data_dims or self.data_dims)
@@ -53,7 +53,7 @@ class TensorType(Type):
         return self.size.instance(value.shape)
 
     def children(self):
-        return list(self.size.children()) + [self._data_dims]
+        return [self.size, self._data_dims]
 
     def __str__(self):
         #out = self.type_name
