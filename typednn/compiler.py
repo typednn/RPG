@@ -26,6 +26,7 @@ class ModuleGraph(Operator):
         self.output_node = list(self.nodes.keys())[-1]
 
 
+
         if input_order is None:
             input_order = self.input_nodes
             self.default_inp_nodes = [self.input_nodes[k] for k in input_order]
@@ -41,7 +42,11 @@ class ModuleGraph(Operator):
             for i in self.submodules:
                 i.init()
             self.inp_types = [i.get_type() for i in self.default_inp_nodes]
-            
+            self.build_modules()
+
+    def build_modules(self):
+        import torch
+        self.main =  torch.nn.ModuleDict({name: k for k, name in self.submodules.items()})
 
     def forward(self, *inps, **kwargs):
         assert len(kwargs) == 0, "not support kwargs for now; we need map kwargs to input nodes"
@@ -49,11 +54,7 @@ class ModuleGraph(Operator):
         context = {}
         for a, b in zip(self.default_inp_nodes, inps):
             context[a] = b
-        for node in self.nodes:
-            if isinstance(node, InputNode):
-                continue
-            context[node] = node.evaluate(context)
-        return context[self.output_node]
+        return self.output_node.evaluate(context)
 
     def __str__(self) -> str:
         #TODO: output nodes; (with input and output types)
@@ -69,7 +70,7 @@ class ModuleGraph(Operator):
             if isinstance(i._parent, Operator):
                 line += i._parent._name + '(' +  ', '.join([j._name if j._name else str(j) for j in i.input_nodes]) + ')'
             else:
-                line += str(i._parent) + '[' + str(i._index) + ']'
+                line += str(i._parent._name) + '[' + str(i._index) + ']'
 
             line += ' ' * max(80 -len(line), 0) + ' # ' + str(i.get_type())
 
@@ -81,10 +82,7 @@ class ModuleGraph(Operator):
         return self._init_args[0]
 
     def _type_inference(self, *args):
-        context = self.get_context()
-        for k, v in context.items():
-            pass
-        return v.out
+        return self.output_node.get_type()
 
     def build_config(self):
         config = dict(
@@ -137,6 +135,7 @@ def compile(node: Node, context=None, config=None, build=True, **kwargs) -> Modu
             if op not in context['submodules']:
                 # remove duplicated name
                 name = op._name
+                op.reconfig(**config.get(name, {}))
                 if name in context['opname_count']:
                     val_count = context['opname_count'].get(name, 0) + 1
                     context['opname_count'][name] = val_count

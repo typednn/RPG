@@ -7,11 +7,6 @@ from .tensor import TensorType, VariableArgs, Type
 from ..node import Node
 from ..functors import Flatten, Seq, Linear, FlattenBatch, Tuple
 
-
-
-# TD = Type('D')
-# TN = Type('N')
-# TM = Type('M')
 ImageType = TensorType('...', 'D', 'N', 'M', data_dims=3)
 
 
@@ -21,7 +16,7 @@ class ConvNet(Operator):
     @classmethod
     def _new_config(cls):
         return dict(
-            layer=3,
+            layer=4,
             hidden=512,
             out_dim=32,
         )
@@ -39,12 +34,16 @@ class ConvNet(Operator):
             nn.Conv2d(C, num_channels, 7, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 5, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 3, stride=2), nn.ReLU(),
+            *[nn.Conv2d(num_channels, num_channels, 3, 2) for _ in range(max(self.config.layer-4, 0))],
             nn.Conv2d(num_channels, self.config.out_dim, 3, stride=2), nn.ReLU()
         ).to(inp_type.device)
 
 
 def test_conv():
-    inp = TensorType('N', 5,224,224, data_dims=3)
+    inp = TensorType('N', 'M', 5,224,224, data_dims=3)
+
+    # assert inp.instance(torch.zeros([5, 5, 224, 224]))
+    # assert inp.instance(torch.zeros([5, 224, 224]))
 
     flattenb = FlattenBatch(inp)
     
@@ -57,9 +56,11 @@ def test_conv():
     linear2 = Linear(linear3, dim=10)
 
     out = Tuple(linear, linear2)
-    graph = out.compile()
+    graph = out.compile(config=dict(Linear=dict(dim=35)))
+    print(graph.pretty_config)
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
+
     image = inp.sample()
     from omegaconf import OmegaConf as C
     
@@ -72,6 +73,9 @@ def test_conv():
     except TypeError as e:
         print(termcolor.colored(str(e), 'red'))
     print("OK!")
+
+    print('conv parameters', len(list(conv.parameters())))
+    print('graph parameters', len(list(graph.parameters())))
     
 
 

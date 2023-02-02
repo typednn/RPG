@@ -143,7 +143,11 @@ class Node(NodeBase):
 
     def __iter__(self):
         for i in range(self._n_childs):
-            yield Node(self, index=i, name=self._name + f'.{i}')
+            if ',' in self._name:
+                name = str(self._name)[1:-1].split(',')[i]
+            else:
+                name = self._name + f'.{i}'
+            yield Node(self, index=i, name=name)
 
 
     def compile(self, *args, **kwargs):
@@ -154,6 +158,9 @@ class Node(NodeBase):
         if isinstance(self._parent, NodeBase):
             return self._parent.evaluate(context)[self._index]
         else:
+            for i in self.input_nodes:
+                if i not in context:
+                    context[i] = i.evaluate(context)
             return self._parent(*[context[i] for i in self.input_nodes])
 
 

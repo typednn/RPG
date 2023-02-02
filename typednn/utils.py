@@ -27,3 +27,9 @@ def frame_assert(frame, cond, msg, errorType=ValueError):
         #error_message = f"\n    {code} at {frame}."
         #raise ValueError(msg + f" in {self._name} from frame {error_message}")
         raise exception_with_traceback(frame, errorType, msg)
+
+def tensor2error(x):
+    import torch
+    if isinstance(x, torch.Tensor):
+        return str(x)[:10] + '...' + ') of shape ' + str(x.shape) + ' of type ' + str(x.dtype)
+    return str(x)

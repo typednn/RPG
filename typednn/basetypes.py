@@ -91,22 +91,23 @@ class TupleType(Type):
         #assert isinstance(inps, tuple) or isinstance(inps, list)
         if not iterable(inps):
             return False
+        inps = list(inps)
 
         if self.dot is None and len(inps) != len(self.elements):
             return False
-        if self.dot is not None and len(inps) < len(self.elements):
+        if self.dot is not None and len(inps) < len(self.elements)-1:
             return False
 
         if self.dot is None:
             return match_list(inps, self.elements)
         else:
             l = self.dot
-            r = len(self.elements) - l
+            r = len(self.elements) - l - 1
             if l > 0 and not match_list(inps[:l], self.elements[:l]):
                 return False
             if r > 0 and not match_list(inps[-r:], self.elements[-r:]):
                 return False
-            return match_list(inps[l:-r], self.elements[l])
+            return self.elements[l].instance(inps[l:-r])
     
     def __iter__(self):
         return iter(self.elements)
@@ -140,7 +141,7 @@ class ListType(Type): # sequence of data type, add T before the batch
         return True
 
 
-class VariableArgs(Type):
+class VariableArgs(Type): # is in fact the ListType with unknown length
     # something that can match arbitrary number of types
     def __init__(self, type_name, based_type: typing.Optional["Type"]=None):
         self._type_name = type_name

@@ -2,7 +2,9 @@ import typing
 import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow
+from ..operator import Operator
 from .size import SizeType, UIntType
+from torch import nn
 
 
 class TensorType(Type):
@@ -55,6 +57,31 @@ class TensorType(Type):
 
     def sample(self):
         return torch.randn(*self.size.sample(), device=self.device, dtype=self.dtype)
+
+
+class MLP(Operator):
+    INFER_SHAPE_BY_FORWARD=True
+
+    @classmethod
+    def _new_config(cls):
+        return dict(
+            layer=3,
+            hidden=512,
+            out_dim=32,
+            act_fn=None,
+        )
+
+    def build_modules(self, inp_type):
+        assert inp_type.data_dims == 1, "MLP only support 1D data"
+        C = inp_type.channel_dim
+        act_fn = self.config['act_fn'] or nn.ELU()
+        hidden_dim = self.config.hidden
+
+        self.main = torch.nn.Sequential(
+            torch.nn.Linear(C, hidden_dim), act_fn,
+            *sum([[torch.nn.Linear(hidden_dim, hidden_dim), act_fn] 
+                  for _ in range(self.config.layer-2)], []),
+            torch.nn.Linear(hidden_dim, self.config.out_dim)).to(inp_type.device)
         
 
 def test():
@@ -86,6 +113,13 @@ def test():
 
     # arrow.test_unify("error", TensorType(1, 4, 5), TensorType(2, 2, 2))
         
+def test_mlp():
+    inp = TensorType(3, 4, 5, data_dims=1)
+
+    mlp = MLP(inp, layer=3, hidden=512, out_dim=32)
+    print(mlp)
+    print(mlp(inp.sample()).shape)
         
 if __name__ == '__main__':
-    test()
+    #test()
+    test_mlp()

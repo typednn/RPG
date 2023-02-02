@@ -135,9 +135,12 @@ class Operator(OptBase):
             if isinstance(a, Type) and not a.instance(b):
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
-                frame_assert(self.call_frmae[0], False, f"input {b} does not match the required input type {a} for {info}", TypeError)
+                from .utils import tensor2error
+                frame_assert(self.call_frmae[0], False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", TypeError)
         out = super().__call__(*args, **kwargs)
         # TODO: check output type
+        out_type = self.get_output().get_type()
+        assert out_type.instance(out), f"output {out} does not match the required output type {out_type}"
         return out
 
         
@@ -217,33 +220,3 @@ class Operator(OptBase):
 
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for now")
-
-
-        
-class TypedFactory(Operator):
-    factory = {}
-    def build_modules(self, *args):
-        #return super().build_modules(*args)
-        from .unification import unify, TypeInferenceFailure
-        inp_types = [i for i in self.inp_types if isinstance(i, Type)]
-        op = None
-        for types, op in self.factory.items():
-            try:
-                unify(inp_types, types, inp_types)[-1]
-            except TypeInferenceFailure:
-                continue
-            op = op
-            break
-
-        if op is None:
-            raise TypeError(f"no matching operator for {self.inp_types} in {self.__class__.__name__}\n Factory: {self.factory}")
-        
-        self.op = op
-
-
-    @classmethod
-    def register(cls, opt, inp_types):
-        raise NotImplementedError
-        
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError

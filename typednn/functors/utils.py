@@ -37,7 +37,7 @@ class Seq(Operator):
         return out[0] 
 
     def _type_inference(self, *args, **kwargs):
-        return self.op_list[-1].out
+        return self.op_list[-1].get_output().get_type()
 
     def __str__(self) -> str:
         out = 'Sequential:\n'
