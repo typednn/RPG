@@ -21,7 +21,7 @@ class ConvNet(Operator):
             out_dim=32,
         )
 
-    def build_modules(self, inp_type):
+    def build_modules(self, inp_type: "ImageType"):
         try:
             int(inp_type.data_shape().total())
         except TypeError:
@@ -40,7 +40,7 @@ class ConvNet(Operator):
 
 
 def test_conv():
-    inp = TensorType('N', 'M', 5,224,224, data_dims=3)
+    inp = TensorType('...', 5, 224, 224, data_dims=3)
 
     # assert inp.instance(torch.zeros([5, 5, 224, 224]))
     # assert inp.instance(torch.zeros([5, 224, 224]))

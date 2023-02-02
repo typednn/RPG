@@ -1,6 +1,11 @@
 # type system of neural networks
 
-The goal of the system is to simplify the coding of  
+The goal of the system is to simplify the coding of neural networks that takes different types of input
+
+Besides, we hope that we only need to define the networks once, e.g., we don't have to define/config the module and write the forward separately.
+
+For structures:
+- we should use implements instead ..
 
 ----
 

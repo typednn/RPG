@@ -131,6 +131,7 @@ def test():
     linear = Linear(flatten, dim=100)
     graph = linear.compile(config=dict(Encoder=dict(out_dim=100, conv=dict(layer=6))))
     print(graph)
+    print(graph.pretty_config)
     
         
 if __name__ == '__main__':
