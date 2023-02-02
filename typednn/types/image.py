@@ -47,15 +47,19 @@ def test_conv():
     inp = TensorType('N', 5,224,224, data_dims=3)
 
     flattenb = FlattenBatch(inp)
+    
     conv = ConvNet(flattenb, layer=4)
     flatten = Flatten(conv)
     
     linear = Linear(flatten, dim=20)
+
     linear3, other = Tuple(linear, flatten)
-    linear2 = Linear(linear3, dim=10, name='output')
+    linear2 = Linear(linear3, dim=10)
 
     out = Tuple(linear, linear2)
-    graph = out.configure()
+    graph = out.compile()
+    print(graph)
+    exit(0)
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
     image = inp.sample()

@@ -1,3 +1,4 @@
+# TODO: add hash for TYPES if necessary
 # we can also support infering the auxiliary data information from the input data information; for example, the shape and dtypes.
 import typing
 
@@ -16,6 +17,7 @@ def iterable(x):
 class Type:
     def __init__(self, type_name) -> None:
         self._type_name = type_name
+        assert self.__class__ == Type, "Type should not be instantiated directly."
 
     @property
     def is_type_variable(self):

@@ -1,5 +1,6 @@
 # https://www.notion.so/Typed-Dynamics-Graph-316d4c6d9509489ebc97a50e698867a2
 
+import inspect
 import typing
 import torch
 from torch import nn
@@ -7,11 +8,20 @@ from omegaconf import OmegaConf as C
 from torch.nn import Module
 from .basetypes import Arrow, Type
 from .node import Node, nodes_to_types
+from .utils import frame_assert
 
 
 class OptBase(Module):
     def default_config(self) -> C:
         return C.create()
+
+
+def get_left_value(frame):
+    frame = frame[0]
+    return inspect.getframeinfo(frame).code_context[0].strip().split("=")[0].strip()
+
+
+OPID = 0
 
 class Operator(OptBase):
     INFER_SHAPE_BY_FORWARD=False
@@ -21,20 +31,34 @@ class Operator(OptBase):
     def __init__(self, *args, name=None, **kwargs) -> None:
         super().__init__()
         # TODO: store the lineno for debugging
-
-        self._lazy_init = False
-        self._lazy_config = False
         self._init_args, self._init_kwargs = args, C.create(kwargs)
         self._name = name or self.__class__.__name__
-
         self.default_inp_nodes = [Node.from_val(i) for i in args]
+        self.clear()
+
+        global OPID
+        self._id = OPID
+        OPID += 1
+
+        self.call_frmae = self.find_caller()
+        self.left_value = get_left_value(self.call_frmae)
+
+    def find_caller(self):
+        # find the caller of this function
+        for frame in inspect.stack():
+            if self.__class__.__name__ in frame[4][0]:
+                return frame
+        return None
+
+    def clear(self):
+        self._lazy_init = False
+        self._config = None
         self._default_out = None
 
 
     def init(self):
         if not self._lazy_init:
             self._lazy_init = True
-            args = self._init_args
             self.build_config() # configure it
 
             try:
@@ -42,12 +66,20 @@ class Operator(OptBase):
                 has_main = True
             except AttributeError:
                 has_main = False
+
             if not has_main:
                 self.build_modules(*nodes_to_types(self.default_inp_nodes))
 
     # get the output node of the operator based on input nodes ..
-    def shadow(self, *input_nodes: typing.List[Node]) -> Node:
-        return Node(parent=self, n_childs=self.get_n_output(*input_nodes), input_nodes=input_nodes)
+    def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
+        # TODO: for replicate operators.
+        frame_assert(self.call_frmae[0], default, "left value inference is not implemneted")
+        name = self.left_value
+        if ',' in name:
+            name = '[' + name + ']'
+
+
+        return Node(parent=self, n_childs=self.get_n_output(*input_nodes), name=name, input_nodes=input_nodes)
 
     """ type inference """
     def _infer_by_arrow(self, *inp_types):
@@ -84,9 +116,9 @@ class Operator(OptBase):
 
     # wrappers
     def get_output(self) -> Node: # out type when input are feed ..
-        #return Node(self._out_type, self, None)
+        # TODO: if possible, extract the default name from the line calling the method
         if self._default_out is None:
-            self._default_out = self.shadow(*self.default_inp_nodes)
+            self._default_out = self.shadow(*self.default_inp_nodes, default=True)
         return self._default_out
 
     def __iter__(self):
@@ -105,12 +137,11 @@ class Operator(OptBase):
         # TODO: check output type
         return out
 
-
         
     """ config system """
     @property
     def config(self):
-        if not hasattr(self, '_config'):
+        if not hasattr(self, '_config') or self._config is None:
             self.build_config()
         return self._config
 
@@ -134,8 +165,7 @@ class Operator(OptBase):
         return self.main(*args, **kwargs)
 
     def build_config(self) -> C:
-        if not hasattr(self, '_config'):
-            self._config = C.merge(self.default_config(), self._init_kwargs)
+        self._config = C.merge(self.default_config(), self._init_kwargs)
 
 
     """ build and handle modules """
@@ -153,90 +183,33 @@ class Operator(OptBase):
 
     """ code for manage computation graph """
     def reconfig(self, **kwargs):
+        if self._lazy_init:
+            import logging
+            logging.warning(f"reconfiguring a module {self._name} that has already been initialized, this is not recommended")
         self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
+        self.clear()
+        
 
     def compile(self, *args, **kwargs):
         return self.get_output().compile(*args, **kwargs)
+        
 
-    """ path """
+    """ utilities """
     def __str__(self) -> str:
         #out = super().__str__()
         self.init()
         out = torch.nn.Module.__str__(self)
-        return out + f"\nOutputType: {self.get_output().get_type()}"
+        return out + f" -> {self.get_output().get_type()}"
 
     def _get_type_from_output(self, output, *args):
         inp = args[0]
         out_shape = inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
         return out_shape
 
+    def __hash__(self) -> int:
+        return hash(f'THISISANOPWITHID:{self._id}')
 
 
-class ModuleGraph(Operator):
-    def init(self):
-        if not self._lazy_init:
-            self._lazy_init = True
-            args = self._init_args
-            self.models = args[0]
-            self.inp_types = args[1]
-            self.build_config()
-            for k, v in self.models.items():
-                v.init()
-
-
-    def forward(self, *inps):
-        assert len(self.inp_types) == 1, "only support one input for now"
-        context = {}
-        for a, b in zip(self.inp_types, inps):
-            assert a.instance(b)
-            context[a] = b
-
-        for module_name, module in self.models.items():
-            inps = []
-            for k in module._init_args:
-                if isinstance(k, Operator):
-                    val = context[k._name]
-                elif isinstance(k, Type):
-                    if hasattr(k, '_trace'):
-                        trace = k._trace
-                        val = context[trace['module']._name]
-                        if 'index' in trace and trace['index'] is not None:
-                            val = val[trace['index']]
-                    else:
-                        val = context[k]
-                else:
-                    val = k
-                inps.append(val)
-            out = context[module_name] = module(*inps)
-        return out
-
-    def __str__(self) -> str:
-        self.init()
-        out = 'Input: ' + ', '.join(map(str, self.inp_types)) + '\n'
-        for k, v in self.models.items():
-            out += f' ({k}): ' + str(v).replace('\n', '\n   ') + '\n'
-        return out
-
-    def get_context(self):
-        return self._init_args[0]
-
-    def _type_inference(self, *args):
-        context = self.get_context()
-        for k, v in context.items():
-            pass
-        return v.out
-
-    def build_config(self):
-        config = dict(
-        )
-        self._config = config
-
-        context = self.get_context()
-        for idx, module in context.items():
-            config[idx] = module.config
-            config[idx]['_type'] = module.__class__.__name__
-        self._config = C.create(config)
-        
         
 class TypedFactory(Operator):
     factory = {}
