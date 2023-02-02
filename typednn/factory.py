@@ -124,12 +124,13 @@ def test():
     print('ok')
 
 
-    inp = TensorType(4, 3, 224, 224, data_dims=3)
+    inp = TensorType(4, 3, 150, 150, data_dims=3)
     print(C.to_yaml(Encoder.default_config()))
     encoder = Encoder(inp)
     flatten = Flatten(encoder)
     linear = Linear(flatten, dim=100)
-    print(linear.compile())
+    graph = linear.compile(config=dict(Encoder=dict(out_dim=100, conv=dict(layer=6))))
+    print(graph)
     
         
 if __name__ == '__main__':

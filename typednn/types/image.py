@@ -34,7 +34,7 @@ class ConvNet(Operator):
             nn.Conv2d(C, num_channels, 7, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 5, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 3, stride=2), nn.ReLU(),
-            *[nn.Conv2d(num_channels, num_channels, 3, 2) for _ in range(max(self.config.layer-4, 0))],
+            *sum([[nn.Conv2d(num_channels, num_channels, 3, 2), nn.ReLU()] for _ in range(max(self.config.layer-4, 0))], []),
             nn.Conv2d(num_channels, self.config.out_dim, 3, stride=2), nn.ReLU()
         ).to(inp_type.device)
 
