@@ -86,6 +86,11 @@ class Factory(Operator):
 
     def _type_inference(self, *inp_types):
         #return self.OPERATORS._type_inference(*inp_types)
+        try:
+            self.main
+        except AttributeError:
+            self.build_modules(*inp_types)
+            
         return self.main.get_output().get_type()
 
     def __str__(self) -> str:
@@ -104,6 +109,7 @@ def test():
 
     from .types.tensor import MLP, Tensor1D, TensorType
     from .types.image import ConvNet, ImageType
+    from .functors import Linear, Flatten
 
     Encoder.register(MLP, Tensor1D, 'mlp')
     Encoder.register(ConvNet, ImageType, 'conv')
@@ -121,7 +127,9 @@ def test():
     inp = TensorType(4, 3, 224, 224, data_dims=3)
     print(C.to_yaml(Encoder.default_config()))
     encoder = Encoder(inp)
-    print(encoder)
+    flatten = Flatten(encoder)
+    linear = Linear(flatten, dim=100)
+    print(linear.compile())
     
         
 if __name__ == '__main__':

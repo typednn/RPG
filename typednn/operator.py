@@ -77,10 +77,13 @@ class Operator(OptBase):
             if not has_main:
                 self.build_modules(*self.inp_types)
 
+    def myassert(self, cond, msg='', errorType=ValueError):
+        frame_assert(cond, msg, self.get_trace, errorType)
+
     # get the output node of the operator based on input nodes ..
     def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
         # TODO: for replicate operators.
-        frame_assert(default, "left value inference is not implemneted", self.get_trace)
+        self.myassert(default, "left value inference is not implemneted")
         name = self.left_value
         if ',' in name:
             name = '[' + name + ']'

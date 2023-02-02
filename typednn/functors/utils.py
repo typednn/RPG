@@ -78,8 +78,8 @@ class Linear(Operator):
         )
 
     def build_modules(self, inp_type):
-        assert isinstance(inp_type, TensorType), "Linear only support TensorType but got: " + str(inp_type)
-        assert inp_type.data_dims == 1
+        self.myassert(isinstance(inp_type, TensorType), "Linear only support TensorType but got: " + str(inp_type))
+        self.myassert(inp_type.data_dims == 1, "Linear only support 1D TensorType but got: " + str(inp_type))
         self.main = nn.Linear(inp_type.channel_dim, self.config.dim).to(inp_type.device)
     
     def _type_inference(self, inp_type):

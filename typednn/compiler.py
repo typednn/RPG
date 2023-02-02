@@ -111,6 +111,8 @@ def compile(node: Node, context=None, config=None, build=True, **kwargs) -> Modu
     """
 
     if build:
+        if config is None:
+            config = {}
         if context is None:
             context = {}
 
