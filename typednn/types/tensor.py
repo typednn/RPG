@@ -8,6 +8,7 @@ from torch import nn
 
 
 class TensorType(Type):
+    PREFIX=None
     def __init__(self, *size, data_dims=1, dtype=None, device=None):
         size = SizeType(*size)
         assert isinstance(size, SizeType) # size could be either an size type or a type variable ..
@@ -58,11 +59,16 @@ class TensorType(Type):
     def __str__(self):
         #out = self.type_name
         out = '(' + ','.join(map(str, self.batch_shape())) + ' : ' + ','.join(map(str, self.data_shape())) + ')'
-        if self.data_dims != 1:
-            out = f'{self.data_dims}D' + out
-        out = 'Tensor' + out
-        if self.dtype != torch.float32:
-            out = 'D' + out
+
+        if self.PREFIX is None:
+            if self.data_dims != 1:
+                out = f'{self.data_dims}D' + out
+            out = 'Tensor' + out
+            if self.dtype != torch.float32:
+                out = 'D' + out
+        else:
+            out = self.PREFIX + out
+
         if self.device != 'cuda:0':
             out = 'Cpu' + out
         return out

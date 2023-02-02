@@ -78,14 +78,20 @@ class Type:
 
     def check_compatibility(self, other):
         # by default we must match the type class and the 
+        from .unification import TypeInferenceFailure
         A = self.children()
         if len(A) == 0:
-            return str(self) == str(other), ([], [])
+            if str(self) != str(other):
+                raise TypeInferenceFailure(f"type {str(self)} is not compatible with type {str(other)}: type name does not match.")
+            return ([], [])
 
         B = other.children()
         if len(A) != len(B):
-            return False, (None, None)
-        return self.__class__ == other.__class__, (A, B)
+            raise TypeInferenceFailure(f"type {str(self)} is not compatible with type {str(other)}: number of children does not match.")
+
+        if not issubclass(other.__class__, self.__class__):
+            raise TypeInferenceFailure(f"type {str(self)} is not compatible with type {str(other)}: type class does not match.")
+        return (A, B)
 
 
 class TupleType(Type):
@@ -150,13 +156,14 @@ class TupleType(Type):
 
         class_compability = issubclass(other.__class__, self.__class__)
         if not class_compability:
-            return False, (None, None)
+            #return False, (None, None)
+            raise TypeInferenceFailure(f"type {self} is not compatible with type {other}.")
 
         if not contain_many(a_children) and not contain_many(b_children):
             # no ..., directly match two lists
             if len(a_children) != len(b_children):
                 raise TypeInferenceFailure(f"type {self} has a different number of children with type {other}.")
-            return class_compability, (a_children, b_children)
+            return (a_children, b_children)
         else:
             if not contain_many(a_children):
                 C, D, dir = b_children, a_children, 1
@@ -215,8 +222,7 @@ class TupleType(Type):
                 # associate C[0] to the remaining element of D
                 resolve_many(C[0], D, dir)
 
-            return class_compability, (A, B)
-
+            return (A, B)
 
 
 class ListType(Type): # sequence of data type, add T before the batch
@@ -325,9 +331,10 @@ class Arrow(Type):
         
 class AttrType(Type):
     # type that supports attributes
-    def __init__(self, type_name=None, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
-        self.type_name = type_name or "AttrType"
+        #self.type_name = type_name or "AttrType"
+        
 
     def __getattr__(self, name):
         if name in self.kwargs:
@@ -336,6 +343,9 @@ class AttrType(Type):
 
     def children(self) -> typing.Tuple["Type"]:
         return tuple(self.kwargs.values())
+
+    def reinit(self, *children):
+        return self.__class__(**dict(zip(self.kwargs.keys(), children)))
 
     def instance(self, x):
         for k, v in self.kwargs.items():
@@ -346,7 +356,17 @@ class AttrType(Type):
         return True
     
     def __str__(self):
-        return self.type_name + "(" + ", ".join(f"{k}={v}" for k, v in self.kwargs.items()) + ")"
+        return self.__class__.__name__ + "(" + ", ".join(f"{k}={v}" for k, v in self.kwargs.items()) + ")"
+
+    def check_compatibility(self, other):
+        # we just needs all subclasses to have the same compatible attributes
+        A, B = [], []
+        for k, v in self.kwargs.items():
+            if not hasattr(other, k):
+                return False, (None, None)
+            A.append(v)
+            B.append(getattr(other, k))
+        return issubclass(other.__class__, self.__class__), (A, B)
 
 
 class DataType(AttrType):
