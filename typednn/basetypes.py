@@ -380,7 +380,7 @@ class AttrType(Type):
     # type that supports attributes
     def __init__(self, *args, **kwargs) -> None:
         assert len(args) == 0 or len(kwargs) == 0
-        annotations = self.__class__.__annotations__
+        annotations = self.__class__.__annotations__ if hasattr(self.__class__, "__annotations__") else {}
         if len(args) > 0:
             assert len(args)  == len(annotations)
             kwargs = dict(zip(annotations, args))

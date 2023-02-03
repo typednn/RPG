@@ -40,6 +40,10 @@ def test_pointdict():
     except TypeInferenceFailure as e:
         print('correctly get error', termcolor.colored(e.__class__.__name__ + ' ' + str(e), 'red'))
 
+    Z = AttrType(xyz=Pointcloud('...', 'D', 'N'))
+
+    Z.check_compatibility(x)
+
 
 if __name__ == '__main__':
     #test_pointcloud()
