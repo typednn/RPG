@@ -240,7 +240,7 @@ class TupleType(Type):
                 if arg_types.base_type is not None:
                     for i in types:
                         if not i.match_many(): # for case 1
-                            resolve(arg_types.base_type, i, dir)
+                            resolve(arg_types.base_type, i, 0) # TODO: we are not sure but we always consider the base type as the left one
 
                 if len(types) > 1 or not types[0].match_many():
                     resolve(arg_types, TupleType(*types), dir)
@@ -395,8 +395,6 @@ class AttrType(Type):
 
         self.kwargs = kwargs
 
-
-
     def __getattr__(self, name):
         if name in self.kwargs:
             return self.kwargs[name]
@@ -407,14 +405,6 @@ class AttrType(Type):
 
     def reinit(self, *children):
         return self.__class__(**dict(zip(self.kwargs.keys(), children)))
-
-    # def instance(self, x):
-    #     for k, v in self.kwargs.items():
-    #         if not hasattr(x, k):
-    #             return False
-    #         if not v.instance(getattr(x, k)):
-    #             return False
-    #     return True
 
     def instantiate_children(self, x) -> "Type":
         outs = []

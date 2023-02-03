@@ -10,13 +10,6 @@ from .basetypes import TupleType, Type, VariableArgs
 class TypeInferenceFailure(Exception):
     """Error in type inference"""
 
-
-def map_type(tp: Type, f):
-    if len(tp.children()) > 0:
-        return tp.reinit([map_type(i, f) for i in tp.children()])
-    else:
-        return f(tp)
-
 def check_occurs(a, b):
     if str(a) == str(b):
         return True
@@ -133,11 +126,3 @@ def unify(
     if query is not None:
         query = substitute(query)
     return tpA, tpB, query
-
-
-def test_inheritance():
-    raise NotImplementedError
-    
-
-if __name__ == '__main__':
-    test_inheritance()

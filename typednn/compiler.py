@@ -1,6 +1,5 @@
 #TODO: support detach node
-#TODO: support module way
-#TODO: provide detail level for types
+#TODO: provide detail level for print and visualization
 
 from .basetypes import Type
 from .operator import Operator
@@ -24,8 +23,6 @@ class ModuleGraph(Operator):
         self.submodules = self.context['submodules']
         self.nodes = self.context['nodes']
         self.output_node = list(self.nodes.keys())[-1]
-
-
 
         if input_order is None:
             input_order = self.input_nodes
@@ -107,7 +104,7 @@ class ModuleGraph(Operator):
 
 def compile(node: Node, context=None, config=None, build=True, **kwargs) -> ModuleGraph:
     """
-    search backward to collect all operators and computation nodess
+    search backward to collect all operators and computation nodes
     """
 
     if build:
