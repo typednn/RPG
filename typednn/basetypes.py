@@ -264,6 +264,8 @@ class TupleType(Type):
                         raise TypeInferenceFailure
                     # case2: associate C[0] to the remaining element of D
                     resolve_many(C[0], D, dir)
+            else:
+                resolve(C[0], TupleType(*D), dir)
 
             return (A, B)
 
@@ -376,10 +378,24 @@ class Arrow(Type):
         
 class AttrType(Type):
     # type that supports attributes
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        assert len(args) == 0 or len(kwargs) == 0
+        annotations = self.__class__.__annotations__
+        if len(args) > 0:
+            assert len(args)  == len(annotations)
+            kwargs = dict(zip(annotations, args))
+
+        if len(annotations) > 0:
+            assert len(annotations) == len(kwargs)
+            from .unification import unify
+            right = list(annotations.values())
+            left = list(kwargs.values())
+            left, _, _ = unify(left, right, None)
+            kwargs = dict(zip(annotations.keys(), left))
+
         self.kwargs = kwargs
-        #self.type_name = type_name or "AttrType"
-        
+
+
 
     def __getattr__(self, name):
         if name in self.kwargs:

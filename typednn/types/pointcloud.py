@@ -1,3 +1,4 @@
+import termcolor
 from ..basetypes import AttrType
 from .tensor import TensorType, Type
 from ..unification import unify, TypeInferenceFailure
@@ -9,7 +10,7 @@ class Pointcloud(TensorType):
         super().__init__(*size, data_dims=data_dims, dtype=dtype, device=device)
 
 class PointDict(AttrType):
-    xyz: Pointcloud('...', 3, 'N')
+    xyz: Pointcloud('...', 'D', 'N')
     agent: TensorType('...', 'N')
 
 #a = PointcloudType()
@@ -29,5 +30,17 @@ def test_pointcloud():
     assert str(b) == "Tensor2D((?)... : 3,N)", f"got {b}"
 
 
+def test_pointdict():
+    x = PointDict(Pointcloud(256, 3, 'N'), TensorType(256, 'N'))
+    y = PointDict(xyz=Pointcloud(256, 3, 'N'), agent=TensorType(256, 'N'))
+    assert str(x) == str(y)
+
+    try:
+        x = PointDict(xyz=Pointcloud(257, 3, 'N'), agent=TensorType(256, 'N'))
+    except TypeInferenceFailure as e:
+        print('correctly get error', termcolor.colored(e.__class__.__name__ + ' ' + str(e), 'red'))
+
+
 if __name__ == '__main__':
-    test_pointcloud()
+    #test_pointcloud()
+    test_pointdict()

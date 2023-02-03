@@ -41,6 +41,8 @@ class ConvNet(Operator):
 
 def test_conv():
     inp = TensorType('...', 5, 224, 224, data_dims=3)
+    image = torch.zeros(5, 224, 224, device='cuda:0')
+    assert inp.instance(image)
 
     # assert inp.instance(torch.zeros([5, 5, 224, 224]))
     # assert inp.instance(torch.zeros([5, 224, 224]))
@@ -64,7 +66,9 @@ def test_conv():
     image = inp.sample()
     from omegaconf import OmegaConf as C
     
-    assert torch.allclose(graph(image)[1], seq(image))
+    #print(image.shape)
+    #image = torch.zeros(5, 224, 224, device='cuda:0')
+    assert torch.allclose(graph(image)[1], seq(image)), f"{image.shape}"
 
 
     img = torch.tensor([1., 2., 3.])

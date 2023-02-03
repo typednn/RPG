@@ -124,7 +124,7 @@ def unify(
         assert x.is_type_variable
         p = findp(x)
         if p.is_type_variable:
-            return allocator[p._type_name]
+            return allocator[p._type_name] # Currently we don't allow any name in B not in A .. this should be removed later ..
         else:
             return p
 
