@@ -140,7 +140,8 @@ class TupleType(Type):
             self.elements.append(i)
 
     def __str__(self):
-        return f"({', '.join(str(e) for e in self.children())})"
+        ch = self.children()
+        return f"({', '.join(str(e) for e in ch)})"
 
     def children(self):
         return tuple(self.elements) # + tuple(self.elements_kwargs.values())
@@ -240,7 +241,11 @@ class TupleType(Type):
                     for i in types:
                         if not i.match_many(): # for case 1
                             resolve(arg_types.base_type, i, dir)
-                resolve(arg_types, TupleType(*types), dir)
+
+                if len(types) > 1 or not types[0].match_many():
+                    resolve(arg_types, TupleType(*types), dir)
+                else:
+                    resolve(arg_types, types[0], dir)
             # print(C, D, self, other)
 
             if len(D) > 0:
@@ -292,7 +297,7 @@ class VariableArgs(Type): # is in fact the ListType with unknown length
     def __str__(self):
         if self.base_type is None:
             return self._type_name + "*"
-        return self._type_name + "(" + str(self.base_type) + ")"
+        return "(" + str(self.base_type) + ")" + self._type_name
 
     def instantiate_children(self, x):
         if not iterable(x):

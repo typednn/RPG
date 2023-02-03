@@ -16,6 +16,7 @@ class PointDict(AttrType):
 
 def test_pointcloud():
     a = Pointcloud('...', 3, 'N')
+
     out = unify(a, TensorType(100, 3, 5, data_dims=2), a, update_name=False)[2]
     assert str(out) == "Pointcloud(100 : 3,5)", f"got {out}"
 
@@ -24,8 +25,8 @@ def test_pointcloud():
     except TypeInferenceFailure as e:
         pass
 
-    b = unify(a, TensorType('...', 3, 'M', data_dims=2), a, update_name=True)[1]
-    print(b)
+    b = unify(a, TensorType('...', 3, 'M', data_dims=2), a, update_name=True, queryA=True)[1]
+    assert str(b) == "Tensor2D((?)... : 3,N)", f"got {b}"
 
 
 if __name__ == '__main__':

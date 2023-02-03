@@ -40,6 +40,7 @@ def unify(
     tpB: Type,
     query: Type,
     update_name=True,
+    queryA=False,
 ):
     # https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system
 
@@ -52,8 +53,7 @@ def unify(
 
     if update_name:
         tpB = tpB.update_name(lambda x: x + '\'')
-
-        if query is not None:
+        if query is not None and not queryA:
             query = query.update_name(lambda x: x + '\'')
 
     pa = {} # map str to type in the end ..
@@ -84,6 +84,7 @@ def unify(
             else:
                 (a_children, b_children) = check_compatibility(a, b, dir)
                 for x, y in zip(a_children, b_children):
+                    # print('children', 'x', x, 'y', y, 'a', a,'b',  b)
                     resolve(x, y, dir) 
         except TypeInferenceFailure as e:
             error = TypeInferenceFailure(str(e) + f" when unifying {a} and {b}\n")
@@ -95,6 +96,12 @@ def unify(
     resolve(tpA, tpB, 0)
 
     allocator = {}
+    # we need to allocate them with names in A
+    for i in pa:
+        p = findp(pa[i])
+        if not i.endswith('\''):
+            if p.is_type_variable and p._type_name not in allocator and p._type_name.endswith('\''):
+                allocator[p._type_name] = i
 
     def substitute(x: Type):
         if not x.polymorphism: # no type variable, directly return
@@ -117,13 +124,9 @@ def unify(
         assert x.is_type_variable
         p = findp(x)
         if p.is_type_variable:
-            #if p._type_name not in allocator:
-            #    allocator[p._type_name] = p.reinit(f'\'T{TID}', *[substitute(i) for i in p.children()])
-            allocator[p._type_name] = p
+            return allocator[p._type_name]
         else:
             return p
-        out = allocator[p._type_name]
-        return out
 
     tpA = substitute(tpA)
     tpB = substitute(tpB)

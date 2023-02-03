@@ -1,16 +1,20 @@
 import termcolor
 
-CMDS = [
-    'python3 -m typednn.types.tensor',
-    'python3 -m typednn.types.image',
-    'python3 -m typednn.factory',
-]
+CMDS ="""
+python3 -m typednn.types.tensor
+python3 -m typednn.types.image
+python3 -m typednn.factory
+python3 -m typednn.types.pointcloud
+"""
 
 import os
-for i in CMDS:
-    out = os.system(i)
+fail = False
+for i in CMDS.split('\n'):
+    out = os.system(i.strip())
     if out != 0:
         print('Error in', i)
+        fail = True
         break
     
-print(termcolor.colored("Congrats! Passed all test cases!", 'green'))
+if not fail:
+    print(termcolor.colored("Congrats! Passed all test cases!", 'green'))

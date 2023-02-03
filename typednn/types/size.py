@@ -30,10 +30,8 @@ class UIntType(Type):
     def check_compatibility(self, other):
         if other.__class__ != self.__class__:
             raise TypeInferenceFailure
-        if self.a == '?':
+        if self.a == '?' or other.a == '?':
             return [], []
-        elif other.a == '?':
-            raise TypeInferenceFailure
         elif int(other.a) == int(self.a):
             return [], []
         raise TypeInferenceFailure
