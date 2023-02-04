@@ -42,6 +42,15 @@ class PointNet(Operator):
         #return super()._type_inference(*inp_types)
         return inp_types.agent.new(*inp_types.agent.batch_shape(), *self.main._output_shape)
 
+    def forward(self, inp):
+        #return super().forward(*args, **kwargs)
+        inp_dict = {
+            'xyz': inp.xyz.transpose(-1, -2),
+            'rgb': inp.rgb.transpose(-1, -2),
+            'agent': inp.agent
+        }
+        return self.main(inp_dict)
+
 
 def test_pointcloud():
     a = Pointcloud('...', 3, 'N')
@@ -81,14 +90,18 @@ def test_pointnet():
     xyz, _ = t
     xyz = xyz.xyz
     print(xyz)
-    exit(0)
 
     pointnet = PointNet(inp)
     print(pointnet)
-    exit(0)
+
+    inp2 = PointDict(Pointcloud(512, 3, 100), Pointcloud(512, 4, 100), TensorType(512, 10))
+    s = inp2.sample()
+    assert str(inp.instance(s)) == 'PointDict(xyz=Pointcloud(512 : 3,100), rgb=Pointcloud(512 : 4,100), agent=Tensor(512 : 10))'
+    #print(s.xyz.shape)
+    pointnet(s)
 
 
 if __name__ == '__main__':
     test_pointnet()
-    #test_pointcloud()
-    #test_pointdict()
+    test_pointcloud()
+    test_pointdict()

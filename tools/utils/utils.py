@@ -549,3 +549,13 @@ def print_input_args(func):
         print('calling', func.__name__, 'with', {k: dshape(v) for k, v in signature.bind(*args, **kwargs).arguments.items()})
         return func(*args, **kwargs)
     return wrapper
+
+    
+    
+class AttrDict(dict):
+    def __getattr__(self, key):
+        return self[key]
+    def __setattr__(self, key, val):
+        self[key] = val
+    def __delattr__(self, key):
+        del self[key]

@@ -206,6 +206,9 @@ class TupleType(Type):
                 dir = 1
             else:
                 C, D, dir = a_children, b_children, 0
+            #print(self, other)
+            if len(D) < len(C) - 1:
+                raise TypeInferenceFailure(f"type {self} has a different number of children with type {other}.")
 
             A = []
             B = []
@@ -440,6 +443,19 @@ class AttrType(Type):
             A.append(v)
             B.append(getattr(other, k))
         return A, B
+        
+
+    def sample(self):
+        assert not self.polymorphism, "can not sample polymorphic type"
+        from tools.utils import AttrDict
+        out = AttrDict()
+        for k, v in self.kwargs.items():
+            if isinstance(v, Type):
+                out[k] = v.sample()
+            else:
+                out[k] = v
+        return out
+
 
 
 class DataType(AttrType):

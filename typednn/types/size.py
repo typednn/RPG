@@ -13,7 +13,7 @@ class UIntType(Type):
 
     def instance(self, value):
         if isinstance(value, int) and (self.a == '?' or value == self.a):
-            return self
+            return UIntType(value)
         return None
 
     def sample(self):
@@ -62,10 +62,20 @@ class SizeType(TupleType):
             self.size.append(i)
         super().__init__(*self.size)
 
+    def instance(self, x):
+        size = SizeType(*x)
+        from ..unification import unify, TypeInferenceFailure
+        try: 
+            out = unify(size, self, None)[0]
+        except TypeInferenceFailure:
+            return None
+        return out
+
     def dims(self):
         if self.dot is None:
             return len(self.size)
         return None
+
 
     def sample(self):
         #return super().sample()
