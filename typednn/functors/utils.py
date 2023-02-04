@@ -2,7 +2,7 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
-from ..types.tensor import TensorType, Arrow, TupleType
+from ..types.tensor import TensorType, Arrow, TupleType, Type
 
 class FlattenBatch(Operator):
     def forward(self, x):
@@ -24,7 +24,8 @@ class Flatten(Operator):
 class Seq(Operator):
     def __init__(self, *modules) -> None:
         self.op_list = modules
-        super().__init__()
+
+        super().__init__(*modules[0]._init_args)
 
     def build_modules(self, *args):
         #self.main = Seq(*self._modules)
@@ -60,14 +61,19 @@ class Concat(Operator):
         return out
 
 class Tuple(Operator):
+    arrow = Arrow(Type("input"), Type("input"))
     def forward(self, *args):
         return args
 
-    def get_n_output(self, *input_nodes):
-        return len(input_nodes)
+    #def get_n_output(self, *input_nodes):
+    #    return len(input_nodes)
+    def get_meta_type(self, *input_nodes):
+        #return super().get_meta_type(*input_nodes)
+        from ..basetypes import TupleType, Type
+        return TupleType(*[input_nodes._meta_type for input_nodes in input_nodes])
 
-    def _type_inference(self, *args):
-        return TupleType(*args)
+    # def _type_inference(self, *args):
+    #     return TupleType(*args)
 
 
 class Linear(Operator):

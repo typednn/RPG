@@ -349,7 +349,17 @@ class Arrow(Type):
 
     def unify(self, *args):
         from .unification import unify
-        return unify(TupleType(*args), TupleType(*self.args), self.out)
+        if len(self.args) > 1:
+            inps = TupleType(*self.args)
+        else:
+            inps = self.args[0]
+
+        if len(args) > 1:
+            args = TupleType(*args)
+        else:
+            args = args[0]
+            
+        return unify(args, inps, self.out)
 
     def test_unify(self, gt, *args):
         from .unification import TypeInferenceFailure
@@ -373,7 +383,6 @@ class Arrow(Type):
 
     def instance(self, x):
         raise NotImplementedError("Arrow is not a simple type, it's a function type.")
-
         
         
 class AttrType(Type):
@@ -384,6 +393,8 @@ class AttrType(Type):
         if len(args) > 0:
             assert len(args)  == len(annotations)
             kwargs = dict(zip(annotations, args))
+        if len(kwargs) == 0:
+            kwargs = annotations
 
         if len(annotations) > 0:
             assert len(annotations) == len(kwargs)
@@ -419,13 +430,16 @@ class AttrType(Type):
 
     def check_compatibility(self, other):
         # we just needs all subclasses to have the same compatible attributes
+        from .unification import TypeInferenceFailure
+        if not issubclass(other.__class__, self.__class__):
+            raise TypeInferenceFailure(f"can not unify {self} with {other}.")
         A, B = [], []
         for k, v in self.kwargs.items():
             if not hasattr(other, k):
                 return False, (None, None)
             A.append(v)
             B.append(getattr(other, k))
-        return issubclass(other.__class__, self.__class__), (A, B)
+        return A, B
 
 
 class DataType(AttrType):

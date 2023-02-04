@@ -4,7 +4,7 @@
 from .basetypes import Type
 from .operator import Operator
 from omegaconf import OmegaConf as C
-from .node import Node, InputNode
+from .node import Node, InputNode, CallNode
 
 
 class ModuleGraph(Operator):
@@ -69,12 +69,7 @@ class ModuleGraph(Operator):
         out = out + 'Inputs: ' + ', '.join([str(self.input_nodes[k]) for k in self.default_inp_nodes])
         for lineno, i in enumerate(self.nodes):
             line = f'\n{lineno}. {i._name} @ {i._id} <- '
-
-            if isinstance(i._parent, Operator):
-                line += i._parent._name + '(' +  ', '.join([j._name if j._name else str(j) for j in i.input_nodes]) + ')'
-            else:
-                line += str(i._parent._name) + '[' + str(i._index) + ']'
-
+            line += i.print_line()
             line += ' ' * max(80 -len(line), 0) + ' # ' + str(i.get_type())
 
             out += line
@@ -134,9 +129,9 @@ def compile(node: Node, context=None, config=None, build=True, **kwargs) -> Modu
     if isinstance(node, Node):
         context['nodes'][node] = node
 
-        if isinstance(node._parent, Operator):
+        if isinstance(node, CallNode):
             # when op is a module
-            op = node._parent
+            op = node.module
             if op not in context['submodules']:
                 # remove duplicated name
                 name = op._name

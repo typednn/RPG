@@ -1,11 +1,16 @@
 # type system of neural networks
 
-The goal of the system is to simplify the coding of neural networks that takes different types of input
+The goal of the system is to simplify the coding of neural networks that takes different types of input.
 
-Besides, we hope that we only need to define the networks once, e.g., we don't have to define/config the module and write the forward separately.
+It has several benefits:
+- Unified interface for different types of input, e.g., text, image, audio, video, etc. Providing ways of automatically generating the neural networks based on the type of the input.
+- Unified config system.
+- High-level abstractions like ``partial''/condition and computation graph for probabilistic programmning -> support functor types!
+- We provide strict type check and shape inference for the neural networks, with better traceback information, which can help us to find bugs early.
+- Interface-like object-oriented design. 
+- With the help of automatical type inference, we only need to define the networks once, e.g., we don't have to define/config the module and write the forward separately.
 
-For structures:
-- we should use implements instead ..
+I hope to use this to provide a unified API for learning methods so that I can hire a new student to implement the learning methods in a unified way.
 
 ----
 

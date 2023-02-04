@@ -36,3 +36,18 @@ def tensor2error(x):
     if isinstance(x, torch.Tensor):
         return str(x)[:10] + '...' + ') of shape ' + str(x.shape) + ' of type ' + str(x.dtype)
     return str(x)
+
+
+def yaml2omega(yaml):
+    import omegaconf
+    return omegaconf.OmegaConf.create(str(yaml))
+
+
+def omega2yaml(omega):
+    import omegaconf
+    import yaml
+    return yaml.safe_load(omegaconf.OmegaConf.to_yaml(omega))
+
+def tensortype2space(type):
+    import gym
+    return gym.spaces.Box(low=-1, high=1, shape=tuple(type.size))

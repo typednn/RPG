@@ -1,10 +1,11 @@
 # computation node
 # TODO: structured node (DictNode)
+# TODO: ArrowNode -> generate (and init) operator if necessary
 
 import abc
 import typing
 import copy
-from .basetypes import Type
+from .basetypes import Type, TupleType, AttrType, Arrow
 
 
 def nodes_to_types(nodes):
@@ -78,7 +79,7 @@ class InputNode(NodeBase):
     # TODO: remove input node ...
     def __init__(self, type, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._type = type
+        self._meta_type = self._type = type
 
     def get_type(self):
         return self._type
@@ -90,7 +91,7 @@ class InputNode(NodeBase):
 class ValNode(NodeBase):
     def __init__(self, val, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.val = val
+        self._meta_type = self.val = val
 
     def get_type(self):
         return self.val
@@ -99,69 +100,120 @@ class ValNode(NodeBase):
         return self.val
 
 
-class Node(NodeBase):
-    def __init__(
-        self,
-        parent=None,
-        input_nodes=None,
-        index=None,
-        n_childs=0,
-        **kwargs
-    ) -> None:
+
+class Node(NodeBase): # compile a static type tree based on meta type 
+    def __init__(self, meta_type, **kwargs) -> None:
         super().__init__(**kwargs)
-        from .operator import Operator
-
-        if isinstance(parent, Operator):
-            assert input_nodes is not None, "input_types should not be None"
-        elif isinstance(parent, NodeBase):
-            assert index is not None, "index should not be None"
-        else:
-            raise NotImplementedError("parent should be an Operator or TypeNode")
-
+        self._meta_type = meta_type
         self._type = None
-        self._parent = parent
-        self._index = index
-        self._n_childs = n_childs
 
-        self.input_nodes = input_nodes
+    @abc.abstractmethod
+    def get_parents(self):
+        pass
+
+    @abc.abstractmethod
+    def evaluate(self, context):
+        pass
+
+    @abc.abstractmethod
+    def _get_type(self):
+        pass
+
+    @abc.abstractmethod
+    def print_line(self):
+        pass
 
     def get_type(self):
-        # lazy evaluation
         if self._type is None:
-            from .operator import Operator
-            if isinstance(self._parent, Operator):
-                self._type = self._parent.get_output_type_by_input(*self.input_nodes)
-            else:
-                self._type = self._parent.get_type()[self._index]
+            self._type = self._get_type()
         return self._type
 
-    def get_parents(self):
-        if isinstance(self._parent, NodeBase):
-            return [self._parent]
-        else:
-            return self.input_nodes
 
     def __iter__(self):
-        for i in range(self._n_childs):
+        if not isinstance(self._meta_type, TupleType):
+            raise RuntimeError(f"Only TupleType or its subclass can iterate, but get {self}.")
+
+        for i in range(len(self._meta_type)):
             if ',' in self._name:
                 name = str(self._name)[1:-1].split(',')[i]
             else:
                 name = self._name + f'.{i}'
-            yield Node(self, index=i, name=name)
+            yield IndexNode(self._meta_type[i], self, index=i, name=name)
+            
 
+    def __getattr__(self, key) -> str:
+        if not isinstance(self._meta_type, AttrType):
+            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+        if not hasattr(self._meta_type, key):
+            raise RuntimeError(f"{self} does not have attribute {key}.")
+        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+        
 
     def compile(self, *args, **kwargs):
         from .compiler import compile
         return compile(self, *args, **kwargs)
 
+            
+class CallNode(Node): # App in the type system.. calling an function..
+    def __init__(self, meta_type, module, input_nodes, **kwargs) -> None:
+        super().__init__(meta_type, **kwargs)
+        from .operator import Operator
+        self.module: Operator = module
+        self.input_nodes = input_nodes
+
+    def get_parents(self):
+        return self.input_nodes
+
+    def print_line(self):
+        return self.module._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
+
     def evaluate(self, context):
-        if isinstance(self._parent, NodeBase):
-            return self._parent.evaluate(context)[self._index]
-        else:
-            for i in self.input_nodes:
-                if i not in context:
-                    context[i] = i.evaluate(context)
-            return self._parent(*[context[i] for i in self.input_nodes])
+        for i in self.input_nodes:
+            if i not in context:
+                context[i] = i.evaluate(context)
+        return self.module(*[context[i] for i in self.input_nodes])
+
+    def _get_type(self):
+        return self.module.get_output_type_by_input(*self.input_nodes)
+
+            
+class IndexNode(Node):
+    def __init__(self, meta_type, parent, index, **kwargs) -> None:
+        super().__init__(meta_type, **kwargs)
+        self.parent: Node = parent
+        self.index = index
+    
+    def get_parents(self):
+        return [self.parent]
+
+    def evaluate(self, context):
+        return self.parent.evaluate(context)[self.index]
+
+    def _get_type(self):
+        return self.parent.get_type()[self.index]
+
+
+    def print_line(self):
+        return str(self.parent._name) + '[' + str(self.index) + ']'
+
+            
+class AttrNode(Node):
+    def __init__(self, meta_type, parent, key, **kwargs) -> None:
+        super().__init__(meta_type, **kwargs)
+        self.parent: Node = parent
+        self.key = key
+
+    def get_parents(self):
+        return [self.parent]
+    
+    def evaluate(self, context):
+        return getattr(self.parent.evaluate(context), self.key)
+
+    def _get_type(self):
+        return getattr(self.parent.get_type(), self.key)
+
+    def print_line(self):
+        return str(self.parent._name) + '.' + str(self.key)
 
 
 

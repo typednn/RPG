@@ -50,9 +50,12 @@ def unify(
             query = query.update_name(lambda x: x + '\'')
 
     pa = {} # map str to type in the end ..
+    names2types = {} # map str to type in the end ..
     def findp(a: Type):
         if a.is_type_variable:
             s = str(a)
+            names2types[s] = a
+
             if s not in pa:
                 pa[s] = a
             if pa[s] != a:
@@ -93,8 +96,8 @@ def unify(
     for i in pa:
         p = findp(pa[i])
         if not i.endswith('\''):
-            if p.is_type_variable and p._type_name not in allocator and p._type_name.endswith('\''):
-                allocator[p._type_name] = i
+            if p.is_type_variable and p._type_name not in allocator:
+                allocator[p._type_name] = names2types[i]._type_name
 
     def substitute(x: Type):
         if not x.polymorphism: # no type variable, directly return
@@ -117,7 +120,9 @@ def unify(
         assert x.is_type_variable
         p = findp(x)
         if p.is_type_variable:
-            return allocator[p._type_name] # Currently we don't allow any name in B not in A .. this should be removed later ..
+            if p._type_name in allocator:
+                return allocator[p._type_name] # Currently we don't allow any name in B not in A .. this should be removed later ..
+            return p
         else:
             return p
 

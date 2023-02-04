@@ -7,8 +7,9 @@ from torch import nn
 from omegaconf import OmegaConf as C
 from torch.nn import Module
 from .basetypes import Arrow, Type
-from .node import Node, nodes_to_types
+from .node import Node, CallNode, nodes_to_types
 from .utils import frame_assert
+from .unification import unify
 
 
 class OptBase(Module):
@@ -25,8 +26,8 @@ OPID = 0
 
 class Operator(OptBase):
     INFER_SHAPE_BY_FORWARD=False
-    arrow: typing.Optional[Arrow] = None # TYPE annotation of the forward funciton
-    N_OUTPUT=None
+    arrow = Arrow(Type("input"), Type("output")) # TYPE annotation of the forward funciton
+    #N_OUTPUT=None
 
     def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
         super().__init__()
@@ -88,27 +89,24 @@ class Operator(OptBase):
         if ',' in name:
             name = '[' + name + ']'
 
-        return Node(parent=self, n_childs=self.get_n_output(*input_nodes), name=name, input_nodes=input_nodes)
+        return CallNode(self.get_meta_type(*input_nodes), self, name=name, input_nodes=input_nodes)
 
     """ type inference """
     def _infer_by_arrow(self, *inp_types):
-        _, _, self._out_type = self.arrow.unify(inp_types)
-        return self._out_type
+        # print(inp_types, self.arrow)
+        _, _, _out_type = self.arrow.unify(*inp_types)
+        return _out_type
 
     # required for infering the number of output 
-    def get_n_output(self, *input_nodes):
-        if self.arrow is not None:
-            return len(self.arrow.out)
-        if self.N_OUTPUT is not None:
-            return self.N_OUTPUT
-        return 1
+    def get_meta_type(self, *input_nodes):
+        return self.arrow.out
 
-    def _type_inference(self, *inp_types):
-        raise NotImplementedError
+    def _type_inference(self, *inp_types) -> Type:
+        return Type("output")
 
     # required for infering the output type
     def get_output_type_by_input(self, *input_nodes):
-        assert not hasattr(self, '_out_type'), "type_inference can only be called once"
+        # assert not hasattr(self, '_out_type'), f"type_inference can only be called once for {self._name}"
         input_types = nodes_to_types(input_nodes)
 
         if self.INFER_SHAPE_BY_FORWARD:
@@ -116,11 +114,9 @@ class Operator(OptBase):
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)
             _out_type = self._get_type_from_output(output, *input_types)
-        elif self.arrow is not None:
-            _out_type = self._infer_by_arrow(*input_types)
         else:
-            assert hasattr(self, '_type_inference'), f"please either override the type_inference function or set the arrow of the class {self.__class__}"
-            _out_type = self._type_inference(*input_types)
+            _out_type = self._infer_by_arrow(*input_types)
+            _out_type = unify(self._type_inference(*input_types), _out_type, None)[1] # run _type inference and unify it with the inferred type
         return _out_type
 
     # wrappers
@@ -133,6 +129,20 @@ class Operator(OptBase):
     def __iter__(self):
         return iter(self.get_output())
 
+    def __getattr__(self, name: str):
+        # assert name in self._modules, f"module {name} is not found in {self.__class__}"
+        error = None
+        try:
+            return super().__getattr__(name)
+        except AttributeError as e:
+            error = e
+
+        if error:
+            if name != 'main':
+                attr = getattr(self.get_output(), name)
+            else:
+                raise error
+        return attr
 
     """ calling, this is not for the graph construct """
     def __call__(self, *args, **kwargs):
