@@ -29,7 +29,7 @@ class PointNet(Operator):
 
     def build_modules(self, inp_type: "PointDict"):
         import gym
-        assert inp_type.xyz.size[1] == 3
+        assert inp_type.xyz.size[-2] == 3
         inp_dict = {
             'xyz': gym.spaces.Box(-1, 1., shape=(3,)),
             'rgb': gym.spaces.Box(-1, 1., shape=(inp_type.rgb.size[-2],)),
@@ -98,10 +98,11 @@ def test_pointnet():
     s = inp2.sample()
     assert str(inp.instance(s)) == 'PointDict(xyz=Pointcloud(512 : 3,100), rgb=Pointcloud(512 : 4,100), agent=Tensor(512 : 10))'
     #print(s.xyz.shape)
+    # print(pointnet.pretty_config)
     pointnet(s)
 
 
 if __name__ == '__main__':
-    test_pointnet()
     test_pointcloud()
     test_pointdict()
+    test_pointnet()

@@ -4,7 +4,7 @@ The goal of the system is to simplify the coding of neural networks that takes d
 
 It has several benefits:
 - Unified interface for different types of input, e.g., text, image, audio, video, etc. Providing ways of automatically generating the neural networks based on the type of the input.
-- Unified config system.
+- unified config and log system.
 - High-level abstractions like ``partial''/condition and computation graph for probabilistic programmning -> support functor types!
 - We provide strict type check and shape inference for the neural networks, with better traceback information, which can help us to find bugs early.
 - Interface-like object-oriented design. 
