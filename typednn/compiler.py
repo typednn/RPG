@@ -1,7 +1,6 @@
 #TODO: support detach node
 #TODO: provide detail level for print and visualization
 
-from .basetypes import Type
 from .operator import Operator
 from omegaconf import OmegaConf as C
 from .node import Node, InputNode, CallNode

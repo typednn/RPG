@@ -162,6 +162,7 @@ class CallNode(Node): # App in the type system.. calling an function..
         self.input_nodes = input_nodes
 
     def get_parents(self):
+        
         return self.input_nodes
 
     def print_line(self):

@@ -131,3 +131,10 @@ def unify(
     if query is not None:
         query = substitute(query)
     return tpA, tpB, query
+
+    
+def try_unify(*args, **kwargs):
+    try:
+        return unify(*args, **kwargs)
+    except TypeInferenceFailure:
+        return None

@@ -10,6 +10,7 @@ from .basetypes import Arrow, Type
 from .node import Node, CallNode, nodes_to_types
 from .utils import frame_assert
 from .unification import unify
+from typing import Mapping, Any
 
 
 class OptBase(Module):
@@ -46,11 +47,11 @@ class Operator(OptBase):
         self.left_value = get_left_value(self.call_frame)
         self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
 
-    def find_caller(self):
+    def find_caller(self, key='OPERATORS'):
         # find the caller of this function
         for frame in inspect.stack():
             # hack ..
-            if (self.__class__.__name__ in frame[4][0] or 'OPERATORS' in frame[4][0]):
+            if (self.__class__.__name__ in frame[4][0] or key in frame[4][0]):
                 return frame
         raise ValueError("cannot find the caller of this function")
 
@@ -84,11 +85,18 @@ class Operator(OptBase):
     # get the output node of the operator based on input nodes ..
     def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
         # TODO: for replicate operators.
-        self.myassert(default, "left value inference is not implemneted")
-        name = self.left_value
+        # self.myassert(default, "left value inference is not implemneted")
+        input_nodes = [Node.from_val(i) for i in input_nodes]
+        if default:
+            name = self.left_value
+        else:
+            for frame in inspect.stack():
+                if ('.shadow' in frame[4][0]):
+                    break
+            name = get_left_value(frame)
+
         if ',' in name:
             name = '[' + name + ']'
-
         return CallNode(self.get_meta_type(*input_nodes), self, name=name, input_nodes=input_nodes)
 
     """ type inference """
@@ -139,7 +147,13 @@ class Operator(OptBase):
 
         if error:
             if name != 'main':
-                attr = getattr(self.get_output(), name)
+                error_again = None
+                try:
+                    attr = getattr(self.get_output(), name)
+                except AttributeError as e:
+                    error_again = e
+                if error_again is not None:
+                    raise error
             else:
                 raise error
         return attr
@@ -216,6 +230,14 @@ class Operator(OptBase):
     def to(self, *args, **kwargs):
         self.init()
         return super().to(*args, **kwargs)
+
+    def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
+        self.init()
+        return super().load_state_dict(state_dict, strict)
+
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
+        self.init()
+        return super().state_dict(destination, prefix, keep_vars)
 
 
     """ code for manage computation graph """

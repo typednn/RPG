@@ -1,1 +1,3 @@
-from .tensor import TensorType
+from .tensor import TensorType, MLP
+from .image import ImageType
+from .pointcloud import PointDict
