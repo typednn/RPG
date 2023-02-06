@@ -5,7 +5,7 @@ python3 -m typednn.types.tensor
 python3 -m typednn.types.image
 python3 -m typednn.factory
 python3 -m typednn.types.pointcloud
-python3 -m typednn.types.test_shadow
+python3 -m typednn.tester.test_shadow
 """
 
 import os

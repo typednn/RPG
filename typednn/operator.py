@@ -30,12 +30,41 @@ class Operator(OptBase):
     arrow = Arrow(Type("input"), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
 
+    def process_args_kwargs(self, *args, **kwargs):
+        config = self.default_config()
+        config_args = {}
+
+        args = list(args)
+        keys = [None] * len(args)
+
+        for k, v in kwargs.items():
+            if k in config:
+                config_args[k] = v
+            else:
+                args.append(v)
+                keys.append(k)
+        return keys, args, C.create(config_args)
+
+    def match_input(self, *args, **kwargs):
+        inps = list(args)
+        for i in range(len(args), len(self._init_args)):
+            if self._init_keys[i] is None:
+                raise ValueError(f"missing input {i}")
+            if self._init_keys[i] in kwargs:
+                inps.append(kwargs.pop(self._init_keys[i]))
+            else:
+                raise ValueError(f"missing input {self._init_keys[i]}")
+        if len(kwargs) > 0:
+            raise ValueError(f"extra inputs {kwargs.keys()}")
+        return inps, kwargs
+
     def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
         super().__init__()
         # TODO: store the lineno for debugging
-        self._init_args, self._init_kwargs = args, C.create(kwargs)
+        self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
+
         self._name = name or self.__class__.__name__
-        self.default_inp_nodes = [Node.from_val(i) for i in args]
+        self.default_inp_nodes = [Node.from_val(i) for i in self._init_args]
         self.clear()
 
         global OPID
@@ -83,9 +112,10 @@ class Operator(OptBase):
         frame_assert(cond, msg, self.get_trace, errorType)
 
     # get the output node of the operator based on input nodes ..
-    def shadow(self, *input_nodes: typing.List[Node], default=False) -> Node:
+    def shadow(self, *input_nodes: typing.List[Node], default=False, **kwargs) -> Node:
         # TODO: for replicate operators.
         # self.myassert(default, "left value inference is not implemneted")
+        input_nodes, _ = self.match_input(*input_nodes, **kwargs)
         input_nodes = [Node.from_val(i) for i in input_nodes]
         if default:
             name = self.left_value
@@ -107,7 +137,9 @@ class Operator(OptBase):
 
     # required for infering the number of output 
     def get_meta_type(self, *input_nodes):
-        return self.arrow.out
+        #return self.arrow.out
+        from .node import nodes_to_metatype
+        return self.arrow.unify(*nodes_to_metatype(input_nodes))[2]
 
     def _type_inference(self, *inp_types) -> Type:
         return Type("output")
@@ -161,6 +193,7 @@ class Operator(OptBase):
     """ calling, this is not for the graph construct """
     def __call__(self, *args, **kwargs):
         self.init()
+        args, kwargs = self.match_input(*args, **kwargs)
 
         #TODO: this only checks for the default input nodes ..
         for a, b in zip(self.default_inp_nodes, args):
@@ -170,6 +203,7 @@ class Operator(OptBase):
                 info = info.replace('\n', '\n' + '>' * 10)
                 from .utils import tensor2error
                 frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
+                
         out = super().__call__(*args, **kwargs)
         # TODO: check output type
         out_type = self.get_output().get_type()
@@ -233,11 +267,11 @@ class Operator(OptBase):
 
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         self.init()
-        return super().load_state_dict(state_dict, strict)
+        return super().load_state_dict(state_dict=state_dict, strict=strict)
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
         self.init()
-        return super().state_dict(destination, prefix, keep_vars)
+        return super().state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
 
 
     """ code for manage computation graph """

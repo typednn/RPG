@@ -14,6 +14,11 @@ def nodes_to_types(nodes):
     return [i.get_type() for i in nodes]
 
 
+def nodes_to_metatype(nodes):
+    from .node import Node
+    nodes: typing.List[Node]
+    return [i._meta_type for i in nodes]
+
 # global NODEID
 NODEID = 0
 
