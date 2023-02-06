@@ -360,15 +360,39 @@ class NameType(Type):
         
 class Arrow(Type):
     def __init__(self, *args, **kwargs) -> None:
-        self.args, self.keys = self.process_args_kwargs(*args, **kwargs)
+        if len(kwargs) == 0 and len(args) == 1 and isinstance(args[0], tuple):
+            children = args[0]
+            assert len(children) % 2 == 0
+            self.args = children[:len(children)//2]
+            self.keys = children[len(children)//2:]
+        else:
+            self.args, self.keys = self.process_args_kwargs(*args, **kwargs)
         self.out = self.args[-1]
 
     def process_args_kwargs(self, *args, **kwargs):
-        return list(args) + list(kwargs.values()), [Type('['+str(i)+']') for i in range(len(args))] + [NameType(i) for i in kwargs] 
+        inputs = list(args) + list(kwargs.values()) 
+
+        keys = []
+        for idx, i in enumerate(args):
+            if i.match_many():
+                keys.append(VariableArgs('[...]', None))
+            else:
+                keys.append(Type('['+str(idx)+']'))
+        keys += [NameType(i) for i in kwargs] 
+        return inputs, keys
+
+    def reinit(self, *children):
+        return self.__class__(children)
         
     def __str__(self):
         #return '->'.join(str(e) for e in zip(self.children())
-        return '->'.join([f'{str(a)}:{str(b)}'for a, b in zip(self.keys, self.args)])
+        args = [str(i) for i in self.args]
+        outs = []
+        for i in args:
+            if '->' in i:
+                i = '(' + i + ')'
+            outs.append(i)
+        return '->'.join([f'{str(a)}:{str(b)}'for a, b in zip(self.keys, outs)])
 
     def children(self) -> typing.Tuple["Type"]:
         #return list(self.args) + [self.out]
@@ -381,6 +405,8 @@ class Arrow(Type):
 
         args, keys = self.process_args_kwargs(*args, **kwargs)
         args = TupleType(*args) #, *keys)
+
+        unify(keys, self.keys[:-1], None)
         return unify(args, inps, self.out)
 
     def test_unify(self, gt, *args):

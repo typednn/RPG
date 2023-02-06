@@ -64,6 +64,7 @@ def unify(
         else:
             return a
 
+
     def resolve(a, b, dir):
         # if dir (direction) is 1, we want to unify b into a; so we call b to check compatibility with a
         error = None
