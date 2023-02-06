@@ -10,16 +10,11 @@ class FlattenBatch(Operator):
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
-
-    def get_meta_type(self, inp_node):
-        inp_type = inp_node._meta_type
-        return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
     
 class Flatten(Operator):
     def forward(self, x):
         dims = self.inp_types[0].data_dims
         return x.reshape(*x.shape[:-dims], -1)
-
 
     def _type_inference(self, inp_type):
         # print(inp_type.data_shape())
@@ -69,9 +64,9 @@ class Tuple(Operator):
     def forward(self, *args):
         return args
 
-    def get_meta_type(self, *input_nodes):
+    def _type_inference(self, *input_types):
         from ..basetypes import TupleType, Type
-        return TupleType(*[input_nodes._meta_type for input_nodes in input_nodes])
+        return TupleType(*input_types)
 
 class Dict(Operator):
     def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
@@ -85,9 +80,9 @@ class Dict(Operator):
         from tools.utils import AttrDict
         return AttrDict(**{k:v for k, v in zip(self._init_keys, args)})
 
-    def get_meta_type(self, *input_nodes):
+    def _type_inference(self, *input_types):
         from ..types import AttrType
-        return AttrType(**{k:input_nodes[i]._meta_type for i, k in enumerate(self._init_keys)})
+        return AttrType(**{k:input_types[i] for i, k in enumerate(self._init_keys)})
 
 
 class Linear(Operator):

@@ -36,7 +36,7 @@ class ModuleGraph(Operator):
         self.default_inp_nodes = self.named_input.values()
 
         from .types import Arrow
-        self.arrow = Arrow(**{k:v._meta_type for k, v in self.named_input.items()}, out=self.output_node._meta_type)
+        self.arrow = Arrow(**{k:v.get_type() for k, v in self.named_input.items()}, out=self.output_node.get_type())
         
     def find_caller(self):
         import inspect

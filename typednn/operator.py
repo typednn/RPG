@@ -127,47 +127,37 @@ class Operator(OptBase):
 
         if ',' in name:
             name = '[' + name + ']'
-        return CallNode(self.get_meta_type(*input_nodes), self, name=name, input_nodes=input_nodes)
+        return CallNode(self.get_output_type_by_input(*input_nodes), self, name=name, input_nodes=input_nodes)
 
-    """ type inference """
-    def _infer_by_arrow(self, *inp_types):
-        # print(inp_types, self.arrow)
-        _, _, _out_type = self.arrow.unify(*inp_types)
+    def _type_inference(self, *input_types) -> Type:
+        from .unification import TypeInferenceFailure
+        error = None
+        try:
+            _, _, _out_type = self.arrow.unify(*input_types)
+        except TypeInferenceFailure as e:
+            error = e
+        frame_assert(
+            error is None,
+            f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", self.get_trace, error.__class__)
         return _out_type
 
-    # required for infering the number of output 
-    def get_meta_type(self, *input_nodes):
-        #return self.arrow.out
-        from .node import nodes_to_metatype
-        return self.arrow.unify(*nodes_to_metatype(input_nodes))[2]
 
-    def as_arrow(self):
-        # as a computation node
-        from .node import Arrow
-        return Node(self.meta_, self, )
-
-    def _type_inference(self, *inp_types) -> Type:
-        return Type("output")
+    def _get_type_from_output(self, output, *args):
+        inp = args[0]
+        out_shape = inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
+        return out_shape
 
     # required for infering the output type
     def get_output_type_by_input(self, *input_nodes):
         # assert not hasattr(self, '_out_type'), f"type_inference can only be called once for {self._name}"
         input_types = nodes_to_types(input_nodes)
-
         if self.INFER_SHAPE_BY_FORWARD:
-            self.init() # init the module so that we can infer the output type ..
+            self.init()
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)
             _out_type = self._get_type_from_output(output, *input_types)
         else:
-            from .unification import TypeInferenceFailure
-            error = None
-            try:
-                _out_type = self._infer_by_arrow(*input_types)
-                _out_type = unify(self._type_inference(*input_types), _out_type, None)[1] # run _type inference and unify it with the inferred type
-            except TypeInferenceFailure as e:
-                error = e
-            frame_assert(error is None, f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", self.get_trace, error.__class__)
+            _out_type = self._type_inference(*input_types)
         return _out_type
 
     # wrappers
@@ -305,11 +295,6 @@ class Operator(OptBase):
         self.init()
         out = torch.nn.Module.__str__(self)
         return out + f" -> {self.get_output().get_type()}"
-
-    def _get_type_from_output(self, output, *args):
-        inp = args[0]
-        out_shape = inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
-        return out_shape
 
     def __hash__(self) -> int:
         return hash(f'THISISANOPWITHID:{self._id}')
