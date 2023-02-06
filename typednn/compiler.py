@@ -23,12 +23,16 @@ class ModuleGraph(Operator):
         self.nodes = self.context['nodes']
         self.output_node = list(self.nodes.keys())[-1]
 
+        
+        self.named_input = {}
+
         if input_order is None:
             input_order = self.input_nodes
-            self.default_inp_nodes = [self.input_nodes[k] for k in input_order]
+            for idx, k in enumerate(self.input_nodes):
+                self.named_input[f'[{idx}]'] = k
         else:
-            assert len(input_order) == len(self.input_nodes), "input order should be the same as input nodes"
-            self.default_inp_nodes = input_order
+            self.named_input = input_order
+        self.default_inp_nodes = self.named_input.values()
         
     def find_caller(self):
         import inspect
@@ -51,11 +55,20 @@ class ModuleGraph(Operator):
         self.main =  torch.nn.ModuleDict({name: k for k, name in self.submodules.items()})
 
     def forward(self, *inps, **kwargs):
-        assert len(kwargs) == 0, "not support kwargs for now; we need map kwargs to input nodes"
-        assert len(self.inp_types) == 1, "only support one input for now"
         context = {}
-        for a, b in zip(self.default_inp_nodes, inps):
-            context[a] = b
+        for (k, node), b in zip(self.named_input.items(), inps):
+            context[node] = b
+        for k, v in kwargs.items():
+            if k not in self.named_input:
+                raise ValueError(f'input {k} is not defined')
+            node = self.named_input[k]
+            if node in context:
+                raise ValueError(f'input {k} is already defined')
+            context[node] = v
+
+        if len(context) != len(self.named_input):
+            raise ValueError(f'input length is not correct, expected {list(self.named_input.keys())}, but only got {list(context.keys())}')
+
         return self.output_node.evaluate(context)
 
     def __str__(self) -> str:

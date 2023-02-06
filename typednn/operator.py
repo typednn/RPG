@@ -141,6 +141,11 @@ class Operator(OptBase):
         from .node import nodes_to_metatype
         return self.arrow.unify(*nodes_to_metatype(input_nodes))[2]
 
+    def as_arrow(self):
+        # as a computation node
+        from .node import Arrow
+        return Node(self.meta_, self, )
+
     def _type_inference(self, *inp_types) -> Type:
         return Type("output")
 
@@ -313,3 +318,9 @@ class Operator(OptBase):
 
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for now")
+
+        
+
+class PartialOperator(Operator):
+    def __init_subclass__(cls) -> None:
+        return super().__init_subclass__()

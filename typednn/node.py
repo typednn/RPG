@@ -92,6 +92,12 @@ class InputNode(NodeBase):
     def evaluate(self, context):
         return context[self]
 
+    def __str__(self) -> str:
+        out = super().__str__()
+        if self._name is not None:
+            return f'{self._name}:{out}'
+        return out
+
 
 class ValNode(NodeBase):
     def __init__(self, val, **kwargs) -> None:
@@ -155,22 +161,33 @@ class Node(NodeBase): # compile a static type tree based on meta type
         from .compiler import compile
         return compile(self, *args, **kwargs)
 
-    def __call__(self, *args, **kwargs):
-        #raise NotImplementedError
-        assert isinstance(self._meta_type, Arrow)
-        return PartialCallNode(self._meta_type, *args, **kwargs)
-
     def call_partial(self, *args, **kwargs):
         #raise NotIM
         raise NotImplementedError
 
 
+"""
+Something TODO:
+- ArrowNode to store operations that will generate arrows
+- We also need utilities to compute and store operators -> Type Inference for partial functions.
+- TODO: support for func define (compile??)
+
+- Lambda? compile func based on a specific type? 
+"""
+class ArrowNode(Node):
+    pass
+
+class CompileNode(Node):
+    def __init__(self, node, **kwargs) -> None:
+        module = node.compile()
         
-class PartialCallNode(Node):
-    # partial call to a module
-    def __init__(self, arrow_type, *args, **kwargs) -> None:
-        #super().__init__(meta_type, **kwargs)
-        raise NotImplementedError
+        super().__init__(meta_type, **kwargs)
+        
+#class PartialCallNode(Node):
+#    # partial call to a module
+#    def __init__(self, arrow_type, *args, **kwargs) -> None:
+#        #super().__init__(meta_type, **kwargs)
+#        raise NotImplementedError
 
             
 class CallNode(Node): # App in the type system.. calling an function..

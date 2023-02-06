@@ -1,6 +1,7 @@
 import termcolor
 
 CMDS ="""
+python3 -m typednn.functors.funcdef
 python3 -m typednn.types.tensor
 python3 -m typednn.types.image
 python3 -m typednn.factory

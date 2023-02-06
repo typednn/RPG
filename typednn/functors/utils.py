@@ -65,15 +65,25 @@ class Tuple(Operator):
     def forward(self, *args):
         return args
 
-    #def get_n_output(self, *input_nodes):
-    #    return len(input_nodes)
     def get_meta_type(self, *input_nodes):
-        #return super().get_meta_type(*input_nodes)
         from ..basetypes import TupleType, Type
         return TupleType(*[input_nodes._meta_type for input_nodes in input_nodes])
 
-    # def _type_inference(self, *args):
-    #     return TupleType(*args)
+class Dict(Operator):
+    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
+        if len(args) > 0:
+            assert len(args) == 1 and isinstance(args[0], dict)
+            assert len(kwargs) == 0
+            kwargs = args[0]
+        super().__init__(*args, name=name, _trace_history=_trace_history, **kwargs)
+
+    def forward(self, *args):
+        from tools.utils import AttrDict
+        return AttrDict(**{k:v for k, v in zip(self._init_keys, args)})
+
+    def get_meta_type(self, *input_nodes):
+        from ..types import AttrType
+        return AttrType(**{k:input_nodes[i]._meta_type for i, k in enumerate(self._init_keys)})
 
 
 class Linear(Operator):
