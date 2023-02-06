@@ -363,8 +363,20 @@ class Arrow(Type):
         if len(kwargs) == 0 and len(args) == 1 and isinstance(args[0], tuple):
             children = args[0]
             assert len(children) % 2 == 0
-            self.args = children[:len(children)//2]
-            self.keys = children[len(children)//2:]
+            self.args = list(children[:len(children)//2])
+            self.keys = list(children[len(children)//2:])
+
+            #TODO: hack to rename the args' name
+            keys = []
+            for idx, i in enumerate(self.keys[:-1]):
+                if i.is_type_variable:
+                    if i.match_many():
+                        i = NameType(f'[{idx}]')
+                    else:
+                        i = VariableArgs('[...]', None)
+                keys.append(i)
+            keys.append(self.keys[-1])
+            self.keys = keys
         else:
             self.args, self.keys = self.process_args_kwargs(*args, **kwargs)
 
