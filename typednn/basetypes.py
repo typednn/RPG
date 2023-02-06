@@ -366,7 +366,7 @@ class Arrow(Type):
             self.args = list(children[:len(children)//2])
             self.keys = list(children[len(children)//2:])
 
-            #TODO: hack to rename the args' name
+            #TODO: hack to rename the args' name; seems too ugly
             keys = []
             for idx, i in enumerate(self.keys[:-1]):
                 if i.is_type_variable:
