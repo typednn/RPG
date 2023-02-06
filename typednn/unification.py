@@ -97,7 +97,7 @@ def unify(
         p = findp(pa[i])
         if not i.endswith('\''):
             if p.is_type_variable and p._type_name not in allocator:
-                allocator[p._type_name] = names2types[i]._type_name
+                allocator[p._type_name] = names2types[i]
 
     def substitute(x: Type):
         if not x.polymorphism: # no type variable, directly return

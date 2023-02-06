@@ -291,10 +291,10 @@ class ListType(Type): # sequence of data type, add T before the batch
 
 class VariableArgs(Type): # is in fact the ListType with unknown length
     # something that can match arbitrary number of types
-    def __init__(self, type_name, based_type: typing.Optional["Type"]):
+    def __init__(self, type_name, based_type: typing.Optional["Type"]=None):
         self._type_name = type_name
         self.base_type = based_type
-        assert self.base_type is not None 
+        #assert self.base_type is not None 
 
     def match_many(self):
         return True
@@ -317,6 +317,7 @@ class VariableArgs(Type): # is in fact the ListType with unknown length
             return None
         if len(children) == 0:
             return []
+        assert self.base_type is not None
         try:
             base_type = self.base_type
             outs = []
@@ -339,29 +340,47 @@ class UnionType(Type):
         raise NotImplementedError
 
         
-class Arrow(Type):
-    def __init__(self, *args) -> None:
-        self.args = args[:-1]
-        self.out = args[-1]
+class NameType(Type):
+    def __init__(self, content) -> None:
+        self.content = content
+        assert isinstance(content, str)
 
     def __str__(self):
-        return '->'.join(str(e) for e in self.children())
+        return str(self.content)
+
+    def reinit(self, *children):
+        return NameType(self.content)
+
+    def children(self):
+        return ()
+
+    def instance(self, x):
+        assert isinstance(x, str) and x == self.content
+
+        
+class Arrow(Type):
+    def __init__(self, *args, **kwargs) -> None:
+        self.args, self.keys = self.process_args_kwargs(*args, **kwargs)
+        self.out = self.args[-1]
+
+    def process_args_kwargs(self, *args, **kwargs):
+        return list(args) + list(kwargs.values()), [Type('['+str(i)+']') for i in range(len(args))] + [NameType(i) for i in kwargs] 
+        
+    def __str__(self):
+        #return '->'.join(str(e) for e in zip(self.children())
+        return '->'.join([f'{str(a)}:{str(b)}'for a, b in zip(self.keys, self.args)])
 
     def children(self) -> typing.Tuple["Type"]:
-        return list(self.args) + [self.out]
+        #return list(self.args) + [self.out]
+        assert len(self.keys) == len(self.args), f"keys and args should have the same length, but got {len(self.keys)} and {len(self.args)}"
+        return self.args + self.keys
 
-    def unify(self, *args):
+    def unify(self, *args, **kwargs):
         from .unification import unify
-        if len(self.args) > 1:
-            inps = TupleType(*self.args)
-        else:
-            inps = self.args[0]
+        inps = TupleType(*self.args[:-1]) #, *self.keys[:-1])
 
-        if len(args) > 1:
-            args = TupleType(*args)
-        else:
-            args = args[0]
-            
+        args, keys = self.process_args_kwargs(*args, **kwargs)
+        args = TupleType(*args) #, *keys)
         return unify(args, inps, self.out)
 
     def test_unify(self, gt, *args):

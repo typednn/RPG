@@ -2,7 +2,7 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
-from ..types.tensor import TensorType, Arrow, TupleType, Type
+from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 class FlattenBatch(Operator):
     def forward(self, x):
@@ -61,7 +61,7 @@ class Concat(Operator):
         return out
 
 class Tuple(Operator):
-    arrow = Arrow(Type("input"), Type("input"))
+    arrow = Arrow(VariableArgs('...', None), VariableArgs('...', None))
     def forward(self, *args):
         return args
 

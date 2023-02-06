@@ -133,7 +133,6 @@ class Node(NodeBase): # compile a static type tree based on meta type
             self._type = self._get_type()
         return self._type
 
-
     def __iter__(self):
         if not isinstance(self._meta_type, TupleType):
             raise RuntimeError(f"Only TupleType or its subclass can iterate, but get {self}.")
@@ -145,18 +144,33 @@ class Node(NodeBase): # compile a static type tree based on meta type
                 name = self._name + f'.{i}'
             yield IndexNode(self._meta_type[i], self, index=i, name=name)
             
-
     def __getattr__(self, key) -> str:
         if not isinstance(self._meta_type, AttrType):
             raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
         if not hasattr(self._meta_type, key):
             raise RuntimeError(f"{self} does not have attribute {key}.")
         return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
-        
 
     def compile(self, *args, **kwargs):
         from .compiler import compile
         return compile(self, *args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        #raise NotImplementedError
+        assert isinstance(self._meta_type, Arrow)
+        return PartialCallNode(self._meta_type, *args, **kwargs)
+
+    def call_partial(self, *args, **kwargs):
+        #raise NotIM
+        raise NotImplementedError
+
+
+        
+class PartialCallNode(Node):
+    # partial call to a module
+    def __init__(self, arrow_type, *args, **kwargs) -> None:
+        #super().__init__(meta_type, **kwargs)
+        raise NotImplementedError
 
             
 class CallNode(Node): # App in the type system.. calling an function..
@@ -220,6 +234,15 @@ class AttrNode(Node):
 
     def print_line(self):
         return str(self.parent._name) + '.' + str(self.key)
+
+    def __getattr__(self, key) -> str:
+        if not isinstance(self._meta_type, AttrType):
+            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+        if not hasattr(self._meta_type, key):
+            raise RuntimeError(f"{self} does not have attribute {key}.")
+        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+        
+
 
 
 

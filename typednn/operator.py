@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from omegaconf import OmegaConf as C
 from torch.nn import Module
-from .basetypes import Arrow, Type
+from .basetypes import Arrow, Type, VariableArgs
 from .node import Node, CallNode, nodes_to_types
 from .utils import frame_assert
 from .unification import unify
@@ -27,7 +27,7 @@ OPID = 0
 
 class Operator(OptBase):
     INFER_SHAPE_BY_FORWARD=False
-    arrow = Arrow(Type("input"), Type("output")) # TYPE annotation of the forward funciton
+    arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
 
     def process_args_kwargs(self, *args, **kwargs):
@@ -35,7 +35,7 @@ class Operator(OptBase):
         config_args = {}
 
         args = list(args)
-        keys = [None] * len(args)
+        keys = [f'args{i}' for i in range(len(args))]
 
         for k, v in kwargs.items():
             if k in config:
@@ -155,8 +155,14 @@ class Operator(OptBase):
             output = self.forward(*shapes)
             _out_type = self._get_type_from_output(output, *input_types)
         else:
-            _out_type = self._infer_by_arrow(*input_types)
-            _out_type = unify(self._type_inference(*input_types), _out_type, None)[1] # run _type inference and unify it with the inferred type
+            from .unification import TypeInferenceFailure
+            error = None
+            try:
+                _out_type = self._infer_by_arrow(*input_types)
+                _out_type = unify(self._type_inference(*input_types), _out_type, None)[1] # run _type inference and unify it with the inferred type
+            except TypeInferenceFailure as e:
+                error = e
+            frame_assert(error is None, f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", self.get_trace, error.__class__)
         return _out_type
 
     # wrappers
