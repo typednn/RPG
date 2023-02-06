@@ -38,7 +38,6 @@ def test_module_define():
         img = ConvNet(FlattenBatch(inp1))
         img2 = img.shadow(FlattenBatch(inp2))
         return {'img': img, 'img2': img2}
-    print(mymodule)
 
     try:
         mymodule(image)
@@ -47,6 +46,9 @@ def test_module_define():
 
     x2 = mymodule(image, image)
     assert torch.allclose(x2.img, x2.img2)
+
+    print('mymodule output type', mymodule.get_output().print_line())
+    assert str(mymodule.get_output().get_type()) == str(AttrType(img=image_type, img2=image_type))
 
 
 if __name__ == '__main__':

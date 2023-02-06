@@ -31,8 +31,12 @@ class ModuleGraph(Operator):
             for idx, k in enumerate(self.input_nodes):
                 self.named_input[f'[{idx}]'] = k
         else:
+            assert len(input_order) == len(self.input_nodes)
             self.named_input = input_order
         self.default_inp_nodes = self.named_input.values()
+
+        from .types import Arrow
+        self.arrow = Arrow(**{k:v._meta_type for k, v in self.named_input.items()}, out=self.output_node._meta_type)
         
     def find_caller(self):
         import inspect
@@ -68,7 +72,6 @@ class ModuleGraph(Operator):
 
         if len(context) != len(self.named_input):
             raise ValueError(f'input length is not correct, expected {list(self.named_input.keys())}, but only got {list(context.keys())}')
-
         return self.output_node.evaluate(context)
 
     def __str__(self) -> str:
