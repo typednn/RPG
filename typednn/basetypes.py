@@ -367,6 +367,9 @@ class Arrow(Type):
             self.keys = children[len(children)//2:]
         else:
             self.args, self.keys = self.process_args_kwargs(*args, **kwargs)
+
+        if self.keys[-1].is_type_variable:
+            self.keys[-1] = NameType('out')
         self.out = self.args[-1]
 
     def process_args_kwargs(self, *args, **kwargs):
