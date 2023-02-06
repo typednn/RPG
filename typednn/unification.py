@@ -100,6 +100,13 @@ def unify(
             if p.is_type_variable and p._type_name not in allocator:
                 allocator[p._type_name] = names2types[i]
 
+    # for i in pa:
+    #     p = findp(pa[i])
+    #     if p.is_type_variable and p._type_name.endswith('\'') and p._type_name not in allocator:
+    #         new_name = p._type_name[:-1]
+    #         if new_name not in allocator:
+    #             allocator[p._type_name] = p.update_name(lambda x: x[:-1])
+
     def substitute(x: Type):
         if not x.polymorphism: # no type variable, directly return
             return x
@@ -123,6 +130,13 @@ def unify(
         if p.is_type_variable:
             if p._type_name in allocator:
                 return allocator[p._type_name] # Currently we don't allow any name in B not in A .. this should be removed later ..
+
+            if p._type_name.endswith('\''):
+                new_name = p._type_name[:-1]
+                if new_name not in allocator:
+                    allocator[p._type_name] = p.update_name(lambda x: x[:-1])
+                    return allocator[p._type_name]
+
             return p
         else:
             return p

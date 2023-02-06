@@ -21,6 +21,14 @@ class ConvNet(Operator):
             out_dim=32,
         )
 
+    def get_meta_type(self, input_node):
+        out = super().get_meta_type(input_node)
+        t = input_node._meta_type
+        if isinstance(t, TensorType):
+            return TensorType(*t.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
+        else:
+            return out
+
     def build_modules(self, inp_type: "ImageType"):
         try:
             int(inp_type.data_shape().total())

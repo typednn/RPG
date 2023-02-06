@@ -10,6 +10,10 @@ class FlattenBatch(Operator):
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
+
+    def get_meta_type(self, inp_node):
+        inp_type = inp_node._meta_type
+        return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
     
 class Flatten(Operator):
     def forward(self, x):

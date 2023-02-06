@@ -295,6 +295,7 @@ class Operator(OptBase):
         
 
     def compile(self, *args, **kwargs):
+        
         return self.get_output().compile(*args, **kwargs)
         
 
