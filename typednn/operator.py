@@ -141,6 +141,12 @@ class Operator(OptBase):
             f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", self.get_trace, error.__class__)
         return _out_type
 
+    def _type_inference_after_init(self, *input_types) -> Type:
+        if self.INFER_SHAPE_BY_FORWARD:
+            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
+            output = self.forward(*shapes)
+            return self._get_type_from_output(output, *input_types)
+        return self._type_inference(*input_types)
 
     def _get_type_from_output(self, output, *args):
         inp = args[0]
@@ -148,17 +154,15 @@ class Operator(OptBase):
         return out_shape
 
     # required for infering the output type
-    def get_output_type_by_input(self, *input_nodes):
-        # assert not hasattr(self, '_out_type'), f"type_inference can only be called once for {self._name}"
-        input_types = nodes_to_types(input_nodes)
-        if self.INFER_SHAPE_BY_FORWARD:
+    def get_output_type_by_input(self, *input_nodes, force_init=False):
+        if force_init:
             self.init()
-            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
-            output = self.forward(*shapes)
-            _out_type = self._get_type_from_output(output, *input_types)
+        if self._lazy_init: #if initliaized, use another way to do the type inference ..
+            input_types = nodes_to_types(input_nodes)
+            return self._type_inference_after_init(*input_types)
         else:
-            _out_type = self._type_inference(*input_types)
-        return _out_type
+            input_types = [i._meta_type for i in input_nodes]
+            return self._type_inference(*input_types)
 
     # wrappers
     def get_output(self) -> Node: # out type when input are feed ..
@@ -199,6 +203,7 @@ class Operator(OptBase):
         #TODO: this only checks for the default input nodes ..
         for a, b in zip(self.default_inp_nodes, args):
             a = a.get_type()
+            
             if isinstance(a, Type) and a.instance(b) is None:
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)

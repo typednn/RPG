@@ -13,6 +13,12 @@ def nodes_to_types(nodes):
     nodes: typing.List[Node]
     return [i.get_type() for i in nodes]
 
+
+def nodes_to_metatype(nodes):
+    from .node import Node
+    nodes: typing.List[Node]
+    return [i._meta_type for i in nodes]
+
 # global NODEID
 NODEID = 0
 
@@ -78,7 +84,7 @@ class InputNode(NodeBase):
     # TODO: remove input node ...
     def __init__(self, type, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._type = type
+        self._meta_type = self._type = type
 
     def get_type(self):
         return self._type
@@ -96,7 +102,7 @@ class InputNode(NodeBase):
 class ValNode(NodeBase):
     def __init__(self, val, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.val = val
+        self._meta_type = self.val = val
 
     def get_type(self):
         return self.val
@@ -107,10 +113,10 @@ class ValNode(NodeBase):
 
 
 class Node(NodeBase): # compile a static type tree based on meta type 
-    def __init__(self, type, **kwargs) -> None:
+    def __init__(self, meta_type, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._type = type
-        self._init = None
+        self._meta_type = meta_type
+        self._type = None
 
     @abc.abstractmethod
     def get_parents(self):
@@ -120,34 +126,36 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def evaluate(self, context):
         pass
 
-    # @abc.abstractmethod
-    # def _get_type(self):
-    #     pass
+    @abc.abstractmethod
+    def _get_type(self):
+        pass
 
     @abc.abstractmethod
     def print_line(self):
         pass
-    
+
     def get_type(self):
+        if self._type is None:
+            self._type = self._get_type()
         return self._type
 
     def __iter__(self):
-        if not isinstance(self.get_type(), TupleType):
+        if not isinstance(self._meta_type, TupleType):
             raise RuntimeError(f"Only TupleType or its subclass can iterate, but get {self}.")
 
-        for i in range(len(self.get_type())):
+        for i in range(len(self._meta_type)):
             if ',' in self._name:
                 name = str(self._name)[1:-1].split(',')[i]
             else:
                 name = self._name + f'.{i}'
-            yield IndexNode(self.get_type()[i], self, index=i, name=name)
+            yield IndexNode(self._meta_type[i], self, index=i, name=name)
             
     def __getattr__(self, key) -> str:
-        if not isinstance(self.get_type(), AttrType):
-            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self.get_type()}.")
-        if not hasattr(self.get_type(), key):
+        if not isinstance(self._meta_type, AttrType):
+            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+        if not hasattr(self._meta_type, key):
             raise RuntimeError(f"{self} does not have attribute {key}.")
-        return AttrNode(getattr(self.get_type(), key), self, key=key, name=self._name + f".{key}", )
+        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
 
     def compile(self, *args, **kwargs):
         from .compiler import compile
@@ -170,7 +178,10 @@ class ArrowNode(Node):
     pass
 
 class CompileNode(Node):
-    pass
+    def __init__(self, node, **kwargs) -> None:
+        module = node.compile()
+        
+        super().__init__(meta_type, **kwargs)
         
 #class PartialCallNode(Node):
 #    # partial call to a module
@@ -199,8 +210,8 @@ class CallNode(Node): # App in the type system.. calling an function..
                 context[i] = i.evaluate(context)
         return self.module(*[context[i] for i in self.input_nodes])
 
-    #def infer_type(self):
-    #    return self.module.get_output_type_by_input(*self.input_nodes)
+    def _get_type(self):
+        return self.module.get_output_type_by_input(*self.input_nodes)
 
             
 class IndexNode(Node):
@@ -215,8 +226,8 @@ class IndexNode(Node):
     def evaluate(self, context):
         return self.parent.evaluate(context)[self.index]
 
-    #def infer_type(self):
-    #    return self.parent.get_type()[self.index]
+    def _get_type(self):
+        return self.parent.get_type()[self.index]
 
 
     def print_line(self):
@@ -235,18 +246,18 @@ class AttrNode(Node):
     def evaluate(self, context):
         return getattr(self.parent.evaluate(context), self.key)
 
-    #def infer_type(self):
-    #    return getattr(self.parent.get_type(), self.key)
+    def _get_type(self):
+        return getattr(self.parent.get_type(), self.key)
 
     def print_line(self):
         return str(self.parent._name) + '.' + str(self.key)
 
     def __getattr__(self, key) -> str:
-        if not isinstance(self.get_type(), AttrType):
-            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self.get_type()}.")
-        if not hasattr(self.get_type(), key):
+        if not isinstance(self._meta_type, AttrType):
+            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+        if not hasattr(self._meta_type, key):
             raise RuntimeError(f"{self} does not have attribute {key}.")
-        return AttrNode(getattr(self.get_type(), key), self, key=key, name=self._name + f".{key}", )
+        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
         
 
 

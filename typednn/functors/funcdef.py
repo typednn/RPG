@@ -52,7 +52,8 @@ def test_module_define():
 
     print('mymodule output type', mymodule.get_output().print_line())
     #assert str(mymodule.get_output().get_type()) == str(AttrType(img=image_type, img2=image_type))
-    assert str(mymodule.get_output().get_type()) == str(AttrType(img=TensorType('B', 32, 'N', 'M', data_dims=3), img2=TensorType('B', 32, 'N', 'M', data_dims=3)))
+    print(mymodule.get_type())
+    assert str(mymodule.get_output().get_type()) == str(AttrType(img=TensorType('B', 32, 12, 12, data_dims=3), img2=TensorType('B', 32, 12, 12, data_dims=3)))
 
 
 if __name__ == '__main__':

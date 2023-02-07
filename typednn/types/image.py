@@ -64,7 +64,6 @@ def test_conv():
 
     out = Tuple(linear, linear2)
     graph = out.compile(config=dict(Linear=dict(dim=35)))
-    print(graph.pretty_config)
 
     seq = Seq(flattenb, conv, flatten, linear, linear2)
 
