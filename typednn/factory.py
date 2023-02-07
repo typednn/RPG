@@ -84,14 +84,11 @@ class Factory(Operator):
     def forward(self, *args, **kwargs):
         raise NotImplementedError
 
-    def _type_inference(self, *inp_types):
-        #return self.OPERATORS._type_inference(*inp_types)
-        try:
-            self.main
-        except AttributeError:
-            self.build_modules(*inp_types)
-            
-        return self.main.get_output().get_type()
+    def get_output_type_by_input(self, *input_nodes, force_init=False):
+        self.init()
+        if force_init:
+            self.main.init()
+        return self.main.get_output_type_by_input(*input_nodes)
 
     def __str__(self) -> str:
         self.init()

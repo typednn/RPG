@@ -211,7 +211,7 @@ class CallNode(Node): # App in the type system.. calling an function..
         return self.module(*[context[i] for i in self.input_nodes])
 
     def _get_type(self):
-        return self.module.get_output_type_by_input(*self.input_nodes)
+        return self.module.get_output_type_by_input(*self.input_nodes, force_init=True)
 
             
 class IndexNode(Node):
