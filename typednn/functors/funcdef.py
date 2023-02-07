@@ -22,7 +22,7 @@ def moduledef(func: typing.Mapping):
         output = Dict(**output)
     print(output._meta_type)
     return output.compile(input_order=input_nodes)
-
+    
 
 def test_module_define():
     import torch
@@ -54,6 +54,7 @@ def test_module_define():
     #assert str(mymodule.get_output().get_type()) == str(AttrType(img=image_type, img2=image_type))
     print(mymodule.get_type())
     assert str(mymodule.get_output().get_type()) == str(AttrType(img=TensorType('B', 32, 12, 12, data_dims=3), img2=TensorType('B', 32, 12, 12, data_dims=3)))
+    print(mymodule.arrow)
 
 
 if __name__ == '__main__':
