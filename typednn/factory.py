@@ -1,4 +1,5 @@
 # the basic class of building modules from configs based on the input types
+#TODO:  we need take care of the meta-type infer for this module .. 
 import termcolor
 from .operator import Operator, nodes_to_types
 from .unification import unify, TypeInferenceFailure
@@ -22,11 +23,23 @@ class Factory(Operator):
     KEYS = []
     OPERATORS = []
     NAMES = []
+
+    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
+        super().__init__(*args, name=name, _trace_history=_trace_history, **kwargs)
+        self.main = None
     
 
     def find_caller(self):
         out = super().find_caller()
         return out
+
+    def get_sub_config(self, idx):
+        import copy
+        config = copy.deepcopy(self.config)
+        module_config = config.get(self.NAMES[idx])
+        for i in self.NAMES:
+            config.pop(i)
+        return C.merge(config, module_config)
 
 
     def build_modules(self, *input_types):
@@ -34,7 +47,7 @@ class Factory(Operator):
         if len(input_types) == 1:
             input_types = input_types[0]
 
-        idx = match_types(input_types, self.KEYS)
+        self.module_idx = idx = match_types(input_types, self.KEYS)
         self.input_types = input_types
         
 
@@ -43,15 +56,9 @@ class Factory(Operator):
                             " {self.__class__.__name__}\n Factory: {self.KEYS}")
 
         get_trace = lambda: f'Factory of {self.OPERATORS[idx]} for input type {input_types} built at' + self.get_trace()
-        import copy
-        config = copy.deepcopy(self.config)
-        module_config = config.get(self.NAMES[idx])
-        for i in self.NAMES:
-            config.pop(i)
-        config = C.merge(config, module_config)
         self.main = self.OPERATORS[idx](
             *self.default_inp_nodes, _trace_history=get_trace, 
-            **config,
+            **self.get_sub_config(idx),
         )
 
     @classmethod
@@ -84,8 +91,14 @@ class Factory(Operator):
     def forward(self, *args, **kwargs):
         raise NotImplementedError
 
+    def reconfig(self, **kwargs):
+        super().reconfig(**kwargs)
+        assert not self._lazy_init
+        self.main.reconfig(**self.get_sub_config(self.module_idx))
+
     def get_output_type_by_input(self, *input_nodes, force_init=False):
-        self.init()
+        if self.main is None:
+            self.build_modules(*[i._meta_type for i in input_nodes])
         if force_init:
             self.main.init()
         return self.main.get_output_type_by_input(*input_nodes)
@@ -125,10 +138,14 @@ def test():
     print(C.to_yaml(Encoder.default_config()))
     encoder = Encoder(inp)
     flatten = Flatten(encoder)
-    linear = Linear(flatten, dim=100)
+    linear = Linear(flatten, dim=32)
     graph = linear.compile(config=dict(Encoder=dict(out_dim=100, conv=dict(layer=6))))
     print(graph)
     print(graph.pretty_config)
+    
+    #print(encoder.get_type())
+    assert str(encoder.get_type()) == "Tensor3D(4 : 100,1,1)"
+    assert str(graph.get_output().get_type()) == "Tensor(4 : 32)"
     
         
 if __name__ == '__main__':

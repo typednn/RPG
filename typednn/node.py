@@ -175,13 +175,12 @@ Something TODO:
 - Lambda? compile func based on a specific type? 
 """
 class ArrowNode(Node):
-    pass
+    def __init__(self, operator, **kwargs) -> None:
+        super().__init__(operator.arrow, **kwargs)
+        self.operator = operator
 
-class CompileNode(Node):
-    def __init__(self, node, **kwargs) -> None:
-        module = node.compile()
-        
-        super().__init__(meta_type, **kwargs)
+    def get_parents(self):
+        raise NotImplementedError("This seems too complicated to implement...")
         
 #class PartialCallNode(Node):
 #    # partial call to a module

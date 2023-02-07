@@ -309,9 +309,3 @@ class Operator(OptBase):
 
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for now")
-
-        
-
-class PartialOperator(Operator):
-    def __init_subclass__(cls) -> None:
-        return super().__init_subclass__()
