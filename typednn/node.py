@@ -174,13 +174,55 @@ Something TODO:
 
 - Lambda? compile func based on a specific type? 
 """
+
 class ArrowNode(Node):
-    def __init__(self, operator, **kwargs) -> None:
-        super().__init__(operator.arrow, **kwargs)
+    def __init__(self, operator, name=None, **kwargs) -> None:
         self.operator = operator
+        self.kwargs = kwargs # kwargs should be nodes ..
+        from .operator import Operator
+        self.base_module = operator if isinstance(operator, Operator) else operator.base_module
+        self.prev_kwargs = {} if isinstance(operator, Operator) else {**operator.prev_kwargs, **operator.kwargs}
+        super().__init__(self._inference_type(operator, **kwargs), **kwargs)
 
     def get_parents(self):
-        raise NotImplementedError("This seems too complicated to implement...")
+        parent_nodes = list(self.kwargs.values())
+        if isinstance(self.operator, Node):
+            parent_nodes.append(self.operator)
+        return parent_nodes
+
+    def print_line(self):
+        return self.operator._name
+    
+    def evaluate(self, context):
+        def new_func(*args, **kwargs):
+            #TODO: check if the kwargs are valid
+            #TODO: make this to be an operator class that is more verbose 
+            op = self.operator.evaluate(context)
+            old_kwargs = {k: v.evaluate(context) for k, v in self.kwargs.items()}
+            return op(*args, **kwargs, **old_kwargs)
+        return new_func
+
+    def _get_type(self):
+        #return super()._get_type()
+        #return self.operator
+        kw_types = {k: v.get_type() for k, v in self.kwargs.items()}
+        return self._inference_type(self.operator, **kw_types)
+
+    def _inference_type(self, op, **kwargs):
+        """
+        for the arrow node:
+            - first 
+            - for a new arrow with (others as any kind; and )
+            - unify the current into kwargs ..
+            - and remove 
+        """
+        raise NotImplementedError("seems too complicated .. hard to decide for now")
+        
+# class ApplicationNode(Node):
+#     def __init__(self, arrow, name=None, **kwargs) -> None:
+#         super().__init__(arrow, name=name, **kwargs)
+#         # notice that each node can only be computed once ..
+#         # application node will store existing kwargs ..
         
 #class PartialCallNode(Node):
 #    # partial call to a module

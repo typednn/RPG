@@ -3,7 +3,7 @@
 
 from .operator import Operator
 from omegaconf import OmegaConf as C
-from .node import Node, InputNode, CallNode
+from .node import Node, InputNode, CallNode, ArrowNode
 from .basetypes import Arrow
 
 
@@ -158,6 +158,9 @@ def compile(node: Node, context=None, config=None, build=True, **kwargs) -> Modu
                     if val_count > 1:
                         name = name+ '_' + str(val_count)
                 context['submodules'][op] = name
+            
+        elif isinstance(node, ArrowNode):
+            raise NotImplementedError("ArrowNode is not supported yet. For arrow node which is initailized with a module; we need to do the same as the CallNode")
 
     context['visited'][node] = True
     if not build:
