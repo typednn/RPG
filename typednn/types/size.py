@@ -16,6 +16,9 @@ class UIntType(Type):
             return UIntType(value)
         return None
 
+    def _get_extra_info(self):
+        return {'a': self.a}
+
     def sample(self):
         if self.a == '?':
             raise NotImplementedError("Cannot sample a variable from ?")

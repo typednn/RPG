@@ -34,6 +34,7 @@ def test_module_define():
     #pass
 
     image_type = TensorType('B', 5, 224, 224, data_dims=3)
+
     @moduledef
     def mymodule(inp1: image_type, inp2: image_type):
         img = ConvNet(FlattenBatch(inp1))

@@ -57,6 +57,12 @@ class Type:
             args.append(fn(self._type_name))
         return self.reinit(*args, *[i.update_name(fn) for i in self.children()])
 
+    def map_types(self, fn) -> "Type":
+        args = []
+        if self.is_type_variable:
+            args.append(self._type_name)
+        return fn(self.reinit(*args, *[i.map_types(fn) for i in self.children()]))
+
     def children(self) -> typing.Tuple["Type"]:
         return ()
     
