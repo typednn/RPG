@@ -2,9 +2,10 @@
 #TODO: provide detail level for print and visualization
 
 from .operator import Operator
-from omegaconf import OmegaConf as C
 from .node import Node, InputNode, CallNode, ArrowNode
 from .basetypes import Arrow
+
+from .functor import Functor
 
 
 class ModuleGraph(Operator):
@@ -23,8 +24,6 @@ class ModuleGraph(Operator):
         self.submodules = self.context['submodules']
         self.nodes = self.context['nodes']
         self.output_node = list(self.nodes.keys())[-1]
-
-        
         self.named_input = {}
 
         if input_order is None:
@@ -51,13 +50,14 @@ class ModuleGraph(Operator):
             self.build_config()
             for i in self.submodules:
                 i.init()
-            self.inp_types = [i.get_type() for i in self.default_inp_nodes]
             self.build_modules()
-            self.arrow = Arrow(**{k:v.get_type() for k, v in self.named_input.items()}, out=self.output_node.get_type())
-
-    def build_modules(self):
-        import torch
-        self.main =  torch.nn.ModuleDict({name: k for k, name in self.submodules.items()})
+            self.arrow = Arrow(
+                **{
+                    k: v.get_type() 
+                    for k, v in self.named_input.items()
+                },
+                out=self.output_node.get_type()
+            )
 
     def forward(self, *inps, **kwargs):
         context = {}
@@ -97,18 +97,6 @@ class ModuleGraph(Operator):
 
     def _type_inference(self, *args):
         return self.output_node.get_type()
-
-    def build_config(self):
-        config = dict(
-        )
-        self._config = config
-
-        for module, name in self.submodules.items():
-            config[name] = module.config
-            config[name]['_type'] = module.__class__.__name__
-        self._config = C.create(config)
-
-    
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for ModuleGraph")
 

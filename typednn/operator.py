@@ -14,7 +14,8 @@ from typing import Mapping, Any
 
 
 class OptBase(Module):
-    def default_config(self) -> C:
+    @classmethod
+    def default_config(cls) -> C:
         return C.create()
 
 
@@ -29,6 +30,25 @@ class Operator(OptBase):
     INFER_SHAPE_BY_FORWARD=False
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
+
+    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
+        super().__init__()
+        # TODO: store the lineno for debugging
+        self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
+
+        self._name = name or self.__class__.__name__
+        self._default_inp_nodes = None
+        #self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
+        self.clear()
+
+        global OPID
+        self._id = OPID
+        OPID += 1
+
+        from .utils import exception_with_traceback
+        self.call_frame = self.find_caller()
+        self.left_value = get_left_value(self.call_frame)
+        self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
 
     def process_args_kwargs(self, *args, **kwargs):
         config = self.default_config()
@@ -58,26 +78,6 @@ class Operator(OptBase):
             raise ValueError(f"extra inputs {kwargs.keys()}")
         return inps, kwargs
 
-    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
-        super().__init__()
-        # TODO: store the lineno for debugging
-        self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
-
-        self._name = name or self.__class__.__name__
-        self._default_inp_nodes = None
-        #self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
-        self.clear()
-
-        global OPID
-        self._id = OPID
-        OPID += 1
-
-        from .utils import exception_with_traceback
-        self.call_frame = self.find_caller()
-        self.left_value = get_left_value(self.call_frame)
-        self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
-
-
     @property
     def default_inp_nodes(self):
         if self._default_inp_nodes is None:
@@ -100,7 +100,6 @@ class Operator(OptBase):
         self._config = None
         self._default_out = None
 
-
     def init(self):
         if not self._lazy_init:
             self._lazy_init = True
@@ -111,10 +110,9 @@ class Operator(OptBase):
                 has_main = True
             except AttributeError:
                 has_main = False
-
-            self.inp_types = nodes_to_types(self.default_inp_nodes)
+            inp_types = nodes_to_types(self.default_inp_nodes)
             if not has_main:
-                self.build_modules(*self.inp_types)
+                self.build_modules(*inp_types)
 
     def myassert(self, cond, msg='', errorType=ValueError):
         frame_assert(cond, msg, self.get_trace, errorType)
@@ -203,6 +201,7 @@ class Operator(OptBase):
                 raise error
         return attr
 
+
     """ calling, this is not for the graph construct """
     def __call__(self, *args, **kwargs):
         self.init()
@@ -243,7 +242,7 @@ class Operator(OptBase):
     @classmethod
     def default_config(cls) -> C:
         return C.merge(
-            super().default_config(cls),
+            super().default_config(),
             cls._new_config()
         )
 
@@ -264,6 +263,7 @@ class Operator(OptBase):
             
 
     def build_config(self) -> C:
+        # build config from self._init_kwargs
         self._config = C.merge(self.default_config(), self._init_kwargs)
 
 
@@ -293,12 +293,12 @@ class Operator(OptBase):
         if self._lazy_init:
             import logging
             logging.warning(f"reconfiguring a module {self._name} that has already been initialized, this is not recommended")
+
         self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
         self.clear()
         
 
     def compile(self, *args, **kwargs):
-        
         return self.get_output().compile(*args, **kwargs)
         
 

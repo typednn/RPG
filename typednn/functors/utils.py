@@ -6,14 +6,14 @@ from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 class FlattenBatch(Operator):
     def forward(self, x):
-        return x.reshape(-1, *self.inp_types[0].data_shape().as_int())
+        return x.reshape(-1, *self.default_inp_nodes[0].get_type().data_shape().as_int())
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
     
 class Flatten(Operator):
     def forward(self, x):
-        dims = self.inp_types[0].data_dims
+        dims = self.default_inp_nodes[0].get_type().data_dims
         return x.reshape(*x.shape[:-dims], -1)
 
     def _type_inference(self, inp_type):
