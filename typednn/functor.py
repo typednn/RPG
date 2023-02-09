@@ -43,8 +43,15 @@ class Functor(Operator):
         self._get_arrow()
 
     def _get_arrow(self):
+        # This function determins the input, output and the arrow of the operator based on the submodules
+        # override this function if the arrow is not determined by the submodules
+
         from .functors import Tuple, Arrow
-        for i in self._input_modules():
+
+        input_modules = self._input_modules()
+        if isinstance(input_modules, Operator):
+            input_modules = [input_modules]
+        for i in input_modules:
             self._default_inp_nodes += list(i.default_inp_nodes)
 
         output_modules = self._output_modules()
@@ -55,7 +62,8 @@ class Functor(Operator):
             output_node = Tuple(*output_nodes)
         else:
             output_node = output_modules.get_output()
-        self.arrow = Arrow(*[i.get_Type() for i in self._default_inp_nodes], output_node.get_type())
+        self.arrow = Arrow(*[i.get_type() for i in self._default_inp_nodes], output_node.get_type())
+
 
     def reconfig(self, **kwargs):
         #return super().reconfig(**kwargs)

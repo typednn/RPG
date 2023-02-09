@@ -5,6 +5,7 @@ from ..operator import Operator
 from ..functor import Functor
 from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
+
 class FlattenBatch(Operator):
     def forward(self, x):
         return x.reshape(-1, *self.default_inp_nodes[0].get_type().data_shape().as_int())
@@ -12,6 +13,7 @@ class FlattenBatch(Operator):
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
     
+
 class Flatten(Operator):
     def forward(self, x):
         dims = self.default_inp_nodes[0].get_type().data_dims
@@ -20,6 +22,7 @@ class Flatten(Operator):
     def _type_inference(self, inp_type):
         # print(inp_type.data_shape())
         return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
+
 
 class Seq(Functor):
     def __init__(self, *modules, **kwargs) -> None:
@@ -32,8 +35,11 @@ class Seq(Functor):
             out = [module(*out)]
         return out[0] 
 
-    def _type_inference(self, *args, **kwargs):
-        return self.op_list[-1].get_output().get_type()
+    def _input_modules(self):
+        return self.op_list[0]
+
+    def _output_modules(self):
+        return self.op_list[-1]
 
     def __str__(self) -> str:
         out = 'Sequential:\n'
@@ -41,6 +47,7 @@ class Seq(Functor):
             out += '  ' + str(i).replace('\n', '\n   ') + '\n'
         out += str(self.out)
         return out
+
 
 class Concat(Operator):
     def forward(self, *args):
@@ -54,6 +61,7 @@ class Concat(Operator):
             out = out.new(*out.batch_shape(), *out.data_shape().concat(i.data_shape(), self.dim))
         return out
 
+
 class Tuple(Operator):
     arrow = Arrow(VariableArgs('...', None), VariableArgs('...', None))
     def forward(self, *args):
@@ -62,6 +70,7 @@ class Tuple(Operator):
     def _type_inference(self, *input_types):
         from ..basetypes import TupleType, Type
         return TupleType(*input_types)
+
 
 class Dict(Operator):
     def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:

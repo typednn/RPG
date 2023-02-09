@@ -523,7 +523,6 @@ class AttrType(Type):
         return out
 
 
-
 class DataType(AttrType):
     # data_cls could be anything ..
     def __init__(self, data_cls, type_name=None):
