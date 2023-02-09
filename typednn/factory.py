@@ -28,10 +28,8 @@ class Factory(Operator):
         super().__init__(*args, name=name, _trace_history=_trace_history, **kwargs)
         self.main = None
     
-
     def find_caller(self):
-        out = super().find_caller()
-        return out
+        return super().find_caller()
 
     def get_sub_config(self, idx):
         import copy

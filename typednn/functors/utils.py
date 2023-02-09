@@ -46,7 +46,6 @@ class Seq(Operator):
         out += str(self.out)
         return out
 
-        
 class Concat(Operator):
     def forward(self, *args):
         import torch

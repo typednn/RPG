@@ -1,31 +1,32 @@
 #TODO: support detach node
 #TODO: provide detail level for print and visualization
 
-from .operator import Operator
+from .functor import Functor
 from .node import Node, InputNode, CallNode, ArrowNode
 from .basetypes import Arrow
 
 from .functor import Functor
 
 
-class ModuleGraph(Operator):
+class ModuleGraph(Functor):
     def __init__(
         self,
-        *args,
+        context,
         name=None,
         input_order=None,
         **kwargs
     ) -> None:
-        super().__init__(*args, name=name, **kwargs)
-
-        args = self._init_args
-        self.context = args[0]
+        self.context = context
         self.input_nodes = self.context['inputs']
-        self.submodules = self.context['submodules']
         self.nodes = self.context['nodes']
-        self.output_node = list(self.nodes.keys())[-1]
-        self.named_input = {}
 
+        submodules = self.context['submodules']
+        modules = {name: module for module, name in submodules.items()}
+        super().__init__(name=name, **modules, **kwargs)
+
+        self.output_node = list(self.nodes.keys())[-1]
+
+        self.named_input = {}
         if input_order is None:
             input_order = self.input_nodes
             for idx, k in enumerate(self.input_nodes):
@@ -33,7 +34,6 @@ class ModuleGraph(Operator):
         else:
             assert len(input_order) == len(self.input_nodes)
             self.named_input = input_order
-        self._default_inp_nodes = self.named_input.values()
 
         self.arrow = Arrow(**{k:v._meta_type for k, v in self.named_input.items()}, out=self.output_node._meta_type)
         
@@ -44,21 +44,17 @@ class ModuleGraph(Operator):
                 return frame
         raise ValueError("cannot find the caller of this function")
 
-    def init(self):
-        if not self._lazy_init:
-            self._lazy_init = True
-            self.build_config()
-            for i in self.submodules:
-                i.init()
-            self.build_modules()
-            self.arrow = Arrow(
-                **{
-                    k: v.get_type() 
-                    for k, v in self.named_input.items()
-                },
-                out=self.output_node.get_type()
-            )
+    def _get_arrow(self):
+        self._default_inp_nodes = self.named_input.values()
+        self.arrow = Arrow(
+            **{
+                k: v.get_type() 
+                for k, v in self.named_input.items()
+            },
+            out=self.output_node.get_type()
+        )
 
+    # def init(self):
     def forward(self, *inps, **kwargs):
         context = {}
         for (k, node), b in zip(self.named_input.items(), inps):
@@ -79,7 +75,7 @@ class ModuleGraph(Operator):
         #TODO: output nodes; (with input and output types)
         self.init()
         out = ''
-        for idx, (k, name) in enumerate(self.submodules.items()):
+        for idx, (name, k) in enumerate(self.submodules.items()):
             out += f' ({idx}).{k.left_value}  of {name}: ' + str(k).replace('\n', '\n   ') + '\n'
 
         out = out + 'Inputs: ' + ', '.join([str(self.input_nodes[k]) for k in self.default_inp_nodes])
@@ -92,11 +88,9 @@ class ModuleGraph(Operator):
         #out = 'Input: ' + ', '.join(map(str, self.inp_types)) + '\n'
         return out
 
-    def get_context(self):
-        return self._init_args[0]
-
     def _type_inference(self, *args):
         return self.output_node.get_type()
+
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for ModuleGraph")
 

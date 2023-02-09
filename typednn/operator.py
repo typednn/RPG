@@ -37,7 +37,6 @@ class Operator(OptBase):
         self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
 
         self._name = name or self.__class__.__name__
-        self._default_inp_nodes = None
         #self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
         self.clear()
 
@@ -96,6 +95,7 @@ class Operator(OptBase):
         return self._trace_history
 
     def clear(self):
+        self._default_inp_nodes = None
         self._lazy_init = False
         self._config = None
         self._default_out = None
