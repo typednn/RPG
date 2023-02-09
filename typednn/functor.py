@@ -27,11 +27,11 @@ class Functor(Operator):
         super().clear()
         self._default_inp_nodes = [] # the default inp nodes will be [] without initliaze the submodules
 
-    def _get_arrow(self):
+    def _input_modules(self):
         raise NotImplementedError
-
-    def _type_inference(self, *input_types):
-        raise NotImplementedError
+    
+    def _output_modules(self):
+        return NotImplementedError
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError
@@ -41,6 +41,21 @@ class Functor(Operator):
             module.init() # initlaize the module
         self.main = torch.nn.ModuleDict(self.submodules)
         self._get_arrow()
+
+    def _get_arrow(self):
+        from .functors import Tuple, Arrow
+        for i in self._input_modules():
+            self._default_inp_nodes += list(i.default_inp_nodes)
+
+        output_modules = self._output_modules()
+        if isinstance(output_modules, list) or isinstance(output_modules, tuple):
+            output_nodes = []
+            for i in output_modules:
+                output_nodes.append(i.get_output())
+            output_node = Tuple(*output_nodes)
+        else:
+            output_node = output_modules.get_output()
+        self.arrow = Arrow(*[i.get_Type() for i in self._default_inp_nodes], output_node.get_type())
 
     def reconfig(self, **kwargs):
         #return super().reconfig(**kwargs)

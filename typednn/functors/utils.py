@@ -2,6 +2,7 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
+from ..functor import Functor
 from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 class FlattenBatch(Operator):
@@ -20,20 +21,15 @@ class Flatten(Operator):
         # print(inp_type.data_shape())
         return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
 
-class Seq(Operator):
-    def __init__(self, *modules) -> None:
+class Seq(Functor):
+    def __init__(self, *modules, **kwargs) -> None:
         self.op_list = modules
-
-        super().__init__(*modules[0]._init_args)
-
-    def build_modules(self, *args):
-        #self.main = Seq(*self._modules)
-        pass
+        super().__init__(*modules, **kwargs)
 
     def forward(self, *args, **kwargs):
         out = args
-        for i in self.op_list:
-            out = [i(*out)]
+        for k, module in self.main.items():
+            out = [module(*out)]
         return out[0] 
 
     def _type_inference(self, *args, **kwargs):
