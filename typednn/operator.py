@@ -64,7 +64,8 @@ class Operator(OptBase):
         self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
 
         self._name = name or self.__class__.__name__
-        self.default_inp_nodes = [Node.from_val(i) for i in self._init_args]
+        self._default_inp_nodes = None
+        #self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
         self.clear()
 
         global OPID
@@ -75,6 +76,13 @@ class Operator(OptBase):
         self.call_frame = self.find_caller()
         self.left_value = get_left_value(self.call_frame)
         self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
+
+
+    @property
+    def default_inp_nodes(self):
+        if self._default_inp_nodes is None:
+            self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
+        return self._default_inp_nodes
 
     def find_caller(self, key='OPERATORS'):
         # find the caller of this function

@@ -34,7 +34,7 @@ class ModuleGraph(Operator):
         else:
             assert len(input_order) == len(self.input_nodes)
             self.named_input = input_order
-        self.default_inp_nodes = self.named_input.values()
+        self._default_inp_nodes = self.named_input.values()
 
         self.arrow = Arrow(**{k:v._meta_type for k, v in self.named_input.items()}, out=self.output_node._meta_type)
         
