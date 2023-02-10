@@ -1,9 +1,7 @@
 # the basic class of building modules from configs based on the input types
-#TODO:  we need take care of the meta-type infer for this module .. 
 import termcolor
 from .operator import Operator, nodes_to_types
 from .unification import unify, TypeInferenceFailure
-from .basetypes import TupleType
 from omegaconf import OmegaConf as C
         
 
@@ -26,11 +24,13 @@ class Factory(Operator):
 
     def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
         super().__init__(*args, name=name, _trace_history=_trace_history, **kwargs)
-        self.main = None
-    
-    def find_caller(self):
-        return super().find_caller()
+        self._selected_module = None
 
+    def get_selected_module(self):
+        if self._selected_module is None:
+            self.select_module(*nodes_to_types(self.default_inp_nodes))
+        return self._selected_module
+    
     def get_sub_config(self, idx):
         import copy
         config = copy.deepcopy(self.config)
@@ -39,25 +39,34 @@ class Factory(Operator):
             config.pop(i)
         return C.merge(config, module_config)
 
-
-    def build_modules(self, *input_types):
-        #return super().build_modules(*args)
+    def select_module(self, *input_types):
         if len(input_types) == 1:
             input_types = input_types[0]
-
-        self.module_idx = idx = match_types(input_types, self.KEYS)
-        self.input_types = input_types
-        
+        self.module_idx = match_types(input_types, self.KEYS)
+        idx = self.module_idx
 
         if idx == -1:
-            raise TypeError(f"no matching operator for {self.inp_types} in"
-                            " {self.__class__.__name__}\n Factory: {self.KEYS}")
-
+            raise TypeError(
+                f"no matching operator for {input_types} in"
+                f" {self.__class__.__name__}\n Factory: {self.KEYS}"
+            )
         get_trace = lambda: f'Factory of {self.OPERATORS[idx]} for input type {input_types} built at' + self.get_trace()
-        self.main = self.OPERATORS[idx](
+        self._selected_module = self.OPERATORS[idx](
             *self.default_inp_nodes, _trace_history=get_trace, 
             **self.get_sub_config(idx),
         )
+
+    def build_modules(self, *args):
+        print('inited here ..')
+        module = self.get_selected_module()
+        module.init()
+        self.main = module
+
+    def reconfig(self, **kwargs):
+        super().reconfig(**kwargs)
+        assert not self._lazy_init
+        self.get_selected_module().reconfig(
+            **self.get_sub_config(self.module_idx))
 
     @classmethod
     def _common_config(cls):
@@ -84,22 +93,9 @@ class Factory(Operator):
         name = name or module.__name__
         assert name not in cls.NAMES, f"module name {name} already exists for Factory {cls.__name__}"
         cls.NAMES.append(name)
-        
-        
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError
 
-    def reconfig(self, **kwargs):
-        super().reconfig(**kwargs)
-        assert not self._lazy_init
-        self.main.reconfig(**self.get_sub_config(self.module_idx))
-
-    def get_output_type_by_input(self, *input_nodes, force_init=False):
-        if self.main is None:
-            self.build_modules(*[i._meta_type for i in input_nodes])
-        if force_init:
-            self.main.init()
-        return self.main.get_output_type_by_input(*input_nodes)
+    def _type_inference(self, *input_types):
+        return self.get_selected_module()._type_inference(*input_types)
 
     def __str__(self) -> str:
         self.init()
@@ -138,7 +134,6 @@ def test():
     flatten = Flatten(encoder)
     linear = Linear(flatten, dim=32)
     graph = linear.compile(config=dict(Encoder=dict(out_dim=100, conv=dict(layer=6))))
-    print(graph)
     print(graph.pretty_config)
     
     #print(encoder.get_type())

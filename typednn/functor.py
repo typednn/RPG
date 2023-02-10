@@ -31,7 +31,7 @@ class Functor(Operator):
         raise NotImplementedError
     
     def _output_modules(self):
-        return NotImplementedError
+        raise NotImplementedError
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError
@@ -63,7 +63,6 @@ class Functor(Operator):
         else:
             output_node = output_modules.get_output()
         self.arrow = Arrow(*[i.get_type() for i in self._default_inp_nodes], output_node.get_type())
-
 
     def reconfig(self, **kwargs):
         #return super().reconfig(**kwargs)

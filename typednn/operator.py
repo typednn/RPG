@@ -137,6 +137,12 @@ class Operator(OptBase):
 
     def _type_inference(self, *input_types) -> Type:
         from .unification import TypeInferenceFailure
+
+        if self._lazy_init and self.INFER_SHAPE_BY_FORWARD:
+            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
+            output = self.forward(*shapes)
+            return self._get_type_from_output(output, *input_types)
+
         error = None
         try:
             _, _, _out_type = self.arrow.unify(*input_types)
@@ -146,13 +152,6 @@ class Operator(OptBase):
             error is None,
             f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", self.get_trace, error.__class__)
         return _out_type
-
-    def _type_inference_after_init(self, *input_types) -> Type:
-        if self.INFER_SHAPE_BY_FORWARD:
-            shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
-            output = self.forward(*shapes)
-            return self._get_type_from_output(output, *input_types)
-        return self._type_inference(*input_types)
 
     def _get_type_from_output(self, output, *args):
         inp = args[0]
@@ -165,7 +164,7 @@ class Operator(OptBase):
             self.init()
         if self._lazy_init: #if initliaized, use another way to do the type inference ..
             input_types = nodes_to_types(input_nodes)
-            return self._type_inference_after_init(*input_types)
+            return self._type_inference(*input_types)
         else:
             input_types = [i._meta_type for i in input_nodes]
             return self._type_inference(*input_types)

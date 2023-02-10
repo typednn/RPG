@@ -22,9 +22,11 @@ class ConvNet(Operator):
         )
 
     def _type_inference(self, input_types) -> Type:
-        assert not self._lazy_init
-        assert isinstance(input_types, TensorType)
-        return TensorType(*input_types.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
+        if not self._lazy_init:
+            assert isinstance(input_types, TensorType)
+            return TensorType(*input_types.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
+        else:
+            return super()._type_inference(input_types)
 
     def build_modules(self, inp_type: "ImageType"):
         try:
