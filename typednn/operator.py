@@ -102,6 +102,8 @@ class Operator(OptBase):
 
     def init(self):
         if not self._lazy_init:
+            self.get_output_type_by_input(*self.default_inp_nodes) # infer the meta types 
+            
             self._lazy_init = True
             self.build_config() # configure it
 
@@ -110,6 +112,7 @@ class Operator(OptBase):
                 has_main = True
             except AttributeError:
                 has_main = False
+
             inp_types = nodes_to_types(self.default_inp_nodes)
             if not has_main:
                 self.build_modules(*inp_types)

@@ -20,7 +20,6 @@ def moduledef(func: typing.Mapping):
         output = Tuple(*output)
     if isinstance(output, dict) and not isinstance(output, NodeBase):
         output = Dict(**output)
-    print(output._meta_type)
     return output.compile(input_order=input_nodes)
     
 
@@ -58,5 +57,29 @@ def test_module_define():
     print(mymodule.arrow)
 
 
+def test_module_define2():
+    from ..types import TensorType, MLP
+    tensortype = TensorType('B', 'M', data_dims=1)
+
+    """
+    Ok in the end we just need one things:
+    - given an operator, we can define its computation graph with one type of input nodes 
+    - but we can change or modify the input nodes when really initalize the operator
+
+    - ok, the simplest way to implement this is the detach node; and we modify the detach node so that we can change the input node .. I feel that I am the genious..
+    - support revise init_args for reconfig.. that's all
+    """
+
+    @moduledef
+    def mymodule(inp1: tensortype):
+        return MLP(inp1)
+    
+    #print(mymodule)
+    print(mymodule.get_output()._meta_type)
+
+    tensortype2 = TensorType('B', 100, data_dims=1)
+    print(mymodule(tensortype2))
+
 if __name__ == '__main__':
     test_module_define()
+    #test_module_define2()

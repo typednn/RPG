@@ -82,6 +82,7 @@ Tensor1D = TensorType('...', 'N', data_dims=1)
 
 class MLP(Operator):
     INFER_SHAPE_BY_FORWARD=True
+    arrow = Arrow(TensorType('...', 'N', data_dims=1), TensorType('...', 'M', data_dims=1))
 
     @classmethod
     def _new_config(cls):
@@ -91,6 +92,13 @@ class MLP(Operator):
             out_dim=32,
             act_fn=None,
         )
+
+    def _type_inference(self, input_types) -> Type:
+        assert input_types.data_dims == 1, "MLP only support 1D data"
+        if not self._lazy_init:
+            return TensorType(*input_types.batch_shape(), self.config.out_dim)
+        else:
+            return super()._type_inference(input_types)
 
     def build_modules(self, inp_type):
         assert inp_type.data_dims == 1, "MLP only support 1D data"

@@ -1,4 +1,4 @@
-# type system of neural networks
+# TypedNN: a domain specific language for configuring and training neural networks  
 
 The goal of the system is to simplify the coding of neural networks that takes different types of input.
 

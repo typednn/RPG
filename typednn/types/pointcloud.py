@@ -39,8 +39,11 @@ class PointNet(Operator):
         self.main = OldPointNet(inp_dict, cfg=cfg).to(inp_type.xyz.device)
             
     def _type_inference(self, inp_types) -> Type:
-        #return super()._type_inference(*inp_types)
-        return inp_types.agent.new(*inp_types.agent.batch_shape(), *self.main._output_shape)
+        out = super()._type_inference(inp_types)
+        if not self._lazy_init:
+            return out
+        else:
+            return out.new(*out.batch_shape(), *self.main._output_shape)
 
     def forward(self, inp):
         #return super().forward(*args, **kwargs)

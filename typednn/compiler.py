@@ -89,7 +89,9 @@ class ModuleGraph(Functor):
         return out
 
     def _type_inference(self, *args):
-        return self.output_node.get_type()
+        if self._lazy_init:
+            return self.output_node.get_type()
+        return self.output_node._meta_type
 
     def __deepcopy__(self):
         raise NotImplementedError("deepcopy is not supported for ModuleGraph")

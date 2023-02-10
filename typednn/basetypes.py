@@ -514,7 +514,7 @@ class AttrType(Type):
     def sample(self):
         assert not self.polymorphism, "can not sample polymorphic type"
         from tools.utils import AttrDict
-        out = AttrDict()
+        out = AttrDict(_base_type=self)
         for k, v in self.kwargs.items():
             if isinstance(v, Type):
                 out[k] = v.sample()

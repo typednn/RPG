@@ -41,11 +41,9 @@ class Functor(Operator):
             module.init() # initlaize the module
         self.main = torch.nn.ModuleDict(self.submodules)
         self._get_arrow()
+        
 
     def _get_arrow(self):
-        # This function determins the input, output and the arrow of the operator based on the submodules
-        # override this function if the arrow is not determined by the submodules
-
         from .functors import Tuple, Arrow
 
         input_modules = self._input_modules()
@@ -80,6 +78,10 @@ class Functor(Operator):
             config[name] = module.config
             config[name]['_type'] = module.__class__.__name__
         self._config = C.create(config)
+
+    def __call__(self, *args, **kwargs):
+        # for functor, the default input nodes is defined here actually 
+        return super().__call__(*args, **kwargs)
 
 
 if __name__ == '__main__':

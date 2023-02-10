@@ -98,6 +98,18 @@ class InputNode(NodeBase):
             return f'{self._name}:{out}'
         return out
 
+class ShadowNode(InputNode): # input node of the operator ..
+    def __init__(self, type, **kwargs) -> None:
+        Node.__init__(**kwargs)
+        self._parent_node = type
+        self._meta_type = type._meta_type
+
+    def get_type(self):
+        return self.type.get_type()
+
+    def __str__(self) -> str:
+        return 'INP:' + self.type.__str__()
+
 
 class ValNode(NodeBase):
     def __init__(self, val, **kwargs) -> None:
