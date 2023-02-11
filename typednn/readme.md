@@ -1,45 +1,29 @@
-# TypedNN: a domain specific language for configuring and training neural networks  
+# TypedNN: a domain-specific language for configuring and training neural networks  
 
-The goal of the system is to simplify the coding of neural networks that takes different types of input.
+The goal of the language is to simplify the coding of neural networks that takes different types of input. It has the following features
 
-It has several benefits:
-- Unified interface for different types of input, e.g., text, image, audio, video, etc. Providing ways of automatically generating the neural networks based on the type of the input.
-- unified config and log system.
-- High-level abstractions like ``partial''/condition and computation graph for probabilistic programmning -> support functor types!
-- We provide strict type check and shape inference for the neural networks, with better traceback information, which can help us to find bugs early.
-- Interface-like object-oriented design. 
-- With the help of automatical type inference, we only need to define the networks once, e.g., we don't have to define/config the module and write the forward separately.
+1. We support an augmented [HM type system](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system), enabling simple shape inference and type check.
+2. Procedure-based module definition: one can define new operators using Python function directly.
+3. Object-oriented: we enable inheritance and class methods so that we can write true object-oriented code. 
+4. All components of the computation graph can be configured with external configs, which supports the research purpose naturally. 
 
-I hope to use this to provide a unified API for learning methods so that I can hire a new student to implement the learning methods in a unified way.
+In the end, we hope that building a deep learning algorithm can be as simple as writing math formulas.
+
+
+Now let's state the key elements of the language:
+
+- A piece of a program describes a computation graph, formed by operators and computation nodes. Each node is associated with two types: the meta type and the actual type. The meta type has to be decided before initializing the modules, at least determining if a node is a dict, tuple or a type that has certain attributes, but it usually does not have to worry about the actual dimensions of the tensor shapes or actual value of the primitive types. The true type will be determined after initializing the operators in the end. 
+- Operator: can be viewed as parameterized function of datas. An operator (CallNode) will be created after feeding computation nodes into a MetaOperator (e.g., the classname of the operator) and it will map inputs to create a new node and an instance of the operator.
+  - an operator can reuse (actually by default it will) parameters for different input types if it is configured well.
+- Function: a function composes operators into new a new MetaOperator (i.e., operator class). One can reuse this function to create new operators.
+- AttrType, or classes: For any subclasses of the AttrType will support class method. Nodes of these types are able to call methods as operators. One can specify some rules to determine which methods to use if necessary.
 
 ----
 
-a type is actually similar to the gym Box. typed_builder is a builder that is able to select the default config based on the type of the input and output 
-objects will be configed as 
-
-
-the major use case is to specify the type of the input and output of the neural network; ideally, when we specify the type of the data, we can automatically generate the neural network based on some high-level specification; instead of choosing the networks by ourselves.
-for example: we can define a seq(a) -> seq(a) network, and the type of the input and output is seq, then we can automatically generate the network based on the element of the seq(a)
-
-another things to choose is that if we need to use the dynamic types? Infer the input and select the result? 
-
-
-abstract operators for datas:
-  - stack (generate sequence)
-  - UNet (transformation)
-  - batchify a sequence (sparse, or dense mode)
-  - reshape a batch of data back in to packed sequences
-  - Encoding, Decoding
-  - reshape (only reshape the batch dimension)
- Also, we can support different ways of fusion different things. 
-
-
-for probabilistic distributions, we have the operators
-  - sample (size, ...) -> data, logp, entropy
-  - rsample if possible (size, ...)
-  - log_prob (evaluate the log prob of the data, ...) (if supported)
-
-we build the stochastic computation graph for all elements
-  - we can sample a element by sampling its all ancestors
-  - we can condition a element by conditioning its all ancestors
-  - one can evaluate the log prob of a element (together with conditions and sampled results) by evaluating the log prob of its all sampled ancestors
+It has several benefits:
+- Unified interface for different types of input, e.g., text, image, audio, video, etc. Providing ways of automatically generating the neural networks based on the type of inputs.
+- unified config and log system.
+- High-level abstractions like ``partial''/condition and computation graphs for probabilistic programming -> support functor types!
+- We provide strict type check and shape inference for the neural networks, with better traceback information, which can help us to find bugs early.
+- Interface-like object-oriented design. 
+- With the help of automatical type inference, we only need to define the networks once, e.g., we don't have to define/config the module and write the forward separately.
