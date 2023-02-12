@@ -5,7 +5,7 @@ import torch
 from ..operator import Operator
 from .tensor import TensorType, VariableArgs, Type
 from ..node import Node
-from ..functors import Flatten, Seq, Linear, FlattenBatch, Tuple
+from ..functors import Flatten, Linear, FlattenBatch, Tuple
 
 ImageType = TensorType('...', 'D', 'N', 'M', data_dims=3)
 
@@ -66,16 +66,21 @@ def test_conv():
 
     out = Tuple(linear, linear2)
     graph = out.compile(config=dict(Linear=dict(dim=35)))
-    exit(0)
 
-    seq = Seq(flattenb, conv, flatten, linear, linear2)
+    #seq = Seq(flattenb, conv, flatten, linear, linear2)
 
     image = inp.sample()
     from omegaconf import OmegaConf as C
     
     #print(image.shape)
     #image = torch.zeros(5, 224, 224, device='cuda:0')
-    assert torch.allclose(graph(image)[1], seq(image)), f"{image.shape}"
+    seq = [flattenb, conv, flatten, linear, linear2]
+    x = image
+    for i in seq:
+        x = i(x)
+
+    assert torch.allclose(graph(image)[1], x), f"{image.shape}"
+    exit(0)
 
 
     img = torch.tensor([1., 2., 3.])

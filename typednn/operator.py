@@ -1,22 +1,4 @@
 # https://www.notion.so/Typed-Dynamics-Graph-316d4c6d9509489ebc97a50e698867a2
-
-"""
-An operator is the container of the neural networks. It is created by OperatorCls().
-But from the perspective of the program, the created instance itself is a piece of code.
-
-By default, feeding nodes and it will return a node containing the operators.
-Calling the node again we can get another node sharing the same operator.
-
-
-- arrow: the type of the operator
-- get_output_type_by_input(self, *args, **kwargs) -> type: type inference of the operator  
-
-- __call__(self, *args, **kwargs) -> data
-
-- reconfig(**kwargs): compute the 
-- init(*args, **kwargs) -> None
-
-"""
 import torch
 from torch import nn
 from omegaconf import OmegaConf as C
@@ -48,6 +30,11 @@ class Operator(OptBase):
         OPID += 1
         self._init_kwargs = C.create()
         self.clear()
+
+        self._input_nodes = None
+
+    def set_input_nodes(self, *input_nodes):
+        self._input_nodes = input_nodes
 
     def clone(self, shallow=True):
         # copy the operator
@@ -87,8 +74,11 @@ class Operator(OptBase):
 
 
     def type_inference(self, *input_types) -> Type:
-        from .unification import TypeInferenceFailure
+        return self._type_inference(*input_types)
 
+
+    def _type_inference(self, *input_types) -> Type:
+        from .unification import TypeInferenceFailure
         if self._initialized and self.INFER_SHAPE_BY_FORWARD:
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)

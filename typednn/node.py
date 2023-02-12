@@ -35,7 +35,7 @@ class NodeBase(abc.ABC):
             return InputNode(val)
         else:
             #return ValNode(val)
-            raise NotImplementedError("not supported")
+            raise NotImplementedError(f"not supported input type for Node: {type(val)}")
 
     @abc.abstractmethod
     def get_type(self, context=None):
@@ -117,7 +117,7 @@ class Node(NodeBase): # compile a static type tree based on meta type
         else:
             if self not in context:
                 context[self] = self._get_type(context)
-            return context
+            return context[self]
 
     def __iter__(self):
         if not isinstance(self._meta_type, TupleType):
@@ -168,26 +168,6 @@ class InputNode(Node):
         if self._name is not None:
             return f'{self._name}:{out}'
         return out
-
-
-
-class ShadowNode(Node): 
-    # input node of the operator 
-    # hack so that we can modify the default input node easily during reconfiguration
-    def __init__(self, type, **kwargs) -> None:
-        Node.__init__(self, type._meta_type, **kwargs)
-        self._parent_type = type
-
-    def get_type(self):
-        return self._parent_type.get_type()
-        
-    def _evaluate(self, context):
-        return self._parent_type.evaluate(context)
-
-    def __str__(self) -> str:
-        return 'INP:' + self._parent_type.__str__()
-
-            
             
 class IndexNode(Node):
     def __init__(self, meta_type, parent, index, **kwargs) -> None:

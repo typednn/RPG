@@ -64,6 +64,7 @@ class Function(Operator):
 
         assert len(self.operators) == len(context['submodules'])
         Operator.__init__(self)
+        return self
 
     def clone(self):
         raise NotImplementedError
@@ -74,18 +75,21 @@ class Function(Operator):
             self._output_node = list(self.nodes.values())[-1]
         return self._output_node
 
-    def __call__(self, *args, **kwargs):
+    def call(self, *args, **kwargs):
         from .abstraction import CallNode
         return CallNode(self, *args, **kwargs)
 
-    def build_modules(self):
-        self.output_node.get_type() # this will directly get the output ..
+    def build_modules(self, *input_types):
+        #self.output_node.get_type() # this will directly get the output ..
+        self.type_inference(*input_types, init=True)
         self.main = torch.nn.ModuleDict(self.operators)
 
-    def type_inference(self, *input_types):
+    def type_inference(self, *input_types, init=False):
         context = {
             node: type for node, type in zip(self.named_input.values(), input_types)
         }
+        if not init:
+            context['_do_not_init'] = True
         return self.output_node.get_type(context)
 
     def reconfig(self, **kwargs):
@@ -105,30 +109,18 @@ class Function(Operator):
             config[name]['_type'] = module.__class__.__name__
         self._config = C.create(config)
 
-    # def init(self):
-    # def forward(self, *inps, **kwargs):
-    #     context = {}
-    #     for node, b in zip(self._default_inp_nodes, inps):
-    #         context[node] = b
-
-    #     for k, v in kwargs.items():
-    #         if k not in self.named_input:
-    #             raise ValueError(f'input {k} is not defined')
-    #         node = self.named_input[k]
-    #         if node in context:
-    #             raise ValueError(f'input {k} is already defined')
-    #         context[node] = v
-
-    #     if len(context) != len(self.named_input):
-    #         raise ValueError(f'input length is not correct, expected {list(self.named_input.keys())}, but only got {list(context.keys())}')
-    #     return self.output_node.evaluate(context)
+    def forward(self, *inps):
+        context = {}
+        for node, b in zip(self.named_input.values(), inps):
+            context[node] = b
+        return self.output_node.evaluate(context)
 
     def __str__(self) -> str:
         #TODO: output nodes; (with input and output types)
         self.init()
         out = ''
         for idx, (name, k) in enumerate(self.operators.items()):
-            out += f' ({idx}).{k.left_value}  of {name}: ' + str(k).replace('\n', '\n   ') + '\n'
+            out += f' ({idx}).[TODO:leftvalue?] of {name}: ' + str(k).replace('\n', '\n   ') + '\n'
 
         out = out + 'Inputs: ' + ', '.join([str(self.named_input[k]) for k in self.named_input])
         for lineno, i in enumerate(self.nodes):
@@ -174,12 +166,12 @@ def abstract(
     context['visited'][node] = False
 
 
-    if node not in inputs:
+    if inputs is None or node not in inputs:
         parents = node.get_parents()
         for i in parents:
-            compile(i, build=False, context=context, inputs=inputs, config=config)
+            abstract(i, build=False, context=context, inputs=inputs, config=config)
 
-    if isinstance(node, InputNode) or node in inputs:
+    if isinstance(node, InputNode) or (inputs is not None and node in inputs):
         context['inputs'][node] = node
 
     if isinstance(node, Node):
@@ -191,11 +183,12 @@ def abstract(
             if op not in context['submodules']:
                 # remove duplicated name
                 name = op._name
-                if name in context['opname_count']:
-                    val_count = context['opname_count'].get(name, 0) + 1
-                    context['opname_count'][name] = val_count
-                    if val_count > 1:
-                        name = name+ '_' + str(val_count)
+                #if name in context['opname_count']:
+
+                val_count = context['opname_count'].get(name, 0) + 1
+                context['opname_count'][name] = val_count
+                if val_count > 1:
+                    name = name+ '_' + str(val_count)
 
                 op.reconfig(**config.get(name, {}))
                 context['submodules'][op] = name

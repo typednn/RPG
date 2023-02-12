@@ -24,7 +24,7 @@ def process_args_kwargs(config, *args, **kwargs):
     return keys, args, C.create(config_args)
 
 class CallNode(Node):
-    def __init__(self, op, *args, **kwargs):
+    def __init__(self, op, *args, caller_key=None, **kwargs):
         from .operator import Operator
         op: Operator = op
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
@@ -34,12 +34,13 @@ class CallNode(Node):
         op.reconfig(**init_kwargs)
 
         self.op = op
-        self.call_frame = self.find_caller()
+        self.call_frame = self.find_caller(caller_key)
         self.left_value = get_left_value(self.call_frame)
         super().__init__(self.op.type_inference(*[i._meta_type for i in self.input_nodes]), name=self.left_value)
 
 
-    def find_caller(self, key='OPERATORS'):
+    def find_caller(self, key):
+        key = key or 'OPERATORS'
         for frame in inspect.stack():
             if (self.op.__class__.__name__ in frame[4][0] or key in frame[4][0]):
                 return frame
@@ -71,8 +72,14 @@ class CallNode(Node):
         return self(*[context[i] for i in self.input_nodes])
 
     def _get_type(self, context):
-        self.op.init(*self.input_nodes) # initailize the operator if not 
-        return self.op.type_inference(*[i.get_type(context) for i in self.input_nodes])
+        if context is None or '_do_not_init' not in context:
+            self.op.init(*self.input_nodes) # initailize the operator if needed 
+            assert self.op._initialized
+        inp_types = [i.get_type(context) for i in self.input_nodes]
+        
+        out = self.op.type_inference(*inp_types)
+        # print(self.op, self.op._initialized, out)
+        return out
         
     def __call__(self, *args, **kwargs):
         inps = self.match_input(*args, **kwargs)
@@ -87,6 +94,7 @@ class CallNode(Node):
                 #frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
                 raise Exception("type mismatch..; we need a better way to raise the error.")
 
+        self.op.set_input_nodes(*self.input_nodes)
         out = self.op(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"

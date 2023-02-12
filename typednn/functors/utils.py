@@ -2,13 +2,12 @@
 import numpy as np
 from torch import nn
 from ..operator import Operator
-from ..functor import Functor
 from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 
 class FlattenBatch(Operator):
     def forward(self, x):
-        return x.reshape(-1, *self.default_inp_nodes[0].get_type().data_shape().as_int())
+        return x.reshape(-1, *self._input_nodes[0].get_type().data_shape().as_int())
 
     def _type_inference(self, inp_type):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
@@ -16,37 +15,12 @@ class FlattenBatch(Operator):
 
 class Flatten(Operator):
     def forward(self, x):
-        dims = self.default_inp_nodes[0].get_type().data_dims
+        dims = self._input_nodes[0].get_type().data_dims
         return x.reshape(*x.shape[:-dims], -1)
 
     def _type_inference(self, inp_type):
         # print(inp_type.data_shape())
         return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
-
-
-class Seq(Functor):
-    def __init__(self, *modules, **kwargs) -> None:
-        self.op_list = modules
-        super().__init__(*modules, **kwargs)
-
-    def forward(self, *args, **kwargs):
-        out = args
-        for k, module in self.main.items():
-            out = [module(*out)]
-        return out[0] 
-
-    def _input_modules(self):
-        return self.op_list[0]
-
-    def _output_modules(self):
-        return self.op_list[-1]
-
-    def __str__(self) -> str:
-        out = 'Sequential:\n'
-        for i in self.op_list:
-            out += '  ' + str(i).replace('\n', '\n   ') + '\n'
-        out += str(self.out)
-        return out
 
 
 class Concat(Operator):
