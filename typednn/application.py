@@ -2,6 +2,7 @@
 import inspect
 from .node import Node
 from omegaconf import OmegaConf as C
+from .basetypes import Type
 
 
 def get_left_value(frame):
@@ -32,46 +33,70 @@ class CallNode(Node): # App in the type system.. calling an function..
     #     self.module: Operator = module
     #     self.input_nodes = input_nodes
 
-    def __init__(self, op, *args, **kwargs):
+    def __init__(self, op, *args, name=None, **kwargs):
         from .operator import Operator
-        self.op: Operator = op
-        raise NotImplementedError
+        op: Operator = op
+        self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
+            op.default_config(), *args, **kwargs)
+
+        self.input_nodes =list(map(Node.from_val, self.input_nodes))
+        op.reconfig(**init_kwargs)
+
+        self.op = op
+        self.call_frame = self.find_caller()
+        self.left_value = get_left_value(self.call_frame)
+
+        super().__init__(self.op.type_inference(*self.input_nodes), name=name)
+
+
+    def find_caller(self, key='OPERATORS'):
+        for frame in inspect.stack():
+            if (self.op.__class__.__name__ in frame[4][0] or key in frame[4][0]):
+                return frame
+        raise ValueError("cannot find the caller of this function")
 
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
-        for i in range(len(args), len(self._init_args)):
-            if self._init_keys[i] is None:
+        for i in range(len(args), len(self.input_nodes)):
+            if self.input_keys[i] is None:
                 raise ValueError(f"missing input {i}")
-            if self._init_keys[i] in kwargs:
-                inps.append(kwargs.pop(self._init_keys[i]))
+            if self.input_keys[i] in kwargs:
+                inps.append(kwargs.pop(self.input_keys[i]))
             else:
-                raise ValueError(f"missing input {self._init_keys[i]}")
+                raise ValueError(f"missing input {self.input_keys[i]}")
         if len(kwargs) > 0:
             raise ValueError(f"extra inputs {kwargs.keys()}")
-        return inps, kwargs
-
+        return inps
 
     def get_parents(self):
-        
         return self.input_nodes
 
     def print_line(self):
-        return self.module._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
+        return self.op._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
 
     def _evaluate(self, context):
         for i in self.input_nodes:
             context[i] = i.evaluate(context)
-        return self.module(*[context[i] for i in self.input_nodes])
+        return self(*[context[i] for i in self.input_nodes])
 
     def _get_type(self):
-        return self.module.get_output_type_by_input(*self.input_nodes, force_init=True)
+        self.op.init(*self.input_nodes) # initailize the operator if not 
+        return self.op.type_inference(*self.input_nodes)
+        
+    def __call__(self, *args, **kwargs):
+        inps = self.match_input(*args, **kwargs)
+        self.op.init(*self.input_nodes) # initalize using the input nodes
 
-
-
-def as_caller(cls):
-    #raise NotImplementedError
-    def callnode(*args, **kwargs):
-        op = cls()
-        return CallNode(op, *args, **kwargs)
-    return callnode
+        for node, input in zip(self.input_nodes, inps):
+            type = node.get_type()
+            if isinstance(type, Type) and type.instance(input) is None:
+                info = '\n' + str(self)
+                info = info.replace('\n', '\n' + '>' * 10)
+                #from .utils import tensor2error
+                #frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
+                raise Exception("type mismatch..; we need a better way to raise the error.")
+        out = self.op(*inps)
+        out_type = self.get_type()
+        assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
+        return out

@@ -21,7 +21,6 @@ from .node import Node, CallNode, nodes_to_types
 from .utils import frame_assert
 from .unification import unify
 from typing import Mapping, Any
-from .utils import exception_with_traceback
 
 
 class OptBase(Module):
@@ -36,33 +35,24 @@ class Operator(OptBase):
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
 
-    def __init__(self, name=None, _trace_history=None, **kwargs) -> None: #, _trace_history=None, **kwargs) -> None:
+    def __init__(self, name=None) -> None: 
         super().__init__()
+        self._name = name or self.__class__.__name__
 
         global OPID
         self._id = OPID
         OPID += 1
-        self._name = name or self.__class__.__name__
 
-        self.reconfig(**kwargs)
-
-        # # TODO: store the lineno for debugging
-        # self._init_keys, self._init_args, self._init_kwargs = self.process_args_kwargs(*args, **kwargs)
-
-        # self.call_frame = self.find_caller()
-        # self.left_value = get_left_value(self.call_frame)
-        # self._trace_history = ('\n' + _trace_history() if _trace_history is not None else '') + '\n\ninit at\n' + exception_with_traceback(self.call_frame[0]) 
+        self._init_kwargs = C.create()
+        self.clear()
 
     """ code for manage computation graph """
     def reconfig(self, **kwargs):
         if self._initialized:
-            import logging
-            logging.warning(f"reconfiguring a module {self._name} that has already been initialized, this is not recommended")
-
-        if hasattr(self, '_init_kwargs'):
-            self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
-        else:
-            self._init_kwargs = C.create(kwargs)
+            #import logging
+            #logging.warning(f"reconfiguring a module {self._name} that has already been initialized, this is not recommended")
+            raise NotImplementedError("Can't config an initalized operator.")
+        self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
         self.clear()
 
     def clear(self):
@@ -104,15 +94,12 @@ class Operator(OptBase):
         return _out_type
 
     # required for infering the output type
-    def type_inference(self, *input_nodes, force_init=False):
-        if force_init:
-            self.init()
+    def type_inference(self, *input_nodes):
         if self._initialized: #if initliaized, use another way to do the type inference ..
             input_types = nodes_to_types(input_nodes)
-            return self._type_inference(*input_types)
         else:
             input_types = [i._meta_type for i in input_nodes]
-            return self._type_inference(*input_types)
+        return self._type_inference(*input_types)
 
     def myassert(self, cond, msg='', errorType=ValueError):
         #frame_assert(cond, msg, self.get_trace, errorType)
@@ -137,13 +124,6 @@ class Operator(OptBase):
     #         self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
     #     return self._default_inp_nodes
 
-    # def find_caller(self, key='OPERATORS'):
-    #     # find the caller of this function
-    #     for frame in inspect.stack():
-    #         # hack ..
-    #         if (self.__class__.__name__ in frame[4][0] or key in frame[4][0]):
-    #             return frame
-    #     raise ValueError("cannot find the caller of this function")
 
     # def get_trace(self):
     #     return self._trace_history
@@ -270,10 +250,7 @@ class Operator(OptBase):
 
     """ utilities """
     def __str__(self) -> str:
-        #out = super().__str__()
-        self.init()
-        out = torch.nn.Module.__str__(self)
-        return out + f" -> {self.get_output().get_type()}"
+        return torch.nn.Module.__str__(self)
 
     def __hash__(self) -> int:
         return hash(f'THISISANOPWITHID:{self._id}')
@@ -285,3 +262,12 @@ class Operator(OptBase):
     def __deepcopy__(self):
         # TODO: deep copy a node will copy the config and the modules
         raise NotImplementedError("deepcopy is not supported for now")
+
+
+
+def register(cls):
+    #raise NotImplementedError
+    def callnode(*args, **kwargs):
+        op = cls()
+        return CallNode(op, *args, **kwargs)
+    return callnode

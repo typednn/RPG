@@ -31,10 +31,7 @@ class NodeBase(abc.ABC):
             return val
 
         from .operator import Operator
-        if isinstance(val, Operator):
-            module: Operator = val
-            return module.get_output()
-        elif isinstance(val, Type):
+        if isinstance(val, Type):
             return InputNode(val)
         else:
             #return ValNode(val)
@@ -158,12 +155,12 @@ class Node(NodeBase): # compile a static type tree based on meta type
                 name = self._name + f'.{i}'
             yield IndexNode(self._meta_type[i], self, index=i, name=name)
             
-    def __getattr__(self, key) -> str:
-        if not isinstance(self._meta_type, AttrType):
-            raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
-        if not hasattr(self._meta_type, key):
-            raise RuntimeError(f"{self} does not have attribute {key}.")
-        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+    # def __getattr__(self, key) -> str:
+    #     if not isinstance(self._meta_type, AttrType):
+    #         raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+    #     if not hasattr(self._meta_type, key):
+    #         raise RuntimeError(f"{self} does not have attribute {key}.")
+    #     return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
 
     def compile(self, *args, **kwargs):
         from .compiler import compile
@@ -243,7 +240,7 @@ from .application import CallNode
 
 
 if __name__ == '__main__':
-    node = ValNode(1)
+    node = InputNode(1)
     import copy
     node2 = copy.deepcopy(node)
     node2 = copy.deepcopy(node)

@@ -2,7 +2,7 @@ import typing
 import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow, InstantiationFailure
-from ..operator import Operator
+from ..operator import Operator, register
 from .size import SizeType, UIntType
 from torch import nn
 
@@ -80,6 +80,7 @@ class TensorType(Type):
 
 Tensor1D = TensorType('...', 'N', data_dims=1)
 
+@register
 class MLP(Operator):
     INFER_SHAPE_BY_FORWARD=True
     arrow = Arrow(TensorType('...', 'N', data_dims=1), TensorType('...', 'M', data_dims=1))
@@ -95,7 +96,7 @@ class MLP(Operator):
 
     def _type_inference(self, input_types) -> Type:
         assert input_types.data_dims == 1, "MLP only support 1D data"
-        if not self._lazy_init:
+        if not self._initialized:
             return TensorType(*input_types.batch_shape(), self.config.out_dim)
         else:
             return super()._type_inference(input_types)
@@ -149,7 +150,6 @@ def test():
         
 def test_mlp():
     inp = TensorType(3, 4, 5, data_dims=1)
-
     mlp = MLP(inp, layer=5, hidden=512, out_dim=32)
     print(mlp)
     mlp(inp.sample())
