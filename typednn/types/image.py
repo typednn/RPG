@@ -80,8 +80,6 @@ def test_conv():
         x = i(x)
 
     assert torch.allclose(graph(image)[1], x), f"{image.shape}"
-    exit(0)
-
 
     img = torch.tensor([1., 2., 3.])
 
