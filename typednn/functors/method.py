@@ -4,7 +4,7 @@ When we define the graph, taking a method attribute of a node will return the co
 
 Note that we require the type is annotated ..
 """
-from .funcdef import moduledef
+#from .funcdef import moduledef
 from ..basetypes import AttrType
 from ..functor import Operator
 

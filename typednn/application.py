@@ -9,8 +9,6 @@ def get_left_value(frame):
     frame = frame[0]
     return inspect.getframeinfo(frame).code_context[0].strip().split("=")[0].strip()
 
-
-
 def process_args_kwargs(config, *args, **kwargs):
     config_args = {}
 
@@ -25,14 +23,7 @@ def process_args_kwargs(config, *args, **kwargs):
             keys.append(k)
     return keys, args, C.create(config_args)
 
-
-class CallNode(Node): # App in the type system.. calling an function..
-    # def __init__(self, meta_type, module, input_nodes, **kwargs) -> None:
-    #     super().__init__(meta_type, **kwargs)
-    #     from .operator import Operator
-    #     self.module: Operator = module
-    #     self.input_nodes = input_nodes
-
+class CallNode(Node):
     def __init__(self, op, *args, **kwargs):
         from .operator import Operator
         op: Operator = op
@@ -45,7 +36,7 @@ class CallNode(Node): # App in the type system.. calling an function..
         self.op = op
         self.call_frame = self.find_caller()
         self.left_value = get_left_value(self.call_frame)
-        super().__init__(self.op.type_inference(*self.input_nodes), name=self.left_value)
+        super().__init__(self.op.type_inference(*[i._meta_type for i in self.input_nodes]), name=self.left_value)
 
 
     def find_caller(self, key='OPERATORS'):
@@ -79,9 +70,9 @@ class CallNode(Node): # App in the type system.. calling an function..
             context[i] = i.evaluate(context)
         return self(*[context[i] for i in self.input_nodes])
 
-    def _get_type(self):
+    def _get_type(self, context):
         self.op.init(*self.input_nodes) # initailize the operator if not 
-        return self.op.type_inference(*self.input_nodes)
+        return self.op.type_inference(*[i.get_type(context) for i in self.input_nodes])
         
     def __call__(self, *args, **kwargs):
         inps = self.match_input(*args, **kwargs)
@@ -95,6 +86,7 @@ class CallNode(Node): # App in the type system.. calling an function..
                 #from .utils import tensor2error
                 #frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
                 raise Exception("type mismatch..; we need a better way to raise the error.")
+
         out = self.op(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"

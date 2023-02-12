@@ -4,23 +4,8 @@ import inspect
 from ..node import InputNode, NodeBase
 from ..types import TupleType, AttrType
 from .utils import Tuple, Dict
+from ..abstraction import asfunc
 
-
-# TODO: add support to quickly wrap a function into a node 
-
-def moduledef(func: typing.Mapping):
-    annotation = func.__annotations__
-    #print(annotation)
-    input_nodes = {}
-    for k, v in annotation.items():
-        input_nodes[k] = InputNode(v, name=k)
-
-    output = func(*input_nodes.values())
-    if isinstance(output, tuple):
-        output = Tuple(*output)
-    if isinstance(output, dict) and not isinstance(output, NodeBase):
-        output = Dict(**output)
-    return output.compile(input_order=input_nodes)
     
 
 def test_module_define():
@@ -34,7 +19,7 @@ def test_module_define():
 
     image_type = TensorType('B', 5, 224, 224, data_dims=3)
 
-    @moduledef
+    @asfunc
     def mymodule(inp1: image_type, inp2: image_type):
         img = ConvNet(FlattenBatch(inp1))
         img2 = img.shadow(FlattenBatch(inp2))

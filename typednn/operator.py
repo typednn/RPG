@@ -1,7 +1,12 @@
 # https://www.notion.so/Typed-Dynamics-Graph-316d4c6d9509489ebc97a50e698867a2
 
 """
-The operator is the container of the neural networks 
+An operator is the container of the neural networks. It is created by OperatorCls().
+But from the perspective of the program, the created instance itself is a piece of code.
+
+By default, feeding nodes and it will return a node containing the operators.
+Calling the node again we can get another node sharing the same operator.
+
 
 - arrow: the type of the operator
 - get_output_type_by_input(self, *args, **kwargs) -> type: type inference of the operator  
@@ -38,13 +43,20 @@ class Operator(OptBase):
     def __init__(self) -> None: 
         super().__init__()
         self._name = self.__class__.__name__
-
         global OPID
         self._id = OPID
         OPID += 1
-
         self._init_kwargs = C.create()
         self.clear()
+
+    def clone(self, shallow=True):
+        # copy the operator
+        if shallow:
+            assert not self._initialized, "Can't clone an initialized operator"
+        new: Operator = self.__class__.__new__(self.__class__)
+        new.__init__(self._name)
+        new.reconfig(**self._init_kwargs)
+        return new
 
     """ code for manage computation graph """
     def reconfig(self, **kwargs):
@@ -56,15 +68,13 @@ class Operator(OptBase):
         self.clear()
 
     def clear(self):
-        # self._default_inp_nodes = None
-        # self._default_out = None
         self._initialized = False
         self._config = None
 
 
     def init(self, *inp_nodes):
         if not self._initialized:
-            self.type_inference(*inp_nodes) # infer the meta types 
+            # self.type_inference(*inp_nodes) # infer the meta types 
             self._initialized = True
             try:
                 self.main
@@ -76,7 +86,7 @@ class Operator(OptBase):
                 self.build_modules(*inp_types)
 
 
-    def _type_inference(self, *input_types) -> Type:
+    def type_inference(self, *input_types) -> Type:
         from .unification import TypeInferenceFailure
 
         if self._initialized and self.INFER_SHAPE_BY_FORWARD:
@@ -93,14 +103,6 @@ class Operator(OptBase):
         self.myassert(error is None, f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", error.__class__)
         return _out_type
 
-    # required for infering the output type
-    def type_inference(self, *input_nodes):
-        if self._initialized: #if initliaized, use another way to do the type inference ..
-            input_types = nodes_to_types(input_nodes)
-        else:
-            input_types = [i._meta_type for i in input_nodes]
-        return self._type_inference(*input_types)
-
     def myassert(self, cond, msg='', errorType=ValueError):
         #frame_assert(cond, msg, self.get_trace, errorType)
         frame_assert(cond, msg, lambda: '', errorType)
@@ -115,89 +117,6 @@ class Operator(OptBase):
             tb = traceback.format_exc()
             self.myassert(False,  f"error in forward function of {self.__class__}:\n{e} with\n {str(tb)}", e.__class__)
             
-
-
-    # @property
-    # def default_inp_nodes(self):
-    #     if self._default_inp_nodes is None:
-    #         from .node import ShadowNode
-    #         self._default_inp_nodes = [Node.from_val(i) for i in self._init_args]
-    #     return self._default_inp_nodes
-
-
-    # def get_trace(self):
-    #     return self._trace_history
-
-    # # get the output node of the operator based on input nodes ..
-    # def shadow(self, *input_nodes: typing.List[Node], default=False, **kwargs) -> Node:
-    #     # TODO: for replicate operators.
-    #     # self.myassert(default, "left value inference is not implemneted")
-    #     input_nodes, _ = self.match_input(*input_nodes, **kwargs)
-    #     input_nodes = [Node.from_val(i) for i in input_nodes]
-    #     if default:
-    #         name = self.left_value
-    #     else:
-    #         for frame in inspect.stack():
-    #             if ('.shadow' in frame[4][0]):
-    #                 break
-    #         name = get_left_value(frame)
-
-    #     if ',' in name:
-    #         name = '[' + name + ']'
-    #     return CallNode(self.get_output_type_by_input(*input_nodes), self, name=name, input_nodes=input_nodes)
-
-    # # wrappers
-    # def get_output(self) -> Node: # out type when input are feed ..
-    #     # TODO: if possible, extract the default name from the line calling the method
-    #     if self._default_out is None:
-    #         self._default_out = self.shadow(*self.default_inp_nodes, default=True)
-    #     return self._default_out
-
-    # def __iter__(self):
-    #     return iter(self.get_output())
-
-    # def __getattr__(self, name: str):
-    #     # assert name in self._modules, f"module {name} is not found in {self.__class__}"
-    #     error = None
-    #     try:
-    #         return super().__getattr__(name)
-    #     except AttributeError as e:
-    #         error = e
-
-    #     if error:
-    #         if name != 'main':
-    #             error_again = None
-    #             try:
-    #                 attr = getattr(self.get_output(), name)
-    #             except AttributeError as e:
-    #                 error_again = e
-    #             if error_again is not None:
-    #                 raise error
-    #         else:
-    #             raise error
-    #     return attr
-
-    # """ calling, this is not for the graph construct """
-    # def __call__(self, *args, **kwargs):
-    #     self.init()
-    #     args, kwargs = self.match_input(*args, **kwargs)
-
-    #     #TODO: this only checks for the default input nodes ..
-    #     for a, b in zip(self.default_inp_nodes, args):
-    #         a = a.get_type()
-            
-    #         if isinstance(a, Type) and a.instance(b) is None:
-    #             info = '\n' + str(self)
-    #             info = info.replace('\n', '\n' + '>' * 10)
-    #             from .utils import tensor2error
-    #             frame_assert(False, f"input {tensor2error(b)} does not match the required input type {a} for {info}", self.get_trace, TypeError)
-                
-    #     out = super().__call__(*args, **kwargs)
-    #     # TODO: check output type
-    #     out_type = self.get_output().get_type()
-    #     assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
-    #     return out
-
         
     """ config system """
     @property
@@ -262,7 +181,7 @@ class Operator(OptBase):
         # TODO: deep copy a node will copy the config and the modules
         raise NotImplementedError("deepcopy is not supported for now")
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs): # Calling the operator will generates a new line of code ..
         op = super().__new__(cls)
         op.__init__()
         return CallNode(op, *args, **kwargs)

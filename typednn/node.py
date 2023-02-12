@@ -38,7 +38,7 @@ class NodeBase(abc.ABC):
             raise NotImplementedError("not supported")
 
     @abc.abstractmethod
-    def get_type(self):
+    def get_type(self, context=None):
         pass
 
     def __init__(self, name=None) -> None:
@@ -87,7 +87,7 @@ class InputNode(NodeBase):
         super().__init__(**kwargs)
         self._meta_type = self._type = type
 
-    def get_type(self):
+    def get_type(self, context=None):
         return self._type
 
     def evaluate(self, context):
@@ -98,18 +98,6 @@ class InputNode(NodeBase):
         if self._name is not None:
             return f'{self._name}:{out}'
         return out
-
-
-# class ValNode(NodeBase):
-#     def __init__(self, val, **kwargs) -> None:
-#         super().__init__(**kwargs)
-#         self._meta_type = self.val = val
-
-#     def get_type(self):
-#         return self.val
-
-#     def evaluate(self, context):
-#         return self.val
 
 
 class Node(NodeBase): # compile a static type tree based on meta type 
@@ -132,17 +120,22 @@ class Node(NodeBase): # compile a static type tree based on meta type
         pass
 
     @abc.abstractmethod
-    def _get_type(self):
+    def _get_type(self, context):
         pass
 
     @abc.abstractmethod
     def print_line(self):
         pass
 
-    def get_type(self):
-        if self._type is None:
-            self._type = self._get_type()
-        return self._type
+    def get_type(self, context=None):
+        if context is None:
+            if self._type is None:
+                self._type = self._get_type(context)
+            return self._type
+        else:
+            if self not in context:
+                context[self] = self._get_type(context)
+            return context
 
     def __iter__(self):
         if not isinstance(self._meta_type, TupleType):
@@ -163,8 +156,8 @@ class Node(NodeBase): # compile a static type tree based on meta type
     #     return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
 
     def compile(self, *args, **kwargs):
-        from .compiler import compile
-        return compile(self, *args, **kwargs)
+        from .abstraction import abstract
+        return abstract(self, *args, **kwargs)
 
     def call_partial(self, *args, **kwargs):
         #raise NotIM
@@ -201,8 +194,8 @@ class IndexNode(Node):
     def _evaluate(self, context):
         return self.parent.evaluate(context)[self.index]
 
-    def _get_type(self):
-        return self.parent.get_type()[self.index]
+    def _get_type(self, context):
+        return self.parent.get_type(context)[self.index]
 
 
     def print_line(self):
@@ -221,8 +214,8 @@ class AttrNode(Node):
     def _evaluate(self, context):
         return getattr(self.parent.evaluate(context), self.key)
 
-    def _get_type(self):
-        return getattr(self.parent.get_type(), self.key)
+    def _get_type(self, context):
+        return getattr(self.parent.get_type(context), self.key)
 
     def print_line(self):
         return str(self.parent._name) + '.' + str(self.key)
