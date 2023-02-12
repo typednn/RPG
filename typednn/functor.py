@@ -41,7 +41,6 @@ class Functor(Operator):
             module.init() # initlaize the module
         self.main = torch.nn.ModuleDict(self.submodules)
         self._get_arrow()
-        
 
     def _get_arrow(self):
         from .functors import Tuple, Arrow
@@ -82,7 +81,3 @@ class Functor(Operator):
     def __call__(self, *args, **kwargs):
         # for functor, the default input nodes is defined here actually 
         return super().__call__(*args, **kwargs)
-
-
-if __name__ == '__main__':
-    pass

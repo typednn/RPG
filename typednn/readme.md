@@ -15,8 +15,9 @@ Now let's state the key elements of the language:
 - A piece of a program describes a computation graph, formed by operators and computation nodes. Each node is associated with two types: the meta type and the actual type. The meta type has to be decided before initializing the modules, at least determining if a node is a dict, tuple or a type that has certain attributes, but it usually does not have to worry about the actual dimensions of the tensor shapes or actual value of the primitive types. The true type will be determined after initializing the operators in the end. 
 - Operator: can be viewed as parameterized function of datas. An operator (CallNode) will be created after feeding computation nodes into a MetaOperator (e.g., the classname of the operator) and it will map inputs to create a new node and an instance of the operator.
   - an operator can reuse (actually by default it will) parameters for different input types if it is configured well.
+  - the created operator will be a part of the computation graph
 - Function: a function composes operators into new a new MetaOperator (i.e., operator class). One can reuse this function to create new operators.
-- AttrType, or classes: For any subclasses of the AttrType will support class method. Nodes of these types are able to call methods as operators. One can specify some rules to determine which methods to use if necessary.
+- AttrType, or classes: For any subclasses of the AttrType will support class method. Nodes of these types are able to call methods as operators. One can specify some rules to determine which methods to use if necessary. We can group several functions together to construct a learning agent. 
 
 ----
 

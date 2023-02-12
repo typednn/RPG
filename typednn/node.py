@@ -19,8 +19,10 @@ def nodes_to_metatype(nodes):
     nodes: typing.List[Node]
     return [i._meta_type for i in nodes]
 
+
 # global NODEID
 NODEID = 0
+
 
 class NodeBase(abc.ABC):
     @classmethod
@@ -35,7 +37,8 @@ class NodeBase(abc.ABC):
         elif isinstance(val, Type):
             return InputNode(val)
         else:
-            return ValNode(val)
+            #return ValNode(val)
+            raise NotImplementedError("not supported")
 
     @abc.abstractmethod
     def get_type(self):
@@ -44,6 +47,7 @@ class NodeBase(abc.ABC):
     def __init__(self, name=None) -> None:
         super().__init__()
         self._name = name
+        self._meta_type = None
 
         global NODEID
         self._id = NODEID
@@ -98,30 +102,17 @@ class InputNode(NodeBase):
             return f'{self._name}:{out}'
         return out
 
-class ShadowNode(InputNode): # input node of the operator ..
-    def __init__(self, type, **kwargs) -> None:
-        Node.__init__(**kwargs)
-        self._parent_node = type
-        self._meta_type = type._meta_type
 
-    def get_type(self):
-        return self.type.get_type()
+# class ValNode(NodeBase):
+#     def __init__(self, val, **kwargs) -> None:
+#         super().__init__(**kwargs)
+#         self._meta_type = self.val = val
 
-    def __str__(self) -> str:
-        return 'INP:' + self.type.__str__()
+#     def get_type(self):
+#         return self.val
 
-
-class ValNode(NodeBase):
-    def __init__(self, val, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._meta_type = self.val = val
-
-    def get_type(self):
-        return self.val
-
-    def evaluate(self, context):
-        return self.val
-
+#     def evaluate(self, context):
+#         return self.val
 
 
 class Node(NodeBase): # compile a static type tree based on meta type 
@@ -134,8 +125,13 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def get_parents(self):
         pass
 
-    @abc.abstractmethod
     def evaluate(self, context):
+        if self not in context:
+            context[self] = self._evaluate(context)
+        return context[self]
+
+    @abc.abstractmethod
+    def _evaluate(self, context):
         pass
 
     @abc.abstractmethod
@@ -178,94 +174,23 @@ class Node(NodeBase): # compile a static type tree based on meta type
         raise NotImplementedError
 
 
-"""
-Something TODO:
-- ArrowNode to store operations that will generate arrows
-- We also need utilities to compute and store operators -> Type Inference for partial functions.
-- TODO: support for func define (compile??)
+class ShadowNode(Node): 
+    # input node of the operator 
+    # hack so that we can modify the default input node easily during reconfiguration
+    def __init__(self, type, **kwargs) -> None:
+        Node.__init__(self, type._meta_type, **kwargs)
+        self._parent_type = type
 
-- Lambda? compile func based on a specific type? 
-"""
-
-class ArrowNode(Node):
-    def __init__(self, operator, name=None, **kwargs) -> None:
-        self.operator = operator
-        self.kwargs = kwargs # kwargs should be nodes ..
-        from .operator import Operator
-        self.base_module = operator if isinstance(operator, Operator) else operator.base_module
-        self.prev_kwargs = {} if isinstance(operator, Operator) else {**operator.prev_kwargs, **operator.kwargs}
-        super().__init__(self._inference_type(operator, **kwargs), **kwargs)
-
-    def get_parents(self):
-        parent_nodes = list(self.kwargs.values())
-        if isinstance(self.operator, Node):
-            parent_nodes.append(self.operator)
-        return parent_nodes
-
-    def print_line(self):
-        return self.operator._name
-    
-    def evaluate(self, context):
-        def new_func(*args, **kwargs):
-            #TODO: check if the kwargs are valid
-            #TODO: make this to be an operator class that is more verbose 
-            op = self.operator.evaluate(context)
-            old_kwargs = {k: v.evaluate(context) for k, v in self.kwargs.items()}
-            return op(*args, **kwargs, **old_kwargs)
-        return new_func
-
-    def _get_type(self):
-        #return super()._get_type()
-        #return self.operator
-        kw_types = {k: v.get_type() for k, v in self.kwargs.items()}
-        return self._inference_type(self.operator, **kw_types)
-
-    def _inference_type(self, op, **kwargs):
-        """
-        for the arrow node:
-            - first 
-            - for a new arrow with (others as any kind; and )
-            - unify the current into kwargs ..
-            - and remove 
-        """
-        raise NotImplementedError("seems too complicated .. hard to decide for now")
+    def get_type(self):
+        return self._parent_type.get_type()
         
-# class ApplicationNode(Node):
-#     def __init__(self, arrow, name=None, **kwargs) -> None:
-#         super().__init__(arrow, name=name, **kwargs)
-#         # notice that each node can only be computed once ..
-#         # application node will store existing kwargs ..
-        
-#class PartialCallNode(Node):
-#    # partial call to a module
-#    def __init__(self, arrow_type, *args, **kwargs) -> None:
-#        #super().__init__(meta_type, **kwargs)
-#        raise NotImplementedError
+    def _evaluate(self, context):
+        return self._parent_type.evaluate(context)
+
+    def __str__(self) -> str:
+        return 'INP:' + self._parent_type.__str__()
 
             
-class CallNode(Node): # App in the type system.. calling an function..
-    def __init__(self, meta_type, module, input_nodes, **kwargs) -> None:
-        super().__init__(meta_type, **kwargs)
-        from .operator import Operator
-        self.module: Operator = module
-        self.input_nodes = input_nodes
-
-    def get_parents(self):
-        
-        return self.input_nodes
-
-    def print_line(self):
-        return self.module._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
-
-    def evaluate(self, context):
-        for i in self.input_nodes:
-            if i not in context:
-                context[i] = i.evaluate(context)
-        return self.module(*[context[i] for i in self.input_nodes])
-
-    def _get_type(self):
-        return self.module.get_output_type_by_input(*self.input_nodes, force_init=True)
-
             
 class IndexNode(Node):
     def __init__(self, meta_type, parent, index, **kwargs) -> None:
@@ -276,7 +201,7 @@ class IndexNode(Node):
     def get_parents(self):
         return [self.parent]
 
-    def evaluate(self, context):
+    def _evaluate(self, context):
         return self.parent.evaluate(context)[self.index]
 
     def _get_type(self):
@@ -296,7 +221,7 @@ class AttrNode(Node):
     def get_parents(self):
         return [self.parent]
     
-    def evaluate(self, context):
+    def _evaluate(self, context):
         return getattr(self.parent.evaluate(context), self.key)
 
     def _get_type(self):
@@ -313,6 +238,7 @@ class AttrNode(Node):
         return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
         
 
+from .application import CallNode
 
 
 

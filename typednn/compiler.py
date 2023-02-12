@@ -2,7 +2,7 @@
 #TODO: provide detail level for print and visualization
 
 from .functor import Functor
-from .node import Node, InputNode, CallNode, ArrowNode
+from .node import Node, InputNode, CallNode #, ArrowNode
 from .basetypes import Arrow
 
 from .functor import Functor
@@ -45,7 +45,7 @@ class ModuleGraph(Functor):
         raise ValueError("cannot find the caller of this function")
 
     def _get_arrow(self):
-        self._default_inp_nodes = self.named_input.values()
+        self._default_inp_nodes = list(self.named_input.values())
         self.arrow = Arrow(
             **{
                 k: v.get_type() 
@@ -57,8 +57,9 @@ class ModuleGraph(Functor):
     # def init(self):
     def forward(self, *inps, **kwargs):
         context = {}
-        for (k, node), b in zip(self.named_input.items(), inps):
+        for node, b in zip(self._default_inp_nodes, inps):
             context[node] = b
+
         for k, v in kwargs.items():
             if k not in self.named_input:
                 raise ValueError(f'input {k} is not defined')
@@ -97,7 +98,13 @@ class ModuleGraph(Functor):
         raise NotImplementedError("deepcopy is not supported for ModuleGraph")
 
 
-def compile(node: Node, context=None, config=None, build=True, **kwargs) -> ModuleGraph:
+def compile(
+    node: Node,
+    context=None,
+    config=None,
+    build=True,
+    **kwargs
+) -> ModuleGraph:
     """
     search backward to collect all operators and computation nodes
     """
@@ -142,9 +149,6 @@ def compile(node: Node, context=None, config=None, build=True, **kwargs) -> Modu
                     if val_count > 1:
                         name = name+ '_' + str(val_count)
                 context['submodules'][op] = name
-            
-        elif isinstance(node, ArrowNode):
-            raise NotImplementedError("ArrowNode is not supported yet. For arrow node which is initailized with a module; we need to do the same as the CallNode")
 
     context['visited'][node] = True
     if not build:
