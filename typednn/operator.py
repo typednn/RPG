@@ -175,3 +175,7 @@ class Operator(OptBase):
         op = super().__new__(cls)
         op.__init__()
         return CallNode(op, *args, **kwargs)
+
+
+    def reuse(self, *args, **kwargs):
+        return CallNode(self, *args, **kwargs)

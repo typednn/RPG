@@ -99,3 +99,6 @@ class CallNode(Node):
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
+
+    def reuse(self, *args, **kwargs):
+        return self.op.reuse(*args, **kwargs)
