@@ -74,7 +74,7 @@ class Operator(OptBase):
 
     def init(self, *inp_nodes):
         if not self._initialized:
-            # self.type_inference(*inp_nodes) # infer the meta types 
+            self.type_inference(*[i._meta_type for i in inp_nodes]) # infer the meta types 
             self._initialized = True
             try:
                 self.main

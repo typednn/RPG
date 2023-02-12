@@ -81,24 +81,6 @@ class NodeBase(abc.ABC):
         pass
 
 
-class InputNode(NodeBase):
-    # TODO: remove input node ...
-    def __init__(self, type, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._meta_type = self._type = type
-
-    def get_type(self, context=None):
-        return self._type
-
-    def evaluate(self, context):
-        return context[self]
-
-    def __str__(self) -> str:
-        out = super().__str__()
-        if self._name is not None:
-            return f'{self._name}:{out}'
-        return out
-
 
 class Node(NodeBase): # compile a static type tree based on meta type 
     def __init__(self, meta_type, **kwargs) -> None:
@@ -162,6 +144,31 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def call_partial(self, *args, **kwargs):
         #raise NotIM
         raise NotImplementedError
+
+class InputNode(Node):
+    # TODO: remove input node ...
+    def __init__(self, type, **kwargs) -> None:
+        super().__init__(type, **kwargs)
+        self._meta_type = self._type = type
+
+    def _get_type(self, context=None):
+        return self._type
+
+    def _evaluate(self, context):
+        return context[self]
+
+    def get_parents(self):
+        return []
+
+    def print_line(self):
+        return f'INP:{self._name}'
+
+    def __str__(self) -> str:
+        out = super().__str__()
+        if self._name is not None:
+            return f'{self._name}:{out}'
+        return out
+
 
 
 class ShadowNode(Node): 
