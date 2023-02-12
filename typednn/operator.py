@@ -247,7 +247,6 @@ class Operator(OptBase):
         return super().state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
 
 
-
     """ utilities """
     def __str__(self) -> str:
         return torch.nn.Module.__str__(self)
@@ -263,11 +262,7 @@ class Operator(OptBase):
         # TODO: deep copy a node will copy the config and the modules
         raise NotImplementedError("deepcopy is not supported for now")
 
-
-
-def register(cls):
-    #raise NotImplementedError
-    def callnode(*args, **kwargs):
-        op = cls()
+    def __new__(cls, *args, **kwargs):
+        op = super().__new__(cls)
+        op.__init__()
         return CallNode(op, *args, **kwargs)
-    return callnode

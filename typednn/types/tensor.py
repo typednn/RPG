@@ -2,7 +2,7 @@ import typing
 import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow, InstantiationFailure
-from ..operator import Operator, register
+from ..operator import Operator
 from .size import SizeType, UIntType
 from torch import nn
 
@@ -80,7 +80,6 @@ class TensorType(Type):
 
 Tensor1D = TensorType('...', 'N', data_dims=1)
 
-@register
 class MLP(Operator):
     INFER_SHAPE_BY_FORWARD=True
     arrow = Arrow(TensorType('...', 'N', data_dims=1), TensorType('...', 'M', data_dims=1))
