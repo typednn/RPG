@@ -149,9 +149,12 @@ def test():
         
 def test_mlp():
     inp = TensorType(3, 4, 5, data_dims=1)
-    mlp = MLP(inp, layer=5, hidden=512, out_dim=32)
+    mlp = MLP(inp, layer=5, hidden=512, out_dim=55)
     print(mlp)
-    mlp(inp.sample())
+    out = mlp(inp.sample())
+    print(mlp.op)
+    print(mlp.op.pretty_config)
+    assert out.shape == (3, 4, 55), out.shape
         
 if __name__ == '__main__':
     test()

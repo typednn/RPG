@@ -33,7 +33,7 @@ class CallNode(Node): # App in the type system.. calling an function..
     #     self.module: Operator = module
     #     self.input_nodes = input_nodes
 
-    def __init__(self, op, *args, name=None, **kwargs):
+    def __init__(self, op, *args, **kwargs):
         from .operator import Operator
         op: Operator = op
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
@@ -45,8 +45,7 @@ class CallNode(Node): # App in the type system.. calling an function..
         self.op = op
         self.call_frame = self.find_caller()
         self.left_value = get_left_value(self.call_frame)
-
-        super().__init__(self.op.type_inference(*self.input_nodes), name=name)
+        super().__init__(self.op.type_inference(*self.input_nodes), name=self.left_value)
 
 
     def find_caller(self, key='OPERATORS'):

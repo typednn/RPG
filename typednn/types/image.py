@@ -22,7 +22,7 @@ class ConvNet(Operator):
         )
 
     def _type_inference(self, input_types) -> Type:
-        if not self._lazy_init:
+        if not self._initialized:
             assert isinstance(input_types, TensorType)
             return TensorType(*input_types.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
         else:

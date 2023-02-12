@@ -35,9 +35,9 @@ class Operator(OptBase):
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
 
-    def __init__(self, name=None) -> None: 
+    def __init__(self) -> None: 
         super().__init__()
-        self._name = name or self.__class__.__name__
+        self._name = self.__class__.__name__
 
         global OPID
         self._id = OPID
