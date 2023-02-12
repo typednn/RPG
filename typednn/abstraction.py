@@ -1,0 +1,207 @@
+import torch
+from .node import Node, InputNode, CallNode #, ArrowNode
+from .basetypes import Arrow
+from .operator import Operator
+from omegaconf import OmegaConf as C
+
+
+# Notice that here Function itself is not an operator  
+# Calling it will generate an operator
+
+def asfunc(func):
+    """
+    The func is a special type of operator that can be reused (other operators can't in a single graph) 
+    """
+    from .functors.utils import Tuple, Dict
+    from .node import NodeBase
+
+    annotation = func.__annotations__
+    #print(annotation)
+    input_nodes = {}
+    for k, v in annotation.items():
+        input_nodes[k] = InputNode(v, name=k)
+
+    output = func(*input_nodes.values())
+    if isinstance(output, tuple):
+        output = Tuple(*output)
+    if isinstance(output, dict) and not isinstance(output, NodeBase):
+        output = Dict(**output)
+    return output.compile(input_order=input_nodes)
+    
+
+# funcnode will generate a FuncNode
+
+class Function(Operator):
+    nodes = None
+    named_input = None
+    operators = None
+
+    @classmethod
+    def new(
+        cls,
+        context,
+        inputs=None, # a named input order
+    ) -> None:
+        self = object.__new__(cls)
+
+        input_nodes = context['inputs']
+
+        self.nodes = context['nodes']
+        self.named_input = {}
+        if inputs is None:
+            for idx, k in enumerate(input_nodes):
+                self.named_input[f'[{idx}]'] = k
+        else:
+            assert len(inputs) == len(input_nodes)
+            self.named_input = {name: node for node, name in inputs.items()}
+
+        self.arrow = Arrow(
+            **{k:v._meta_type for k, v in self.named_input.items()},
+            out=self.output_node._meta_type
+        )
+
+        self.operators = {name: module for module, name in context['submodules'].items()}
+
+        assert len(self.operators) == len(context['submodules'])
+        Operator.__init__(self)
+
+    def clone(self):
+        raise NotImplementedError
+
+    @property
+    def output_node(self):
+        if not hasattr(self, '_output_node'):
+            self._output_node = list(self.nodes.values())[-1]
+        return self._output_node
+
+    def __call__(self, *args, **kwargs):
+        from .abstraction import CallNode
+        return CallNode(self, *args, **kwargs)
+
+    def build_modules(self):
+        self.output_node.get_type() # this will directly get the output ..
+        self.main = torch.nn.ModuleDict(self.operators)
+
+    def type_inference(self, *input_types):
+        context = {
+            node: type for node, type in zip(self.named_input.values(), input_types)
+        }
+        return self.output_node.get_type(context)
+
+    def reconfig(self, **kwargs):
+        #return super().reconfig(**kwargs)
+        outs = {}
+        for k, v in kwargs.items():
+            if k in self.operators:
+                self.operators[k].reconfig(**v)
+            else:
+                outs[k] = v
+        super().reconfig(**outs)
+
+    def build_config(self):
+        config = C.merge(self.default_config(), self._init_kwargs)
+        for name, module in self.operators.items():
+            config[name] = module.config
+            config[name]['_type'] = module.__class__.__name__
+        self._config = C.create(config)
+
+    # def init(self):
+    # def forward(self, *inps, **kwargs):
+    #     context = {}
+    #     for node, b in zip(self._default_inp_nodes, inps):
+    #         context[node] = b
+
+    #     for k, v in kwargs.items():
+    #         if k not in self.named_input:
+    #             raise ValueError(f'input {k} is not defined')
+    #         node = self.named_input[k]
+    #         if node in context:
+    #             raise ValueError(f'input {k} is already defined')
+    #         context[node] = v
+
+    #     if len(context) != len(self.named_input):
+    #         raise ValueError(f'input length is not correct, expected {list(self.named_input.keys())}, but only got {list(context.keys())}')
+    #     return self.output_node.evaluate(context)
+
+    def __str__(self) -> str:
+        #TODO: output nodes; (with input and output types)
+        self.init()
+        out = ''
+        for idx, (name, k) in enumerate(self.operators.items()):
+            out += f' ({idx}).{k.left_value}  of {name}: ' + str(k).replace('\n', '\n   ') + '\n'
+
+        out = out + 'Inputs: ' + ', '.join([str(self.named_input[k]) for k in self.named_input])
+        for lineno, i in enumerate(self.nodes):
+            line = f'\n{lineno}. {i._name} @ {i._id} <- '
+            line += i.print_line()
+            line += ' ' * max(80 -len(line), 0) + ' # ' + str(i.get_type())
+
+            out += line
+        #out = 'Input: ' + ', '.join(map(str, self.inp_types)) + '\n'
+        return out
+
+    # def __deepcopy__(self):
+    #     raise NotImplementedError("deepcopy is not supported for ModuleGraph")
+
+
+def abstract(
+    node: Node,
+    context=None,
+    config=None,
+    build=True,
+    inputs=None,
+    **kwargs
+) -> Function:
+    """
+    search backward to collect all operators and computation nodes
+    """
+
+    if build:
+        if config is None:
+            config = {}
+        if context is None:
+            context = {}
+
+        for key in ['opname_count', 'inputs', 'nodes', 'visited', 'submodules']:
+            if key not in context:
+                context[key] = {}
+    else:
+        assert context is not None, "context should be provided for non-root nodes"
+
+    if node in context['visited']:
+        assert context['visited'][node], "cyclic dependency detected"
+        return context
+    context['visited'][node] = False
+
+
+    if node not in inputs:
+        parents = node.get_parents()
+        for i in parents:
+            compile(i, build=False, context=context, inputs=inputs, config=config)
+
+    if isinstance(node, InputNode) or node in inputs:
+        context['inputs'][node] = node
+
+    if isinstance(node, Node):
+        context['nodes'][node] = node
+
+        if isinstance(node, CallNode):
+            # when op is a module
+            op = node.op
+            if op not in context['submodules']:
+                # remove duplicated name
+                name = op._name
+                if name in context['opname_count']:
+                    val_count = context['opname_count'].get(name, 0) + 1
+                    context['opname_count'][name] = val_count
+                    if val_count > 1:
+                        name = name+ '_' + str(val_count)
+
+                op.reconfig(**config.get(name, {}))
+                context['submodules'][op] = name
+
+    context['visited'][node] = True
+    if not build:
+        return context
+    else:
+        return Function.new(context, **kwargs)
