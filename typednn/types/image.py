@@ -2,7 +2,7 @@ from torch import nn
 import termcolor
 
 import torch
-from ..operator import Operator
+from ..code import Code
 from .tensor import TensorType, VariableArgs, Type
 from ..node import Node
 from ..functors import Flatten, Linear, FlattenBatch, Tuple
@@ -10,7 +10,7 @@ from ..functors import Flatten, Linear, FlattenBatch, Tuple
 ImageType = TensorType('...', 'D', 'N', 'M', data_dims=3)
 
 
-class ConvNet(Operator):
+class ConvNet(Code):
     INFER_SHAPE_BY_FORWARD=True
 
     @classmethod
@@ -79,17 +79,17 @@ def test_conv():
     for i in seq:
         x = i(x)
 
-    assert torch.allclose(graph(image)[1], x), f"{image.shape}"
+    assert torch.allclose(graph.forward(image)[1], x), f"{image.shape}"
 
     img = torch.tensor([1., 2., 3.])
 
     try:
-        graph(img)
+        graph.forward(img)
     except TypeError as e:
         print(termcolor.colored(str(e), 'red'))
     print("OK!")
 
-    print('conv parameters', len(list(conv.parameters())))
+    print('conv parameters', len(list(conv.code.parameters())))
     print('graph parameters', len(list(graph.parameters())))
     
 

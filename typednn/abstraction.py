@@ -1,7 +1,7 @@
 import torch
 from .node import Node, InputNode, CallNode #, ArrowNode
 from .basetypes import Arrow
-from .operator import Operator
+from .code import Code
 from omegaconf import OmegaConf as C
 
 
@@ -31,7 +31,7 @@ def asfunc(func):
 
 # funcnode will generate a FuncNode
 
-class Function(Operator):
+class Function(Code):
     nodes = None
     named_input = None
     operators = None
@@ -63,7 +63,7 @@ class Function(Operator):
         self.operators = {name: module for module, name in context['submodules'].items()}
 
         assert len(self.operators) == len(context['submodules'])
-        Operator.__init__(self)
+        Code.__init__(self)
         return self
 
     def clone(self):
@@ -75,7 +75,7 @@ class Function(Operator):
             self._output_node = list(self.nodes.values())[-1]
         return self._output_node
 
-    def call(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         from .abstraction import CallNode
         return CallNode(self, *args, **kwargs)
 
@@ -179,10 +179,10 @@ def abstract(
 
         if isinstance(node, CallNode):
             # when op is a module
-            op = node.op
-            if op not in context['submodules']:
+            code = node.code
+            if code not in context['submodules']:
                 # remove duplicated name
-                name = op._name
+                name = code._name
                 #if name in context['opname_count']:
 
                 val_count = context['opname_count'].get(name, 0) + 1
@@ -190,8 +190,8 @@ def abstract(
                 if val_count > 1:
                     name = name+ '_' + str(val_count)
 
-                op.reconfig(**config.get(name, {}))
-                context['submodules'][op] = name
+                code.reconfig(**config.get(name, {}))
+                context['submodules'][code] = name
 
     context['visited'][node] = True
     if not build:

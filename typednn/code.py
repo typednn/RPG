@@ -17,7 +17,7 @@ class OptBase(Module):
 
 OPID = 0
 
-class Operator(OptBase):
+class Code(OptBase):
     INFER_SHAPE_BY_FORWARD=False
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     #N_OUTPUT=None
@@ -40,7 +40,7 @@ class Operator(OptBase):
         # copy the operator
         if shallow:
             assert not self._initialized, "Can't clone an initialized operator"
-        new: Operator = self.__class__.__new__(self.__class__)
+        new: Code = self.__class__.__new__(self.__class__)
         new.__init__(self._name)
         new.reconfig(**self._init_kwargs)
         return new
@@ -84,28 +84,23 @@ class Operator(OptBase):
             output = self.forward(*shapes)
             inp = input_types[0]
             return inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
-
-        error = None
-        try:
-            _, _, _out_type = self.arrow.unify(*input_types)
-        except TypeInferenceFailure as e:
-            error = e
-        self.myassert(error is None, f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", error.__class__)
+        _, _, _out_type = self.arrow.unify(*input_types)
         return _out_type
 
-    def myassert(self, cond, msg='', errorType=ValueError):
-        #frame_assert(cond, msg, self.get_trace, errorType)
-        frame_assert(cond, msg, lambda: '', errorType)
-
+        # error = None
+        # try:
+        # except TypeInferenceFailure as e:
+        #     error = e
+        # self.myassert(error is None, f"cannot infer the output type of {self._name} with input {input_types}.\n{error}", error.__class__)
 
     def forward(self, *args, **kwargs):
-        assert self.main is not None, "please either override this function or set the module of the class"
-        try:
-            return self.main(*args, **kwargs)
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            self.myassert(False,  f"error in forward function of {self.__class__}:\n{e} with\n {str(tb)}", e.__class__)
+        return self.main(*args, **kwargs)
+        # assert self.main is not None, "please either override this function or set the module of the class"
+        # try:
+        # except Exception as e:
+        #     import traceback
+        #     tb = traceback.format_exc()
+        #     self.myassert(False,  f"error in forward function of {self.__class__}:\n{e} with\n {str(tb)}", e.__class__)
             
         
     """ config system """
@@ -179,3 +174,6 @@ class Operator(OptBase):
 
     def reuse(self, *args, **kwargs):
         return CallNode(self, *args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError("Please use reuse() to reuse an operator")

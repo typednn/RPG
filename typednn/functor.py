@@ -1,10 +1,10 @@
 # Functor takes in modules as input and wrap them into a new module.
 import torch
-from .operator import Operator
+from .code import Code
 from omegaconf import OmegaConf as C
 
 
-class Functor(Operator):
+class Functor(Code):
     def __init__(
         self,
         *args, name=None,
@@ -46,7 +46,7 @@ class Functor(Operator):
         from .functors import Tuple, Arrow
 
         input_modules = self._input_modules()
-        if isinstance(input_modules, Operator):
+        if isinstance(input_modules, Code):
             input_modules = [input_modules]
         for i in input_modules:
             self._default_inp_nodes += list(i.default_inp_nodes)

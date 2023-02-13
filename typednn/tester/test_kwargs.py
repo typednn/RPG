@@ -1,9 +1,9 @@
 import torch
-from ..operator import Operator, Arrow
+from ..code import Code, Arrow
 from tools.utils import AttrDict
 from ..types import AttrType, Type, TensorType, VariableArgs
 
-class KWArgsOp(Operator):
+class KWArgsOp(Code):
     arrow = Arrow(VariableArgs("...", None), AttrType(a=Type("a"), b=Type("b")))
 
     def forward(self,  a, b, *args):

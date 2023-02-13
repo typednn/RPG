@@ -3,8 +3,10 @@
 # TODO: ArrowNode -> generate (and init) operator if necessary
 
 import abc
+import inspect
 import typing
 import copy
+from .utils import frame_assert, exception_with_traceback
 from .basetypes import Type, TupleType, AttrType, Arrow
 
 
@@ -30,7 +32,7 @@ class NodeBase(abc.ABC):
         if isinstance(val, NodeBase):
             return val
 
-        from .operator import Operator
+        from .code import Code
         if isinstance(val, Type):
             return InputNode(val)
         else:
@@ -81,12 +83,34 @@ class NodeBase(abc.ABC):
         pass
 
 
-
 class Node(NodeBase): # compile a static type tree based on meta type 
-    def __init__(self, meta_type, **kwargs) -> None:
-        super().__init__(**kwargs)
+    trace_key = None
+
+    def __init__(self, meta_type, name=None, trace=None, **kwargs) -> None:
+        if self.trace_key is not None:
+            call_frame = self.find_caller(self.trace_key)
+            frame = call_frame[0]
+            name = inspect.getframeinfo(frame).code_context[0].strip().split("=")[0].strip()
+            self.trace = ('\n' + trace if trace is not None else '') + '\n\ninit at\n' + exception_with_traceback(frame) 
+        else:
+            self.trace = trace
+        super().__init__(name, **kwargs)
+
         self._meta_type = meta_type
         self._type = None
+
+
+
+    def myassert(self, cond, msg='', errorType=ValueError):
+        #frame_assert(cond, msg, self.get_trace, errorType)
+        frame_assert(cond, msg, lambda: self.trace or '', errorType)
+
+    def find_caller(self, key):
+        key = key or 'OPERATORS'
+        for frame in inspect.stack():
+            if (key in frame[4][0]):
+                return frame
+        raise ValueError("cannot find the caller of this function")
 
     @abc.abstractmethod
     def get_parents(self):
@@ -130,12 +154,12 @@ class Node(NodeBase): # compile a static type tree based on meta type
                 name = self._name + f'.{i}'
             yield IndexNode(self._meta_type[i], self, index=i, name=name)
             
-    # def __getattr__(self, key) -> str:
-    #     if not isinstance(self._meta_type, AttrType):
-    #         raise RuntimeError(f"Only AttrType or its subclass can have attributes, but get {self._meta_type}.")
-    #     if not hasattr(self._meta_type, key):
-    #         raise RuntimeError(f"{self} does not have attribute {key}.")
-    #     return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+    def __getattr__(self, key) -> str:
+        if not isinstance(self._meta_type, AttrType):
+            raise RuntimeError(f"Missing key {key}: notice that only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+        if not hasattr(self._meta_type, key):
+            raise RuntimeError(f"{self} does not have attribute {key}.")
+        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
 
     def compile(self, *args, **kwargs):
         from .abstraction import abstract

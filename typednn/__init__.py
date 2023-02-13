@@ -1,4 +1,4 @@
 from tools.utils import AttrDict
-from .operator import Operator
+from .code import Code
 from .factory import Factory
 from . import types

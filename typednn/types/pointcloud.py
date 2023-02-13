@@ -4,7 +4,7 @@ from omegaconf import OmegaConf as C
 from .tensor import TensorType, Type, Arrow
 from ..unification import unify, TypeInferenceFailure
 
-from ..operator import Operator
+from ..code import Code
 from .. import utils
 
 
@@ -20,7 +20,7 @@ class PointDict(AttrType):
 
     
 from nn.modules.point import PointNet as OldPointNet
-class PointNet(Operator):
+class PointNet(Code):
     arrow = Arrow(PointDict(), TensorType('...', 'dim')) #TODO: if possible, infer it from the config
 
     @classmethod

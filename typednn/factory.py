@@ -1,6 +1,6 @@
 # the basic class of building modules from configs based on the input types
 import termcolor
-from .operator import Operator, nodes_to_types
+from .code import Code, nodes_to_types
 from .unification import unify, TypeInferenceFailure
 from omegaconf import OmegaConf as C
         
@@ -17,7 +17,7 @@ def match_types(input_node, type_lists):
     return -1
 
 
-class Factory(Operator):
+class Factory(Code):
     KEYS = []
     OPERATORS = []
     NAMES = []

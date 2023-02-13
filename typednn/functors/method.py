@@ -6,7 +6,7 @@ Note that we require the type is annotated ..
 """
 #from .funcdef import moduledef
 from ..basetypes import AttrType
-from ..functor import Operator
+from ..functor import Code
 
 
 REGISTERED_OPERATORS = {}
