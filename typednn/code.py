@@ -165,9 +165,10 @@ class Code(OptBase):
         # TODO: deep copy a node will copy the config and the modules
         raise NotImplementedError("deepcopy is not supported for now")
 
-    def __new__(cls, *args, **kwargs): # Calling the operator will generates a new line of code ..
+    def __new__(cls, *args, name=None, **kwargs): # Calling the operator will generates a new line of code ..
         op = super().__new__(cls)
         op.__init__()
+        op._name = name
         return CallNode(op, *args, **kwargs)
 
 

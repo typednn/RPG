@@ -58,13 +58,14 @@ def test_module_define2():
 
     @asfunc
     def mymodule(inp1: tensortype):
-        return MLP(inp1)
+        return MLP(inp1, name='mymlp')
     
     #print(mymodule)
     print(mymodule.as_node()._meta_type)
     #print(mymodule.pretty_config)
     #exit(0)
-    mymodule.reconfig(MLP=dict(out_dim=512))
+    print(mymodule.pretty_config)
+    mymodule.reconfig(mymlp=dict(out_dim=512))
 
     tensortype2 = TensorType('B', 100, data_dims=1)
     node2 = mymodule(tensortype2)

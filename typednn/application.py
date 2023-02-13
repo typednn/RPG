@@ -37,7 +37,7 @@ class CallNode(Node):
 
         self.sync_code()
         meta_type = code.type_inference(*[i._meta_type for i in self.input_nodes])
-
+        
         super().__init__(meta_type)
 
     def sync_code(self):
