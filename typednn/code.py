@@ -135,19 +135,19 @@ class Code(OptBase):
         self.main = None
 
     def parameters(self, recurse: bool = True):
-        self.init()
+        assert self._initialized
         return super().parameters(recurse)
 
     def to(self, *args, **kwargs):
-        self.init()
+        assert self._initialized
         return super().to(*args, **kwargs)
 
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
-        self.init()
+        assert self._initialized
         return super().load_state_dict(state_dict=state_dict, strict=strict)
 
     def state_dict(self, destination=None, prefix='', keep_vars=False):
-        self.init()
+        assert self._initialized
         return super().state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
 
 

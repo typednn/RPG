@@ -40,7 +40,7 @@ class PointNet(Code):
             
     def _type_inference(self, inp_types) -> Type:
         out = super()._type_inference(inp_types)
-        if not self._lazy_init:
+        if not self._initialized:
             return out
         else:
             return out.new(*out.batch_shape(), *self.main._output_shape)

@@ -21,7 +21,7 @@ def process_args_kwargs(config, *args, **kwargs):
     return keys, args, C.create(config_args)
 
 class CallNode(Node):
-    def __init__(self, code, *args, caller_key=None, **kwargs):
+    def __init__(self, code, *args, key=None, **kwargs):
         from .code import Code
         code: Code = code
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
@@ -31,7 +31,7 @@ class CallNode(Node):
         code.reconfig(**init_kwargs)
 
         self.code = code
-        self.trace_key = self.code.__class__.__name__
+        self.trace_key = key or self.code.__class__.__name__
         meta_type = code.type_inference(*[i._meta_type for i in self.input_nodes])
         super().__init__(meta_type)
 
@@ -60,10 +60,13 @@ class CallNode(Node):
             context[i] = i.evaluate(context)
         return self(*[context[i] for i in self.input_nodes])
 
+
+    def init(self):
+        self.code.init(*self.input_nodes) # initalize using the input nodes
+
     def _get_type(self, context):
         if context is None or '_do_not_init' not in context:
-            self.code.init(*self.input_nodes) # initailize the operator if needed 
-            assert self.code._initialized
+            self.init()
         inp_types = [i.get_type(context) for i in self.input_nodes]
         
         out = self.code.type_inference(*inp_types)
@@ -72,7 +75,7 @@ class CallNode(Node):
         
     def __call__(self, *args, **kwargs):
         inps = self.match_input(*args, **kwargs)
-        self.code.init(*self.input_nodes) # initalize using the input nodes
+        self.init()
 
         for node, input in zip(self.input_nodes, inps):
             type = node.get_type()
@@ -89,4 +92,4 @@ class CallNode(Node):
         return out
 
     def reuse(self, *args, **kwargs):
-        return self.code.reuse(*args, **kwargs)
+        return self.code.reuse(*args, key=self._name, **kwargs)
