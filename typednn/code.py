@@ -4,7 +4,7 @@ from torch import nn
 from omegaconf import OmegaConf as C
 from torch.nn import Module
 from .basetypes import Arrow, Type, VariableArgs
-from .node import Node, CallNode, nodes_to_types
+from .node import Node, CallNode
 from .utils import frame_assert
 from .unification import unify
 from typing import Mapping, Any
@@ -60,16 +60,14 @@ class Code(OptBase):
         self._config = None
 
 
-    def init(self, *inp_nodes):
+    def init(self, *inp_types):
         if not self._initialized:
-            self.type_inference(*[i._meta_type for i in inp_nodes]) # infer the meta types 
             self._initialized = True
             try:
                 self.main
                 has_main = True
             except AttributeError:
                 has_main = False
-            inp_types = nodes_to_types(inp_nodes)
             if not has_main:
                 self.build_modules(*inp_types)
 

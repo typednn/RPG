@@ -31,12 +31,17 @@ class CallNode(Node):
         code.reconfig(**init_kwargs)
 
         self.code = code
-        self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
 
+        #self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
         self.trace_key = key or self.code.__class__.__name__
+
+        self.sync_code()
         meta_type = code.type_inference(*[i._meta_type for i in self.input_nodes])
 
         super().__init__(meta_type)
+
+    def sync_code(self):
+        self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -62,16 +67,16 @@ class CallNode(Node):
             context[i] = i.evaluate(context)
         return self.eval(*[context[i] for i in self.input_nodes])
 
-    def init(self):
-        self.code.init(*self.input_nodes) # initalize using the input nodes
+    def init(self, context='default'):
+        self.code.init(*[i.get_type(context) for i in self.input_nodes]) # initalize using the input nodes
 
     def _get_type(self, context):
         if context is None or '_do_not_init' not in context:
-            self.init()
+            self.init(context=context)
         inp_types = [i.get_type(context) for i in self.input_nodes]
         
+        self.sync_code()
         out = self.code.type_inference(*inp_types)
-        # print(self.op, self.op._initialized, out)
         return out
         
     def eval(self, *args, **kwargs):
@@ -86,6 +91,7 @@ class CallNode(Node):
                 #raise Exception("type mismatch..; we need a better way to raise the error.")
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
 
+        self.sync_code()
         out = self.code.forward(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"

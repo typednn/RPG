@@ -78,9 +78,12 @@ class Function(Code):
             self._output_node = list(self.nodes.values())[-1]
         return self._output_node
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, key=None, **kwargs):
         from .abstraction import CallNode
-        return CallNode(self, *args, key=self._name, **kwargs)
+        return CallNode(self, *args, key=key or self._name, **kwargs)
+
+    def as_node(self):
+        return self(*self.named_input.values(), key='as_node')
 
     def build_modules(self, *input_types):
         #self.output_node.get_type() # this will directly get the output ..

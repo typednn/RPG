@@ -10,12 +10,6 @@ from .utils import frame_assert, exception_with_traceback
 from .basetypes import Type, TupleType, AttrType, Arrow
 
 
-def nodes_to_types(nodes):
-    from .node import Node
-    nodes: typing.List[Node]
-    return [i.get_type() for i in nodes]
-
-
 def nodes_to_metatype(nodes):
     from .node import Node
     nodes: typing.List[Node]
@@ -57,7 +51,7 @@ class NodeBase(abc.ABC):
         return []
 
     def __str__(self) -> str:
-        return f'{self.__class__.__name__}({self.get_type()})'
+        return f'{self.__class__.__name__}({self.get_type("default")})'
 
     def __hash__(self) -> int:
         return hash(f'THISISANODEWITHID:{self._id}')
@@ -133,8 +127,8 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def print_line(self):
         pass
 
-    def get_type(self, context=None):
-        if context is None:
+    def get_type(self, context='default'):
+        if context is 'default':
             if self._type is None:
                 self._type = self._get_type(context)
             return self._type

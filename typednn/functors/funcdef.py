@@ -35,7 +35,8 @@ def test_module_define():
     x2 = mymodule.forward(image, image)
     assert torch.allclose(x2.img, x2.img2)
 
-    node = mymodule(image_type, image_type)
+    #node = mymodule(image_type, image_type)
+    node = mymodule.as_node()
     print('mymodule output type', node.print_line())
     #assert str(mymodule.get_output().get_type()) == str(AttrType(img=image_type, img2=image_type))
     print(node.get_type())
@@ -60,11 +61,18 @@ def test_module_define2():
         return MLP(inp1)
     
     #print(mymodule)
-    print(mymodule.get_output()._meta_type)
+    print(mymodule.as_node()._meta_type)
+    #print(mymodule.pretty_config)
+    #exit(0)
+    mymodule.reconfig(MLP=dict(out_dim=512))
 
     tensortype2 = TensorType('B', 100, data_dims=1)
-    print(mymodule(tensortype2))
+    node2 = mymodule(tensortype2)
+
+    #print(mymodule(tensortype2))
+    #print(node2._meta_type)
+    print(node2)
 
 if __name__ == '__main__':
-    test_module_define()
-    #test_module_define2()
+    # test_module_define()
+    test_module_define2()
