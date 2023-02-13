@@ -33,8 +33,9 @@ class Code(OptBase):
 
         self._input_nodes = None
 
-    def set_input_nodes(self, *input_nodes):
+    def set_input_nodes(self, *input_nodes, keys=None):
         self._input_nodes = input_nodes
+        self._input_keys = keys
 
     def clone(self, shallow=True):
         # copy the operator

@@ -16,17 +16,17 @@ def asfunc(func):
     from .node import NodeBase
 
     annotation = func.__annotations__
-    #print(annotation)
+
     input_nodes = {}
     for k, v in annotation.items():
-        input_nodes[k] = InputNode(v, name=k)
+        input_nodes[InputNode(v, name=k)] = k
 
-    output = func(*input_nodes.values())
+    output = func(*input_nodes.keys())
     if isinstance(output, tuple):
         output = Tuple(*output)
     if isinstance(output, dict) and not isinstance(output, NodeBase):
         output = Dict(**output)
-    return output.compile(input_order=input_nodes)
+    return output.compile(inputs=input_nodes, name=func.__name__)
     
 
 # funcnode will generate a FuncNode
@@ -41,6 +41,7 @@ class Function(Code):
         cls,
         context,
         inputs=None, # a named input order
+        name=None
     ) -> None:
         self = object.__new__(cls)
 
@@ -64,6 +65,8 @@ class Function(Code):
 
         assert len(self.operators) == len(context['submodules'])
         Code.__init__(self)
+        if name is not None:
+            self._name = name
         return self
 
     def clone(self):
@@ -77,7 +80,7 @@ class Function(Code):
 
     def __call__(self, *args, **kwargs):
         from .abstraction import CallNode
-        return CallNode(self, *args, **kwargs)
+        return CallNode(self, *args, key=self._name, **kwargs)
 
     def build_modules(self, *input_types):
         #self.output_node.get_type() # this will directly get the output ..
@@ -111,6 +114,8 @@ class Function(Code):
 
     def forward(self, *inps):
         context = {}
+        if len(inps) != len(self.named_input):
+            raise ValueError(f'Expected {len(self.named_input)} inputs, got {len(inps)}')
         for node, b in zip(self.named_input.values(), inps):
             context[node] = b
         return self.output_node.evaluate(context)
@@ -197,4 +202,4 @@ def abstract(
     if not build:
         return context
     else:
-        return Function.new(context, **kwargs)
+        return Function.new(context, inputs=inputs, **kwargs)

@@ -47,20 +47,13 @@ class Tuple(Code):
 
 
 class Dict(Code):
-    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
-        if len(args) > 0:
-            assert len(args) == 1 and isinstance(args[0], dict)
-            assert len(kwargs) == 0
-            kwargs = args[0]
-        super().__init__(*args, name=name, _trace_history=_trace_history, **kwargs)
-
     def forward(self, *args):
         from tools.utils import AttrDict
-        return AttrDict(**{k:v for k, v in zip(self._init_keys, args)})
+        return AttrDict(**{k:v for k, v in zip(self._input_keys, args)})
 
     def _type_inference(self, *input_types):
         from ..types import AttrType
-        return AttrType(**{k:input_types[i] for i, k in enumerate(self._init_keys)})
+        return AttrType(**{k:input_types[i] for i, k in enumerate(self._input_keys)})
 
 
 class Linear(Code):

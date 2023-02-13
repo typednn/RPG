@@ -5,7 +5,6 @@ from omegaconf import OmegaConf as C
 from .basetypes import Type
 
 
-
 def process_args_kwargs(config, *args, **kwargs):
     config_args = {}
 
@@ -20,6 +19,7 @@ def process_args_kwargs(config, *args, **kwargs):
             keys.append(k)
     return keys, args, C.create(config_args)
 
+
 class CallNode(Node):
     def __init__(self, code, *args, key=None, **kwargs):
         from .code import Code
@@ -31,10 +31,12 @@ class CallNode(Node):
         code.reconfig(**init_kwargs)
 
         self.code = code
+        self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
+
         self.trace_key = key or self.code.__class__.__name__
         meta_type = code.type_inference(*[i._meta_type for i in self.input_nodes])
-        super().__init__(meta_type)
 
+        super().__init__(meta_type)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -60,7 +62,6 @@ class CallNode(Node):
             context[i] = i.evaluate(context)
         return self.eval(*[context[i] for i in self.input_nodes])
 
-
     def init(self):
         self.code.init(*self.input_nodes) # initalize using the input nodes
 
@@ -85,7 +86,6 @@ class CallNode(Node):
                 #raise Exception("type mismatch..; we need a better way to raise the error.")
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
 
-        self.code.set_input_nodes(*self.input_nodes)
         out = self.code.forward(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
@@ -93,3 +93,11 @@ class CallNode(Node):
 
     def reuse(self, *args, **kwargs):
         return self.code.reuse(*args, key=self._name, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError("CallNode is not callable yet; its behavior needs to be determined.")
+
+        if self.op._initialized:
+            return self.eval(*args, **kwargs)
+        else:
+            return self.reuse(*args, **kwargs)
