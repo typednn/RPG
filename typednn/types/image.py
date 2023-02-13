@@ -89,6 +89,8 @@ def test_conv():
         print(termcolor.colored(str(e), 'red'))
     print("OK!")
 
+    graph.init()
+
     print('conv parameters', len(list(conv.code.parameters())))
     print('graph parameters', len(list(graph.parameters())))
     
