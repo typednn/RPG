@@ -18,8 +18,12 @@ class TensorType(Type):
         self.dtype = dtype or torch.float32
         self.device = device or 'cuda:0'
 
-        self.data_dims = data_dims
-        self._data_dims = UIntType(data_dims)
+        if isinstance(data_dims, Type):
+            self.data_dims = None
+            self._data_dims = data_dims
+        else:
+            self.data_dims = data_dims
+            self._data_dims = UIntType(data_dims)
 
     def _get_extra_info(self):
         return {

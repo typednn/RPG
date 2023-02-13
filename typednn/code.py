@@ -20,6 +20,7 @@ OPID = 0
 class Code(OptBase):
     INFER_SHAPE_BY_FORWARD=False
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
+
     #N_OUTPUT=None
 
     def __init__(self) -> None: 

@@ -1,8 +1,8 @@
 """
 When we define the graph, taking a method attribute of a node will return the corresponding method wrapper.
-
-
 Note that we require the type is annotated ..
+
+Inheritance or override parents' methods are a very common issue.
 """
 #from .funcdef import moduledef
 from ..basetypes import AttrType
