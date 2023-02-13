@@ -21,8 +21,8 @@ def test_shadow():
     
     i = inp.sample()
 
-    assert torch.allclose(repeat.forward(i)[0], mlp2(i))
-    assert torch.allclose(repeat.forward(i)[1], mlp2(mlp2(i)))
+    assert torch.allclose(repeat.forward(i)[0], mlp2.eval(i))
+    assert torch.allclose(repeat.forward(i)[1], mlp2.eval(mlp2.eval(i)))
 
     
     

@@ -58,7 +58,7 @@ class CallNode(Node):
     def _evaluate(self, context):
         for i in self.input_nodes:
             context[i] = i.evaluate(context)
-        return self(*[context[i] for i in self.input_nodes])
+        return self.eval(*[context[i] for i in self.input_nodes])
 
 
     def init(self):
@@ -73,7 +73,7 @@ class CallNode(Node):
         # print(self.op, self.op._initialized, out)
         return out
         
-    def __call__(self, *args, **kwargs):
+    def eval(self, *args, **kwargs):
         inps = self.match_input(*args, **kwargs)
         self.init()
 

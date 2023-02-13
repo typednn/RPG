@@ -102,7 +102,7 @@ def test_pointnet():
     assert str(inp.instance(s)) == 'PointDict(xyz=Pointcloud(512 : 3,100), rgb=Pointcloud(512 : 4,100), agent=Tensor(512 : 10))'
     #print(s.xyz.shape)
     # print(pointnet.pretty_config)
-    pointnet(s)
+    pointnet.eval(s)
 
 
 if __name__ == '__main__':

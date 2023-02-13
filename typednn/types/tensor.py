@@ -151,7 +151,7 @@ def test_mlp():
     inp = TensorType(3, 4, 5, data_dims=1)
     mlp = MLP(inp, layer=5, hidden=512, out_dim=55)
     print(mlp)
-    out = mlp(inp.sample())
+    out = mlp.eval(inp.sample())
     print(mlp.code)
     print(mlp.code.pretty_config)
     assert out.shape == (3, 4, 55), out.shape

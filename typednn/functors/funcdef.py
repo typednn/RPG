@@ -55,7 +55,7 @@ def test_module_define2():
     - support revise init_args for reconfig.. that's all
     """
 
-    @moduledef
+    @asfunc
     def mymodule(inp1: tensortype):
         return MLP(inp1)
     

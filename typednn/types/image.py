@@ -77,7 +77,7 @@ def test_conv():
     seq = [flattenb, conv, flatten, linear, linear2]
     x = image
     for i in seq:
-        x = i(x)
+        x = i.eval(x)
 
     assert torch.allclose(graph.forward(image)[1], x), f"{image.shape}"
 

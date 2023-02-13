@@ -4,11 +4,11 @@ CMDS ="""
 python3 -m typednn.functors.funcdef
 python3 -m typednn.types.tensor
 python3 -m typednn.types.image
-python3 -m typednn.factory
 python3 -m typednn.types.pointcloud
 python3 -m typednn.tester.test_shadow
 python3 -m typednn.tester.test_kwargs
 python3 -m typednn.tester.test_arrow
+python3 -m typednn.factory
 """
 
 import os
