@@ -54,7 +54,7 @@ class Element(Dataset, TorchDataset): # Single data ..
         return [self[i] for i in idx]
 
         
-class Batch(Code):
+class Batch(Dataset):
     arrow = dataset_type(types.Type("A"), types.Type("B"))
     def __new__(cls, element, *args, name=None, **kwargs):
         self = super().__new__(cls, element, *args, name=name, **kwargs)

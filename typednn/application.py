@@ -22,8 +22,8 @@ def process_args_kwargs(config, *args, **kwargs):
 
 class CallNode(Node):
     def __init__(self, code, *args, key=None, reconfig=True, **kwargs):
-        from .operator import Code
-        code: Code = code
+        from .operator import ArrowNode
+        code: ArrowNode = code
         
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
             code.default_config(), *args, **kwargs)

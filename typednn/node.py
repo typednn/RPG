@@ -97,8 +97,6 @@ class Node(NodeBase): # compile a static type tree based on meta type
         self._meta_type = meta_type
         self._type = None
 
-
-
     def myassert(self, cond, msg='', errorType=ValueError):
         #frame_assert(cond, msg, self.get_trace, errorType)
         frame_assert(cond, msg, lambda: self.trace or '', errorType)
@@ -264,8 +262,6 @@ class AttrNode(Node):
         
 
 from .application import CallNode
-
-
 
 if __name__ == '__main__':
     node = InputNode(1)
