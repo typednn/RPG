@@ -21,14 +21,17 @@ def process_args_kwargs(config, *args, **kwargs):
 
 
 class CallNode(Node):
-    def __init__(self, code, *args, key=None, **kwargs):
+    def __init__(self, code, *args, key=None, reconfig=True, **kwargs):
         from .operator import Code
         code: Code = code
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
             code.default_config(), *args, **kwargs)
 
         self.input_nodes =list(map(Node.from_val, self.input_nodes))
-        code.reconfig(**init_kwargs)
+        if reconfig:
+            code.reconfig(**init_kwargs)
+        else:
+            assert len(init_kwargs) == 0
 
         self.code = code
 

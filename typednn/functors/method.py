@@ -74,9 +74,17 @@ class NewType3(NewType2):
     def encode(self):
         return MLP(self.a, out_dim=10)
 
+class NewType4(NewType):
+    a: TensorType(300, 100)
+
+    @asmethod
+    def encode(self):
+        return MLP(self.a, out_dim=10)
+
 new_type1 = NewType()
 new_type2 = NewType2()
 new_type3 = NewType2()
+new_type4 = NewType3()
 assert new_type1.encode.method is new_type2.encode.method
 assert new_type3.encode.method is new_type2.encode.method and new_type3.encode.method is NewType.encode.method
 assert NewType3.encode.method is not NewType2.encode.method
@@ -88,29 +96,14 @@ inp = NewType2(a=TensorType(512, 100)).sample()
 
 out = new_type2.encode()
 inp = NewType3().sample()
-print(out.eval(inp))
+x1 = out.eval(inp)
+print(x1.shape)
 
-exit(0)
+out2 = new_type3.encode()
+x2 = out2.eval(inp)
+import torch
+assert torch.allclose(x1, x2)
+print(x2.shape)
 
-def test():
-
-    new_type = NewType(a=TensorType('B', 100))
-    print(new_type.encode())
-
-    new_type2 = NewType(TensorType(512, 100))
-
-    inp = new_type2.sample()
-    output_node = inp.encode()
-
-    print(output_node.get_type())
-    exit(0)
-
-    out = inp.encode()
-    print(type(out))
-    exit(0)
-    #print(out.shape)
-
-
-
-if __name__ == '__main__':
-    test()
+x3 = new_type4.encode().eval(inp)
+assert x3.shape[-1] == 10
