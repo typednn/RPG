@@ -24,6 +24,7 @@ class CallNode(Node):
     def __init__(self, code, *args, key=None, reconfig=True, **kwargs):
         from .operator import Code
         code: Code = code
+        
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
             code.default_config(), *args, **kwargs)
 
@@ -34,8 +35,6 @@ class CallNode(Node):
             assert len(init_kwargs) == 0
 
         self.code = code
-
-        #self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
         self.trace_key = key or self.code.__class__.__name__
 
         self.sync_code()

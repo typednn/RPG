@@ -1,8 +1,9 @@
 import torch
-from typednn import Code, types
+from typednn import Code, types, AttrDict
 from typednn.application import DataNode
 import typing
 from abc import abstractmethod, ABC
+from torch.utils.data import Dataset as TorchDataset
 
 int_type = types.UIntType("?")
 
@@ -23,7 +24,7 @@ class Dataset(Code):
     NODE_MAP = DataNode # add __len__ and __getitem__ to this class
 
 
-class Element(Dataset): # Single data ..
+class Element(Dataset, TorchDataset): # Single data ..
 
     arrow = dataset_type(types.Type("A"), types.Type("B"), int_type)
     def _build_dataset(self):
@@ -54,9 +55,11 @@ class Element(Dataset): # Single data ..
 
         
 class Batch(Code):
-    def __init__(self, element, name=None, _trace_history=None, **kwargs) -> None:
-        super().__init__(name=name, _trace_history=_trace_history, **kwargs)
-        self.element = element
+    arrow = dataset_type(types.Type("A"), types.Type("B"))
+    def __new__(cls, element, *args, name=None, **kwargs):
+        self = super().__new__(cls, element, *args, name=name, **kwargs)
+        self.code.element = element
+        return self
 
     @classmethod
     def _new_config(cls):
@@ -68,22 +71,33 @@ class Batch(Code):
             drop_last=False,
         )
 
-    def build_modules(self):
-        self.main = torch.utils.data.DataLoader(
-            self.element, **self.config
+    def build_modules(self, input_module):
+        from torch.utils.data import DataLoader, default_collate
+        def collate_fn(batch):
+            out = AttrDict(_base_type=batch[0]._base_type)
+
+            for k, v in batch[0].items():
+                if v is not None:
+                    out[k] = default_collate([b[k] for b in batch])
+            return out
+
+        self.main = DataLoader(
+            self.element.code, 
+            collate_fn=collate_fn, 
+            **self.config
         )
         self._iter = None
 
-    def _type_inference(self):
+    def _type_inference(self, arrow):
         #return super()._get_type_from_output(output, *args)
         # add batch dimension ..
         def add_batch_dim(type):
             if isinstance(type, types.TensorType):
                 return type.new(self.config.batch_size, *type.size)
             return type
-        return self.element.arrow.out.map_types(add_batch_dim)
+        return arrow.map_types(add_batch_dim)
 
-    def forward(self):
+    def forward(self, *args):
         if self._iter is None:
             self._iter = iter(self.main)
         try:
@@ -96,11 +110,10 @@ class Batch(Code):
         
 if __name__ == '__main__':
     from app.model.datasets.mnist import MNISTDataset
-
-    mnist = MNISTDataset(train=True)
+    mnist = MNISTDataset(int_type, train=True)
     batched_minst = Batch(mnist)
 
     #print(batched_minst.arrow)
-    out = batched_minst()
+    out = batched_minst.eval(mnist.eval(0))
     print(out.input.shape)
     print(out.output.shape)

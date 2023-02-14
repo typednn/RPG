@@ -168,16 +168,19 @@ class Code(OptBase):
         # TODO: deep copy a node will copy the config and the modules
         raise NotImplementedError("deepcopy is not supported for now")
 
-    def __new__(cls, *args, name=None, **kwargs): # Calling the operator will generates a new line of code ..
+    def new(cls, name=None):
         op = super().__new__(cls)
         op.__init__()
         if name is not None:
             op._name = name
-        return cls.NODE_MAP(op, *args, **kwargs)
+        return  op
+
+    def __new__(cls, *args, name=None, **kwargs): # Calling the operator will generates a new line of code ..
+        return cls.NODE_MAP(cls.new(cls, name), *args, **kwargs)
 
 
     def reuse(self, *args, **kwargs):
         return self.NODE_MAP(self, *args, **kwargs)
 
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError("Please use reuse() to reuse an operator")
+    # def __call__(self, *args, **kwargs):
+    #     raise NotImplementedError("Please use reuse() to reuse an operator")
