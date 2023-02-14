@@ -1,0 +1,13 @@
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_005_r --info.coef 0.05 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_005_n --info.coef 0.05 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_01_r --info.coef 0.1 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_01_n --info.coef 0.1 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_03_r --info.coef 0.3 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabeld --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/d_03_n --info.coef 0.3 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000
+
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_005_r --info.coef 0.05 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_005_n --info.coef 0.05 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_01_r --info.coef 0.1 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_01_n --info.coef 0.1 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_03_r --info.coef 0.3 --env.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000
+python3 maze_tester/test_maze.py --var relabel --env_name SmallMaze2 --reward_scale 0. --save_video 0 --path tmp/relabel/c_03_n --info.coef 0.3 --env.n 5 --hooks.save_traj.n_epoch 10 --relabel_latent None --max_epoch 2000

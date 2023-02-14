@@ -1,0 +1,1 @@
+ python3 maze_tester/test_maze.py --var rpgmix --env_name SmallMaze2 --reward_scale 0. --save_video 0  --path xxx --info.coef 0.1 --env_cfg.n 5 --hooks.save_traj.n_epoch 10 --max_epoch 2000 --info_delay 1 

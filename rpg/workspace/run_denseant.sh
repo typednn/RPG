@@ -1,0 +1,2 @@
+python3 maze_tester/exp_denseant.py --exp denseantabl --seed 0,1,2,3 --runall remote --ids 0,1 --wandb True --silent
+#python3 maze_tester/exp_denseant.py --exp denseantabl --seed 0,1,2,3 --runall remote --ids 8 --cpu 5 --wandb True --silent
