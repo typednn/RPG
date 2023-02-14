@@ -73,6 +73,9 @@ class CallNode(Node):
     def init(self, context='default'):
         self.code.init(*[i.get_type(context) for i in self.input_nodes]) # initalize using the input nodes
 
+    def reconfig(self, **kwargs):
+        self.code.reconfig(**kwargs)
+
     def _get_type(self, context):
         if context is None or '_do_not_init' not in context:
             self.init(context=context)
@@ -110,3 +113,9 @@ class CallNode(Node):
             return self.eval(*args, **kwargs)
         else:
             return self.reuse(*args, **kwargs)
+
+
+class DataNode(CallNode):
+    def __len__(self):
+        self.init()
+        return len(self.code)

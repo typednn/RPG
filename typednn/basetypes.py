@@ -523,25 +523,6 @@ class AttrType(Type):
         return out
 
 
-class DataType(AttrType):
-    # data_cls could be anything ..
-    def __init__(self, data_cls, type_name=None):
-        self.data_cls = data_cls
-        self.type_name = type_name or self.data_cls.__name__
-
-    def __str__(self):
-        #return self.data_cls.__name__
-        return self.type_name
-
-    def instance(self, x):
-        if isinstance(x, self.data_cls):
-            return self
-        return None
-
-    def children(self):
-        return ()
-
-
 class PType(Type):
     # probablistic distribution of the base_type
     def __init__(self, base_type) -> None:

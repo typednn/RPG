@@ -58,8 +58,7 @@ class Function(Code):
         return self._output_node
 
     def __call__(self, *args, key=None, **kwargs):
-        from .abstraction import CallNode
-        return CallNode(self, *args, key=key or self._name, reconfig=False, **kwargs)
+        return self.NODE_MAP(self, *args, key=key or self._name, reconfig=False, **kwargs)
 
     def as_node(self):
         return self(*self.named_input.values(), key='as_node')

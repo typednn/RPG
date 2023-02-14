@@ -20,6 +20,7 @@ OPID = 0
 class Code(OptBase):
     INFER_SHAPE_BY_FORWARD=False
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
+    NODE_MAP=CallNode
 
     #N_OUTPUT=None
 
@@ -172,11 +173,11 @@ class Code(OptBase):
         op.__init__()
         if name is not None:
             op._name = name
-        return CallNode(op, *args, **kwargs)
+        return cls.NODE_MAP(op, *args, **kwargs)
 
 
     def reuse(self, *args, **kwargs):
-        return CallNode(self, *args, **kwargs)
+        return self.NODE_MAP(self, *args, **kwargs)
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError("Please use reuse() to reuse an operator")

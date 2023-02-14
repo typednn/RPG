@@ -1,20 +1,31 @@
 import torch
-from typednn import Operator, types
+from typednn import Code, types
+from typednn.application import DataNode
+import typing
 from abc import abstractmethod, ABC
 
 int_type = types.UIntType("?")
 
 def dataset_type(a, b, *args):
     return types.Arrow(*args, types.AttrType(input=a, output=b))
+# class DatasetType(types.Type):
+#     def __init__(self, input, output) -> None:
+#         self.input = input
+#         self.output = output
+
+#     def __str__(self) -> str:
+#         return f"DatasetType({self.input}, {self.output})"
+
+#     def children(self) -> typing.Tuple["Type"]:
+#         return [self.input, self.output]
+
+class Dataset(Code):
+    NODE_MAP = DataNode # add __len__ and __getitem__ to this class
 
 
-class Dataset(Operator):
-    arrow = dataset_type(types.Type("A"), types.Type("B"))
+class Element(Dataset): # Single data ..
 
-class Element(Dataset):
-    def __init__(self, *args, name=None, _trace_history=None, **kwargs) -> None:
-        super().__init__(types.UIntType("?"), *args, name=name, _trace_history=_trace_history, **kwargs)
-
+    arrow = dataset_type(types.Type("A"), types.Type("B"), int_type)
     def _build_dataset(self):
         raise NotImplementedError("Must be implemented by subclass")
 
@@ -29,7 +40,6 @@ class Element(Dataset):
 
 
     def __len__(self):
-        self.init()
         return len(self.main)
 
     def __iter__(self):
@@ -43,7 +53,7 @@ class Element(Dataset):
         return [self[i] for i in idx]
 
         
-class Batch(Dataset):
+class Batch(Code):
     def __init__(self, element, name=None, _trace_history=None, **kwargs) -> None:
         super().__init__(name=name, _trace_history=_trace_history, **kwargs)
         self.element = element
@@ -85,7 +95,7 @@ class Batch(Dataset):
 
         
 if __name__ == '__main__':
-    from app.generator.datasets.mnist import MNISTDataset
+    from app.model.datasets.mnist import MNISTDataset
 
     mnist = MNISTDataset(train=True)
     batched_minst = Batch(mnist)

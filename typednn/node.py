@@ -235,6 +235,7 @@ class AttrNode(Node):
         if not hasattr(self._meta_type, key):
             raise RuntimeError(f"{self} does not have attribute {key}.")
         return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+
         
 
 from .application import CallNode
