@@ -93,9 +93,7 @@ class Node(NodeBase): # compile a static type tree based on meta type
         else:
             self.trace = trace
         super().__init__(name=name, **kwargs)
-
         self._meta_type = meta_type
-        self._type = None
 
     def myassert(self, cond, msg='', errorType=ValueError):
         #frame_assert(cond, msg, self.get_trace, errorType)
@@ -112,13 +110,8 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def get_parents(self):
         pass
 
-    def evaluate(self, context):
-        if self not in context:
-            context[self] = self._evaluate(context)
-        return context[self]
-
     @abc.abstractmethod
-    def _evaluate(self, context):
+    def print_line(self):
         pass
 
     @abc.abstractmethod
@@ -126,8 +119,13 @@ class Node(NodeBase): # compile a static type tree based on meta type
         pass
 
     @abc.abstractmethod
-    def print_line(self):
+    def _evaluate(self, context):
         pass
+
+    def evaluate(self, context):
+        if self not in context:
+            context[self] = self._evaluate(context)
+        return context[self]
 
     def get_type(self, context='default'):
         if context is 'default':

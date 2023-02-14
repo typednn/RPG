@@ -5,7 +5,7 @@ class ConfigurableBase:
     def default_config(cls) -> C:
         return C.create()
 
-class Configurable:
+class Configurable(ConfigurableBase):
     def __init__(self) -> None: 
         self._init_kwargs = C.create()
 

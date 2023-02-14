@@ -20,6 +20,7 @@ Major components:
 
 OPID = 0
 
+
 class ArrowNode(Node, Module, Configurable):
     arrow = None
 
@@ -27,7 +28,8 @@ class ArrowNode(Node, Module, Configurable):
         Module.__init__(self)
         self.parents = list(parents)
         meta_type = self._get_meta_type(*parents)
-        Node.__init__(meta_type, **kwargs)
+        Node.__init__(self, meta_type, **kwargs)
+        Configurable.__init__(self)
 
     def _get_meta_type(self, *parents):
         return self.arrow
@@ -36,8 +38,8 @@ class ArrowNode(Node, Module, Configurable):
     def _get_callable(self, *parents_callable, context=None):
         raise NotImplementedError
 
-    def _type_inference(self, **input_types) -> Type:
-        return self.arrow.unify(*input_types.values())[-1]
+    def _type_inference(self, *input_types) -> Type:
+        return self.arrow.unify(*input_types)[-1]
 
     # Node interface 
     def get_parents(self):
@@ -46,8 +48,8 @@ class ArrowNode(Node, Module, Configurable):
     def print_line(self):
         return self._name
 
-    def type_inference(self, **input_types) -> Type:
-        return self._type_inference(**input_types)
+    def type_inference(self, *input_types) -> Type:
+        return self._type_inference(*input_types)
 
     # NODE interface: will initalize the operators
     def _get_type(self, context):
@@ -83,15 +85,15 @@ class Code(ArrowNode):
     def _get_type(self, context):
         return self.arrow
 
-    def _type_inference(self, **input_types) -> Type:
+    def _type_inference(self, *input_types) -> Type:
         from .unification import TypeInferenceFailure
         if self._initialized and self.INFER_SHAPE_BY_FORWARD:
-            input_types = input_types.values()
+            input_types = input_types
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)
             inp = input_types[0]
             return inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
-        return super()._type_inference(**input_types)
+        return super()._type_inference(*input_types)
 
     """ code for manage computation graph """
     def reconfig(self, **kwargs):

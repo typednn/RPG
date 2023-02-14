@@ -33,8 +33,7 @@ class CallNode(Node):
 
         self.op = op
         self.trace_key = key or self.op.__class__.__name__
-        meta_type = op.type_inference(
-            **dict(self.input_keys, [i._meta_type for i in self.input_nodes]))
+        meta_type = op.type_inference(*[i._meta_type for i in self.input_nodes])
         super().__init__(meta_type)
 
     def get_parents(self):
@@ -49,9 +48,10 @@ class CallNode(Node):
         return self.eval(*[context[i] for i in self.input_nodes], context=context)
 
     def _get_type(self, context):
+        # NOTICE that get type does not enforce initialization
         self.op.get_type(context)
-        inp_types = {k: i.get_type(context) for k, i in zip(self.input_keys,  self.input_nodes)}
-        return self.op.type_inference(**inp_types)
+        inp_types = [i.get_type(context) for i in self.input_nodes]
+        return self.op.type_inference(*inp_types)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -75,11 +75,9 @@ class CallNode(Node):
             if isinstance(type, Type) and type.instance(input) is None:
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
-                #raise Exception("type mismatch..; we need a better way to raise the error.")
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
 
-        self.sync()
-        out = self.op.forward(*inps)
+        out = op(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
