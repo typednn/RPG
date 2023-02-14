@@ -10,67 +10,58 @@ from .utils import frame_assert
 from .unification import unify
 from typing import Mapping, Any, Callable
 
+"""
+Major components:
+- infer the meta type
+- config and meta config
+- init
+- do type inference
+"""
 
 OPID = 0
 
-
 class ArrowNode(Node, Module, Configurable):
-    """
-    Major components:
-    - infer the meta type
-    - config and meta config
-    - init
-    - do type inference
-    """
     arrow = None
 
-    def __init__(
-        self,
-        *parents, # sub module
-        name=None,
-        trace=None,
-        **kwargs
-    ) -> None:
+    def __init__(self, *parents, **kwargs) -> None:
         Module.__init__(self)
         self.parents = list(parents)
         meta_type = self._get_meta_type(*parents)
-        Node.__init__(meta_type, name, trace, **kwargs)
+        Node.__init__(meta_type, **kwargs)
 
-    def _get_meta_type(self, *args):
+    def _get_meta_type(self, *parents):
         return self.arrow
+
+    # specific for the arrow node ..
+    def _get_callable(self, *parents_callable, context=None):
+        raise NotImplementedError
+
+    def _type_inference(self, **input_types) -> Type:
+        return self.arrow.unify(*input_types.values())[-1]
 
     # Node interface 
     def get_parents(self):
         return self.parents
 
-    def _get_type(self, context):
-        return super()._get_type(context)
-
     def print_line(self):
         return self._name
 
+    def type_inference(self, **input_types) -> Type:
+        return self._type_inference(**input_types)
+
+    # NODE interface: will initalize the operators
+    def _get_type(self, context):
+        return self.arrow
+
     def _evaluate(self, context) -> Callable:
         forwards = [i.evaluate(context) for i in self.parents]
-        return self._get_callable(*forwards)
-
-    def type_inference(self, *input_types) -> Type:
-        return self._type_inference(*input_types)
-
-
-    # specific for the arrow node ..
-    def _get_callable(self, *parents_callable):
-        raise NotImplementedError
-
-    def _type_inference(*input_types) -> Type:
-        raise NotImplementedError
-
-
+        return self._get_callable(*forwards, context=context)
 
 
 class Code(ArrowNode):
     INFER_SHAPE_BY_FORWARD=False
-    arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
     NODE_MAP=CallNode
+    arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
 
     def __new__(cls, *args, name=None, **kwargs): # Calling the operator will generates a new line of code ..
         return cls.NODE_MAP(cls.new(cls, name), *args, **kwargs)
@@ -83,43 +74,39 @@ class Code(ArrowNode):
         self._name = self.__class__.__name__
         self._initialized = False
 
-    # hooks
-    def set_input_nodes(self, *input_nodes, keys=None):
-        self._input_nodes = input_nodes
-        self._input_keys = keys
-
-    def clone(self, shallow=True):
-        raise NotImplementedError
-
-    """ code for manage computation graph """
-    def reconfig(self, **kwargs):
-        if self._initialized:
-            #import logging
-            #logging.warning(f"reconfiguring a module {self._name} that has already been initialized, this is not recommended")
-            raise NotImplementedError("Can't config an initalized operator.")
-        self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
-        self.clear()
-
-    def init(self, *inp_types):
+    def _get_callable(self, *parents_callable, context=None):
+        assert len(parents_callable) is 0
         if not self._initialized:
-            self._initialized = True
-            self.build_modules(*inp_types)
+            self.init(context)
+        return self.main
 
-    def _type_inference(self, *input_types) -> Type:
+    def _get_type(self, context):
+        return self.arrow
+
+    def _type_inference(self, **input_types) -> Type:
         from .unification import TypeInferenceFailure
         if self._initialized and self.INFER_SHAPE_BY_FORWARD:
+            input_types = input_types.values()
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self.forward(*shapes)
             inp = input_types[0]
             return inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
-        _, _, _out_type = self.arrow.unify(*input_types)
-        return _out_type
+        return super()._type_inference(**input_types)
 
-    #def forward(self, *args, **kwargs):
-    #    return self.main(*args, **kwargs)
+    """ code for manage computation graph """
+    def reconfig(self, **kwargs):
+        if self._initialized:
+            raise NotImplementedError("Can't config an initalized operator.")
+        self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
+        self._config = None
+        self._initialized = False
 
     """ build and handle modules """
-    def build_modules(self, *args):
+    def init(self, **input_types):
+        if not self._initialized:
+            self._initialized = True
+            self.build_modules(**input_types)
+    def build_modules(self, **input_types):
         self.main = None
 
     """ utilities """
@@ -140,11 +127,6 @@ class Code(ArrowNode):
         if name is not None:
             op._name = name
         return  op
-    # def __call__(self, *args, **kwargs):
-    #     raise NotImplementedError("Please use reuse() to reuse an operator")
-
-
-    
 
     # pytorch 
     def parameters(self, recurse: bool = True):

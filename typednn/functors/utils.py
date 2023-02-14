@@ -48,7 +48,7 @@ class Tuple(Code):
 
 class Dict(Code):
     def forward(self, *args):
-        from tools.utils import AttrDict
+        from ..attrdict import AttrDict
         return AttrDict(**{k:v for k, v in zip(self._input_keys, args)})
 
     def _type_inference(self, *input_types):

@@ -21,29 +21,37 @@ def process_args_kwargs(config, *args, **kwargs):
 
 
 class CallNode(Node):
-    def __init__(self, code, *args, key=None, reconfig=True, **kwargs):
+    def __init__(self, op, *args, key=None, reconfig=True, **kwargs):
         from .operator import ArrowNode
-        code: ArrowNode = code
-        
-        self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(
-            code.default_config(), *args, **kwargs)
-
+        op: ArrowNode = op
+        self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(op.default_config(), *args, **kwargs)
         self.input_nodes =list(map(Node.from_val, self.input_nodes))
         if reconfig:
-            code.reconfig(**init_kwargs)
+            op.reconfig(**init_kwargs)
         else:
             assert len(init_kwargs) == 0
 
-        self.code = code
-        self.trace_key = key or self.code.__class__.__name__
-
-        self.sync_code()
-        meta_type = code.type_inference(*[i._meta_type for i in self.input_nodes])
-        
+        self.op = op
+        self.trace_key = key or self.op.__class__.__name__
+        meta_type = op.type_inference(
+            **dict(self.input_keys, [i._meta_type for i in self.input_nodes]))
         super().__init__(meta_type)
 
-    def sync_code(self):
-        self.code.set_input_nodes(*self.input_nodes, keys=self.input_keys)
+    def get_parents(self):
+        return [self.op] + list(self.input_nodes)
+
+    def print_line(self):
+        return self.op._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
+
+    def _evaluate(self, context):
+        for i in self.input_nodes:
+            context[i] = i.evaluate(context)
+        return self.eval(*[context[i] for i in self.input_nodes], context=context)
+
+    def _get_type(self, context):
+        self.op.get_type(context)
+        inp_types = {k: i.get_type(context) for k, i in zip(self.input_keys,  self.input_nodes)}
+        return self.op.type_inference(**inp_types)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -58,35 +66,9 @@ class CallNode(Node):
             raise ValueError(f"extra inputs {kwargs.keys()}")
         return inps
 
-    def get_parents(self):
-        return self.input_nodes
-
-    def print_line(self):
-        return self.code._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
-
-    def _evaluate(self, context):
-        for i in self.input_nodes:
-            context[i] = i.evaluate(context)
-        return self.eval(*[context[i] for i in self.input_nodes])
-
-    def init(self, context='default'):
-        self.code.init(*[i.get_type(context) for i in self.input_nodes]) # initalize using the input nodes
-
-    def reconfig(self, **kwargs):
-        self.code.reconfig(**kwargs)
-
-    def _get_type(self, context):
-        if context is None or '_do_not_init' not in context:
-            self.init(context=context)
-        inp_types = [i.get_type(context) for i in self.input_nodes]
-        
-        self.sync_code()
-        out = self.code.type_inference(*inp_types)
-        return out
-        
-    def eval(self, *args, **kwargs):
+    def eval(self, *args, context={}, **kwargs):
         inps = self.match_input(*args, **kwargs)
-        self.init()
+        op = self.op.evaluate(context)
 
         for node, input in zip(self.input_nodes, inps):
             type = node.get_type()
@@ -96,25 +78,17 @@ class CallNode(Node):
                 #raise Exception("type mismatch..; we need a better way to raise the error.")
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
 
-        self.sync_code()
-        out = self.code.forward(*inps)
+        self.sync()
+        out = self.op.forward(*inps)
         out_type = self.get_type()
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
 
     def reuse(self, *args, **kwargs):
-        return self.code.reuse(*args, key=self._name, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError("CallNode is not callable yet; its behavior needs to be determined.")
-
-        if self.op._initialized:
-            return self.eval(*args, **kwargs)
-        else:
-            return self.reuse(*args, **kwargs)
+        return self.op.reuse(*args, key=self._name, **kwargs)
 
 
 class DataNode(CallNode):
     def __len__(self):
         self.init()
-        return len(self.code)
+        return len(self.op)
