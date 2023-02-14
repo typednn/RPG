@@ -2,7 +2,7 @@ from torch import nn
 import termcolor
 
 import torch
-from ..code import Code
+from ..operator import Code
 from .tensor import TensorType, VariableArgs, Type
 from ..node import Node
 from ..functors import Flatten, Linear, FlattenBatch, Tuple

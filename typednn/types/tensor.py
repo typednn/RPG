@@ -2,7 +2,7 @@ import typing
 import numpy as np
 import torch
 from ..basetypes import Type, VariableArgs, TupleType, Arrow, InstantiationFailure
-from ..code import Code
+from ..operator import Code
 from .size import SizeType, UIntType
 from torch import nn
 

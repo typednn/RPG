@@ -40,6 +40,7 @@ class Code(OptBase):
 
     def clone(self, shallow=True):
         # copy the operator
+        raise NotImplementedError
         if shallow:
             assert not self._initialized, "Can't clone an initialized operator"
         new: Code = self.__class__.__new__(self.__class__)
@@ -169,7 +170,8 @@ class Code(OptBase):
     def __new__(cls, *args, name=None, **kwargs): # Calling the operator will generates a new line of code ..
         op = super().__new__(cls)
         op.__init__()
-        op._name = name
+        if name is not None:
+            op._name = name
         return CallNode(op, *args, **kwargs)
 
 

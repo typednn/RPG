@@ -1,5 +1,5 @@
 import torch
-from ..code import Code, Arrow
+from ..operator import Code, Arrow
 from tools.utils import AttrDict
 from ..types import AttrType, Type, TensorType, VariableArgs
 

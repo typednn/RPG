@@ -1,34 +1,13 @@
 import torch
+
 from .node import Node, InputNode, CallNode #, ArrowNode
 from .basetypes import Arrow
-from .code import Code
+from .operator import Code
 from omegaconf import OmegaConf as C
 
 
 # Notice that here Function itself is not an operator  
 # Calling it will generate an operator
-
-def asfunc(func):
-    """
-    The func is a special type of operator that can be reused (other operators can't in a single graph) 
-    """
-    from .functors.utils import Tuple, Dict
-    from .node import NodeBase
-
-    annotation = func.__annotations__
-
-    input_nodes = {}
-    for k, v in annotation.items():
-        input_nodes[InputNode(v, name=k)] = k
-
-    output = func(*input_nodes.keys())
-    if isinstance(output, tuple):
-        output = Tuple(*output)
-    if isinstance(output, dict) and not isinstance(output, NodeBase):
-        output = Dict(**output)
-    return output.compile(inputs=input_nodes, name=func.__name__)
-    
-
 # funcnode will generate a FuncNode
 
 class Function(Code):

@@ -1,6 +1,6 @@
 # Functor takes in modules as input and wrap them into a new module.
 import torch
-from .code import Code
+from .operator import Code
 from omegaconf import OmegaConf as C
 
 

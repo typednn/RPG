@@ -4,7 +4,7 @@ from omegaconf import OmegaConf as C
 from .tensor import TensorType, Type, Arrow
 from ..unification import unify, TypeInferenceFailure
 
-from ..code import Code
+from ..operator import Code
 from .. import utils
 
 

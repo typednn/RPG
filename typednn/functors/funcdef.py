@@ -4,8 +4,32 @@ import inspect
 from ..node import InputNode, NodeBase
 from ..types import TupleType, AttrType
 from .utils import Tuple, Dict
-from ..abstraction import asfunc
 
+
+def asfunc(func, annotation=None):
+    """
+    The func is a special type of operator that can be reused (other operators can't in a single graph) 
+
+    TODO: Default args to configs ..
+    """
+    from ..functors.utils import Tuple, Dict
+    from ..node import NodeBase
+
+    if annotation is None:
+         annotation = func.__annotations__
+
+    input_nodes = {}
+    for k, v in annotation.items():
+        input_nodes[InputNode(v, name=k)] = k
+
+    output = func(*input_nodes.keys())
+    if isinstance(output, tuple):
+        output = Tuple(*output)
+    if isinstance(output, dict) and not isinstance(output, NodeBase):
+        output = Dict(**output)
+    output_func = output.compile(inputs=input_nodes, name=func.__name__)
+    output_func.function = func # store the original func
+    return output_func
     
 
 def test_module_define():

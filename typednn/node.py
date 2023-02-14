@@ -26,7 +26,7 @@ class NodeBase(abc.ABC):
         if isinstance(val, NodeBase):
             return val
 
-        from .code import Code
+        from .operator import Code
         if isinstance(val, Type):
             return InputNode(val)
         else:
@@ -84,11 +84,15 @@ class Node(NodeBase): # compile a static type tree based on meta type
         if self.trace_key is not None:
             call_frame = self.find_caller(self.trace_key)
             frame = call_frame[0]
-            name = inspect.getframeinfo(frame).code_context[0].strip().split("=")[0].strip()
+            code = inspect.getframeinfo(frame).code_context[0].strip()
+            if code.startswith('return '):
+                name = 'return'
+            else:
+                name = code.split("=")[0].strip()
             self.trace = ('\n' + trace if trace is not None else '') + '\n\ninit at\n' + exception_with_traceback(frame) 
         else:
             self.trace = trace
-        super().__init__(name, **kwargs)
+        super().__init__(name=name, **kwargs)
 
         self._meta_type = meta_type
         self._type = None

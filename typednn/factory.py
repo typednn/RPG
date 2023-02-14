@@ -1,6 +1,6 @@
 # the basic class of building modules from configs based on the input types
 import termcolor
-from .code import Code
+from .operator import Code
 from .unification import unify, TypeInferenceFailure
 from omegaconf import OmegaConf as C
         

@@ -549,20 +549,3 @@ def print_input_args(func):
         print('calling', func.__name__, 'with', {k: dshape(v) for k, v in signature.bind(*args, **kwargs).arguments.items()})
         return func(*args, **kwargs)
     return wrapper
-
-    
-    
-class AttrDict(dict):
-    def __init__(self, *args, _base_type=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._base_type = _base_type
-    def __getattr__(self, key):
-        if key in self:
-            return self[key]
-        if self._base_type is not None and hasattr(self._base_type, key):
-            return getattr(self._base_type, key)
-        return self[key]
-    def __setattr__(self, key, val):
-        self[key] = val
-    def __delattr__(self, key):
-        del self[key]

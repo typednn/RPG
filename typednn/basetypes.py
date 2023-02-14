@@ -479,7 +479,7 @@ class AttrType(Type):
         if name in self.kwargs:
             return self.kwargs[name]
         raise AttributeError(name)
-
+        
     def children(self) -> typing.Tuple["Type"]:
         return tuple(self.kwargs.values())
 
@@ -513,7 +513,7 @@ class AttrType(Type):
 
     def sample(self):
         assert not self.polymorphism, "can not sample polymorphic type"
-        from tools.utils import AttrDict
+        from .attrdict import AttrDict
         out = AttrDict(_base_type=self)
         for k, v in self.kwargs.items():
             if isinstance(v, Type):

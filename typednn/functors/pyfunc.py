@@ -1,6 +1,6 @@
 # define pytorch wrapper for TensorTypes; not recommended actually ..
 from ..types import TensorType, VariableArgs, Arrow
-from ..code import Code
+from ..operator import Code
 from ..application import CallNode
 
 
@@ -28,6 +28,7 @@ class PyOp(Code):
 
 
 def torchop(func):
+    # TODO: allow to specify configs here
     return PyOp(function=func)
 
     

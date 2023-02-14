@@ -1,7 +1,7 @@
 # utility function like concat, stack and so on ..
 import numpy as np
 from torch import nn
-from ..code import Code
+from ..operator import Code
 from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 
