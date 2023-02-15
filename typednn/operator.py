@@ -72,6 +72,12 @@ class ArrowNode(Node, ConfigurableBase, Module):
         )
 
 class Code(ArrowNode):
+    """
+    Modify pytorch module into an arrow node
+    The module will be initialized once we want to infer the type of the node for the first time
+    """
+
+
     INFER_SHAPE_BY_FORWARD=False
     NODE_MAP=CallNode
     arrow = Arrow(VariableArgs("...", None), Type("output")) # TYPE annotation of the forward funciton
@@ -105,7 +111,7 @@ class Code(ArrowNode):
 
     def _type_inference(self, *input_types, context: Context) -> Type:
         from .unification import TypeInferenceFailure
-        if context is not None and self.INFER_SHAPE_BY_FORWARD:
+        if self._module is not None and self.INFER_SHAPE_BY_FORWARD:
             input_types = input_types
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self._get_module(context)(*shapes)

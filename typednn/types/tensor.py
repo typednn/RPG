@@ -99,7 +99,7 @@ class MLP(Code):
 
     def _type_inference(self, input_types, context) -> Type:
         assert input_types.data_dims == 1, "MLP only support 1D data"
-        if context is None:
+        if self._module is None:
             return TensorType(*input_types.batch_shape(), self.config.out_dim)
         else:
             return super()._type_inference(input_types, context=context)
