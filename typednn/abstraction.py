@@ -38,7 +38,7 @@ class Function(Code):
         )
 
         self.operators = {name: module for module, name in context['submodules'].items()}
-        self._input_nodes = list(self.named_input.values())
+        self._input_nodes = list(self.named_input.values()) # set the default input nodes
 
         assert len(self.operators) == len(context['submodules'])
         Code.__init__(self)
@@ -57,13 +57,6 @@ class Function(Code):
 
     def __call__(self, *args, key=None, **kwargs):
         return self.NODE_MAP(self, *args, key=key or self._name, **kwargs)
-
-    # def as_node(self):
-    #     return self(*self.named_input.values(), key='as_node')
-    # def build_model(self, *input_types):
-    #     #self.output_node.get_type() # this will directly get the output ..
-    #     self.type_inference(*input_types, init=True)
-    #     self.main = torch.nn.ModuleDict(self.operators)
 
     def get_subcontext(self, input_types=None):
         context = Context()
