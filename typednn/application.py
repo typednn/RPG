@@ -42,6 +42,14 @@ class CallNode(Node):
         self.sync()
         return self.op._type_inference(*inp_types, context=context)
 
+    @property
+    def config(self):
+        return self.op.config
+
+    @property
+    def pretty_config(self):
+        return self.op.pretty_config
+
     def match_input(self, *args, **kwargs):
         inps = list(args)
         for i in range(len(args), len(self.input_nodes)):

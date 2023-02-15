@@ -9,7 +9,6 @@ If and only if the method is not defined in the current class, it will be inheri
 import inspect
 from ..abstraction import Function
 from ..basetypes import AttrType
-from ..functor import Code
 from .funcdef import asfunc
 from ..operator import Code
 
@@ -54,11 +53,10 @@ def asmethod(func) -> "Code":
     return wrapper
 
 
-from ..types import TensorType, MLP
+from ..types import TensorType, MLP, PointDict
 class NewType(AttrType):
     a: TensorType('B', 'N')
 
-    #@asop(inherit=False)
     @asmethod
     def encode(self):
         return MLP(self.a)

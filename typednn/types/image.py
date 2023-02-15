@@ -67,8 +67,9 @@ def test_conv():
     linear2 = Linear(linear3, dim=10)
 
     out = Tuple(linear, linear2)
+
+
     graph = out.compile(config=dict(Linear=dict(dim=36)))
-    print(graph)
 
     #print(graph._type_inference(TensorType(32, 5, 224, 224, data_dims=3), context=Context()))
     #exit(0)

@@ -85,12 +85,12 @@ class Function(Code):
                 outs[k] = v
         super().reconfig(**outs)
 
-    def build_config(self):
+    def _get_config(self):
         config = C.merge(self.default_config(), self._init_kwargs)
         for name, module in self.operators.items():
             config[name] = module.config
             config[name]['_type'] = module.__class__.__name__
-        self._config = C.create(config)
+        return C.create(config)
 
     def forward(self, *inps):
         if hasattr(self, '_context'):
@@ -115,11 +115,7 @@ class Function(Code):
             line += ' ' * max(80 -len(line), 0) + ' # ' + str(i.get_type())
 
             out += line
-        #out = 'Input: ' + ', '.join(map(str, self.inp_types)) + '\n'
         return out
-
-    # def __deepcopy__(self):
-    #     raise NotImplementedError("deepcopy is not supported for ModuleGraph")
 
 
 def abstract(
