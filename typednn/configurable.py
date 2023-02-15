@@ -30,6 +30,6 @@ class Configurable(ConfigurableBase):
             cls._new_config()
         )
 
-    def build_config(self) -> C:
+    def _get_config(self) -> C:
         # build config from self._init_kwargs
-        self._config = C.merge(self.default_config(), self._init_kwargs)
+        return C.merge(self.default_config(), self._init_kwargs)

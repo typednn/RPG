@@ -10,16 +10,7 @@ from .utils import frame_assert
 from .unification import unify
 from typing import Mapping, Any, Callable
 
-"""
-Major components:
-- infer the meta type
-- config and meta config
-- init
-- do type inference
-"""
-
 OPID = 0
-
 
 class ArrowNode(Node, Module, Configurable):
     arrow = None

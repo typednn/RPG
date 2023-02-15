@@ -115,27 +115,18 @@ class Node(NodeBase): # compile a static type tree based on meta type
         pass
 
     @abc.abstractmethod
-    def _get_type(self, context):
+    def _get_type(self, *args, context=None):
         pass
 
     @abc.abstractmethod
-    def _evaluate(self, context):
+    def _get_evaluate(self, *args, context=None):
         pass
 
-    def evaluate(self, context):
-        if self not in context:
-            context[self] = self._evaluate(context)
-        return context[self]
+    def _get_config(self, *args, context=None): # by default we don't config this ..
+        return None
 
-    def get_type(self, context='default'):
-        if context is 'default':
-            if self._type is None:
-                self._type = self._get_type(context)
-            return self._type
-        else:
-            if self not in context:
-                context[self] = self._get_type(context)
-            return context[self]
+    def _get_module(self, *args, context=None):
+        return None
 
     def __iter__(self):
         if not isinstance(self._meta_type, TupleType):
@@ -172,7 +163,7 @@ class InputNode(Node):
     def _get_type(self, context=None):
         return self._type
 
-    def _evaluate(self, context):
+    def _get_evaluate(self, context):
         return context[self]
 
     def get_parents(self):
@@ -187,31 +178,6 @@ class InputNode(Node):
             return f'{self._name}:{out}'
         return out
 
-
-# class ConstantNode(Node):
-#     def __init__(self, type, value, **kwargs) -> None:
-#         super().__init__(type, **kwargs)
-#         self._meta_type = self._type = type
-#         self.value = value
-
-#     def _get_type(self, context=None):
-#         return self._type
-
-#     def _evaluate(self, context):
-#         return self.value
-
-#     def get_parents(self):
-#         return []
-
-#     def print_line(self):
-#         return f'{self.value}'
-
-#     def __str__(self) -> str:
-#         out = str(self.value)
-#         if self._name is not None:
-#             return f'{self._name}:{out}'
-#         return out
-
             
 class IndexNode(Node):
     def __init__(self, meta_type, parent, index, **kwargs) -> None:
@@ -222,12 +188,11 @@ class IndexNode(Node):
     def get_parents(self):
         return [self.parent]
 
-    def _evaluate(self, context):
+    def _get_evaluate(self, context):
         return self.parent.evaluate(context)[self.index]
 
     def _get_type(self, context):
         return self.parent.get_type(context)[self.index]
-
 
     def print_line(self):
         return str(self.parent._name) + '[' + str(self.index) + ']'
@@ -242,7 +207,7 @@ class AttrNode(Node):
     def get_parents(self):
         return [self.parent]
     
-    def _evaluate(self, context):
+    def _get_evaluate(self, context):
         return getattr(self.parent.evaluate(context), self.key)
 
     def _get_type(self, context):
