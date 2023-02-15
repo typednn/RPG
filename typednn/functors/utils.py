@@ -7,7 +7,7 @@ from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 class FlattenBatch(Code):
     def forward(self, x):
-        input_nodes = self._context.get_inputs()[0]
+        input_nodes = self._input_nodes
         return x.reshape(-1, *input_nodes[0].get_type().data_shape().as_int())
 
     def _type_inference(self, inp_type, context):
@@ -16,7 +16,7 @@ class FlattenBatch(Code):
 
 class Flatten(Code):
     def forward(self, x):
-        input_nodes = self._context.get_inputs()[0]
+        input_nodes = self._input_nodes
 
         dims = input_nodes[0].get_type().data_dims
         return x.reshape(*x.shape[:-dims], -1)

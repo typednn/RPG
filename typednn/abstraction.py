@@ -7,10 +7,6 @@ from .context import Context
 from omegaconf import OmegaConf as C
 
 
-# Notice that here Function itself is not an operator  
-# Calling it will generate an operator
-# funcnode will generate a FuncNode
-
 class Function(Code):
     nodes = None
     named_input = None
@@ -42,6 +38,7 @@ class Function(Code):
         )
 
         self.operators = {name: module for module, name in context['submodules'].items()}
+        self._input_nodes = list(self.named_input.values())
 
         assert len(self.operators) == len(context['submodules'])
         Code.__init__(self)
@@ -68,16 +65,22 @@ class Function(Code):
     #     self.type_inference(*input_types, init=True)
     #     self.main = torch.nn.ModuleDict(self.operators)
 
-    def _get_module(self, context: Context):
-        return super()._get_module(context)
+    def get_subcontext(self, input_types=None):
+        context = Context()
+        for a, b in zip(self.named_input.values(), input_types):
+            context.type.dict[a] = b
+        return context
 
-    def type_inference(self, *input_types, init=False):
-        context = {
-            node: type for node, type in zip(self.named_input.values(), input_types)
-        }
-        if not init:
-            context['_do_not_init'] = True
-        return context.type[self.output_node]
+    def build_model(self, *input_types):
+        subcontext: Context = self.get_subcontext(input_types)
+        subcontext.type[self.output_node] # call the last node to get the type
+        return torch.nn.ModuleDict(self.operators)
+
+    def _type_inference(self, *input_types, context):
+        if context is None:
+            return super()._type_inference(*input_types, context=None) 
+        subcontext = self.get_subcontext(input_types=input_types)
+        return subcontext.type[self.output_node]
 
     def reconfig(self, **kwargs):
         #return super().reconfig(**kwargs)
@@ -97,16 +100,17 @@ class Function(Code):
         self._config = C.create(config)
 
     def forward(self, *inps):
-        context = {}
-        if len(inps) != len(self.named_input):
-            raise ValueError(f'Expected {len(self.named_input)} inputs, got {len(inps)}')
+        if hasattr(self, '_context'):
+            context: Context = self.get_subcontext(self._context)
+        else:
+            context = self.default_context
+        context.evaluate.dict.clear()
         for node, b in zip(self.named_input.values(), inps):
-            context[node] = b
-        return self.output_node.evaluate(context)
+            context.evaluate.dict[node] = b
+        return context.evaluate[self.output_node]
 
     def __str__(self) -> str:
         #TODO: output nodes; (with input and output types)
-        self.init()
         out = ''
         for idx, (name, k) in enumerate(self.operators.items()):
             out += f' ({idx}).[TODO:leftvalue?] of {name}: ' + str(k).replace('\n', '\n   ') + '\n'

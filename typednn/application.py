@@ -26,7 +26,7 @@ class CallNode(Node):
         # context is None
         self._meta_type = op._type_inference(*[
             i._meta_type for i in self.input_nodes], context=None)
-        # self.default_context.store_application(self)
+        self.sync()
 
     def sync(self):
         self.op._input_keys = self.input_keys

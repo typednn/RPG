@@ -46,19 +46,19 @@ class Context:
         #self.module = Visitor('module', self) # callable pytorch modules
         self.type = Visitor('type', self) # type of the node
         self.evaluate = Visitor('evaluate', self) # evaluated value of the node
+        self.subcontext = {}
 
         self.name = name
         # self.applications = {}
         self.children = []
-
         self._trace = [] # record the node calling
 
         global ContextID
         self.ID = ContextID
         ContextID += 1
 
-    def get_inputs(self):
-        return self._trace[-1].input_nodes, self._trace[-1].input_keys
+    # def get_inputs(self):
+    #     return self._trace[-1].input_nodes, self._trace[-1].input_keys
 
     # def store_application(self, caller):
     #     out = self.applications.get(caller.op, [])

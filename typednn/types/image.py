@@ -69,7 +69,9 @@ def test_conv():
     out = Tuple(linear, linear2)
     graph = out.compile(config=dict(Linear=dict(dim=36)))
     print(graph)
-    exit(0)
+
+    #print(graph._type_inference(TensorType(32, 5, 224, 224, data_dims=3), context=Context()))
+    #exit(0)
 
     #seq = Seq(flattenb, conv, flatten, linear, linear2)
 
@@ -93,9 +95,10 @@ def test_conv():
         print(termcolor.colored(str(e), 'red'))
     print("OK!")
 
-    graph.init()
+    # graph.init()
+    graph._get_module(graph.default_context)
 
-    print('conv parameters', len(list(conv.code.parameters())))
+    print('conv parameters', len(list(conv.op.parameters())))
     print('graph parameters', len(list(graph.parameters())))
     
 
