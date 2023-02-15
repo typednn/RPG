@@ -23,6 +23,8 @@ def process_args_kwargs(config, *args, **kwargs):
 class CallNode(Node):
     def __init__(self, op, *args, key=None, reconfig=True, **kwargs):
         from .operator import ArrowNode
+        from .context import get_context
+
         op: ArrowNode = op
         self.input_keys, self.input_nodes, init_kwargs = process_args_kwargs(op.default_config(), *args, **kwargs)
         self.input_nodes =list(map(Node.from_val, self.input_nodes))
@@ -33,7 +35,7 @@ class CallNode(Node):
 
         self.op = op
         self.trace_key = key or self.op.__class__.__name__
-        meta_type = op.type_inference(*[i._meta_type for i in self.input_nodes])
+        meta_type = op._type_inference(*[i._meta_type for i in self.input_nodes], context=get_context()) # context is None
         super().__init__(meta_type)
 
     def get_parents(self):
@@ -42,16 +44,8 @@ class CallNode(Node):
     def print_line(self):
         return self.op._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
 
-    def _evaluate(self, context):
-        for i in self.input_nodes:
-            context[i] = i.evaluate(context)
-        return self.eval(*[context[i] for i in self.input_nodes], context=context)
-
-    def _get_type(self, context):
-        # NOTICE that get type does not enforce initialization
-        self.op.get_type(context)
-        inp_types = [i.get_type(context) for i in self.input_nodes]
-        return self.op.type_inference(*inp_types)
+    def _get_type(self, op_type, *inp_types, context):
+        return self.op._type_inference(*inp_types, context)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -66,24 +60,26 @@ class CallNode(Node):
             raise ValueError(f"extra inputs {kwargs.keys()}")
         return inps
 
-    def eval(self, *args, context={}, **kwargs):
+    def _get_evaluate(self, op, *args, context=None, **kwargs):
         inps = self.match_input(*args, **kwargs)
-        op = self.op.evaluate(context)
-
         for node, input in zip(self.input_nodes, inps):
-            type = node.get_type()
+            type = context.type[node]
             if isinstance(type, Type) and type.instance(input) is None:
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
-
         out = op(*inps)
-        out_type = self.get_type()
+        out_type = context[self]
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
 
     def reuse(self, *args, **kwargs):
         return self.op.reuse(*args, key=self._name, **kwargs)
+
+    def eval(self, *args, **kwargs):
+        print('eval', self.context.evaluate[self.op])
+        exit(0)
+        return self._get_evaluate(self.context.evaluate[self.op], *args, context=self.context, **kwargs)
 
 
 class DataNode(CallNode):

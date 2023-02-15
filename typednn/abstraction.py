@@ -74,7 +74,7 @@ class Function(Code):
         }
         if not init:
             context['_do_not_init'] = True
-        return self.output_node.get_type(context)
+        return context.type[self.output_node]
 
     def reconfig(self, **kwargs):
         #return super().reconfig(**kwargs)

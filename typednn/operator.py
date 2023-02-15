@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 from torch.nn import Module
-from .configurable import Configurable
+from .configurable import ConfigurableBase
 from .basetypes import Arrow, Type, VariableArgs
 from .node import Node, CallNode
 from omegaconf import OmegaConf as C
@@ -12,25 +12,21 @@ from typing import Mapping, Any, Callable
 
 OPID = 0
 
-class ArrowNode(Node, Module, Configurable):
+class ArrowNode(Node, Module, ConfigurableBase):
     arrow = None
 
     def __init__(self, *parents, **kwargs) -> None:
         Module.__init__(self)
         self.parents = list(parents)
         meta_type = self._get_meta_type(*parents)
+        self._init_kwargs = C.create()
         Node.__init__(self, meta_type, **kwargs)
-        Configurable.__init__(self)
 
     def _get_meta_type(self, *parents):
         return self.arrow
 
-    # specific for the arrow node ..
-    def _get_callable(self, *parents_callable, context=None):
-        raise NotImplementedError
-
-    def _type_inference(self, *input_types) -> Type:
-        return self.arrow.unify(*input_types)[-1]
+    def _type_inference(self, *input_types, context) -> Type:
+        return context[self].unify(*input_types)[-1]
 
     # Node interface 
     def get_parents(self):
@@ -39,16 +35,37 @@ class ArrowNode(Node, Module, Configurable):
     def print_line(self):
         return self._name
 
-    def type_inference(self, *input_types) -> Type:
-        return self._type_inference(*input_types)
-
     # NODE interface: will initalize the operators
-    def _get_type(self, context):
+    def _get_type(self, *args, context):
         return self.arrow
 
-    def _evaluate(self, context) -> Callable:
-        forwards = [i.evaluate(context) for i in self.parents]
-        return self._get_callable(*forwards, context=context)
+    def _get_evaluate(self, *parents_callable, context=None):
+        raise NotImplementedError
+
+    def __copy__(self):
+        # TODO: shallow copy a node will only copy the config
+        raise NotImplementedError
+
+    def __deepcopy__(self):
+        # TODO: deep copy a node will copy the config and the modules
+        raise NotImplementedError("deepcopy is not supported for now")
+
+
+    def _get_config(self, *args, context) -> C:
+        # build config from self._init_kwargs
+        return C.merge(self.default_config(), self._init_kwargs)
+
+
+    @classmethod
+    def _new_config(cls)->C:
+        return C.create()
+
+    @classmethod
+    def default_config(cls) -> C:
+        return C.merge(
+            super().default_config(),
+            cls._new_config()
+        )
 
 
 class Code(ArrowNode):
@@ -65,18 +82,15 @@ class Code(ArrowNode):
     def __init__(self) -> None: 
         super().__init__()
         self._name = self.__class__.__name__
-        self._initialized = False
 
-    def _get_callable(self, *parents_callable, context=None):
+    def _get_evaluate(self, *parents_callable, context):
         assert len(parents_callable) is 0
-        if not self._initialized:
-            self.init(context)
-        return self.main
+        return context.module[self]
 
     def _get_type(self, context):
         return self.arrow
 
-    def _type_inference(self, *input_types) -> Type:
+    def _type_inference(self, *input_types, context) -> Type:
         from .unification import TypeInferenceFailure
         if self._initialized and self.INFER_SHAPE_BY_FORWARD:
             input_types = input_types
@@ -84,35 +98,15 @@ class Code(ArrowNode):
             output = self.forward(*shapes)
             inp = input_types[0]
             return inp.new(*inp.batch_shape(), *output.shape[-inp.data_dims:])
-        return super()._type_inference(*input_types)
-
-    """ code for manage computation graph """
-    def reconfig(self, **kwargs):
-        if self._initialized:
-            raise NotImplementedError("Can't config an initalized operator.")
-        self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
-        self._config = None
-        self._initialized = False
+        return super()._type_inference(*input_types, context=context)
 
     """ build and handle modules """
-    def init(self, **input_types):
-        if not self._initialized:
-            self._initialized = True
-            self.build_modules(**input_types)
-    def build_modules(self, **input_types):
-        self.main = None
+    def _get_module(self, **input_types):
+        return None
 
     """ utilities """
     def __str__(self) -> str:
         return torch.nn.Module.__str__(self)
-
-    def __copy__(self):
-        # TODO: shallow copy a node will only copy the config
-        raise NotImplementedError
-
-    def __deepcopy__(self):
-        # TODO: deep copy a node will copy the config and the modules
-        raise NotImplementedError("deepcopy is not supported for now")
 
     def new(cls, name=None):
         op = super().__new__(cls)
@@ -121,19 +115,38 @@ class Code(ArrowNode):
             op._name = name
         return  op
 
-    # pytorch 
-    def parameters(self, recurse: bool = True):
-        assert self._initialized
-        return super().parameters(recurse)
+    # """ code for manage computation graph """
+    def reconfig(self, context=None, **kwargs):
+        #TODO: rewrite this part
+        if context is None:
+            context = self.context
 
-    def to(self, *args, **kwargs):
-        assert self._initialized
-        return super().to(*args, **kwargs)
+        assert self not in context.module.dict
+        self._init_kwargs = C.merge(self._init_kwargs, C.create(kwargs))
+        if self in context.config.dict:
+            del context.config.dict[self]
 
-    def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
-        assert self._initialized
-        return super().load_state_dict(state_dict=state_dict, strict=strict)
+    def config(self, context):
+        context = context or self.context
+        return context.config[self]
 
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        assert self._initialized
-        return super().state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
+    @property
+    def pretty_config(self):
+        return C.to_yaml(self.config)
+
+    # # pytorch 
+    # def parameters(self, recurse: bool = True):
+    #     assert self._initialized
+    #     return super().parameters(recurse)
+
+    # def to(self, *args, **kwargs):
+    #     assert self._initialized
+    #     return super().to(*args, **kwargs)
+
+    # def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
+    #     assert self._initialized
+    #     return super().load_state_dict(state_dict=state_dict, strict=strict)
+
+    # def state_dict(self, destination=None, prefix='', keep_vars=False):
+    #     assert self._initialized
+    #     return super().state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)

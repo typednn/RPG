@@ -1,7 +1,7 @@
 import typing
 import termcolor
 import inspect
-from ..node import InputNode, NodeBase
+from ..node import InputNode
 from ..types import TupleType, AttrType
 from .utils import Tuple, Dict
 
@@ -13,7 +13,7 @@ def asfunc(func, annotation=None):
     TODO: Default args to configs ..
     """
     from ..functors.utils import Tuple, Dict
-    from ..node import NodeBase
+    from ..node import Node
 
     if annotation is None:
          annotation = func.__annotations__
@@ -25,7 +25,7 @@ def asfunc(func, annotation=None):
     output = func(*input_nodes.keys())
     if isinstance(output, tuple):
         output = Tuple(*output)
-    if isinstance(output, dict) and not isinstance(output, NodeBase):
+    if isinstance(output, dict) and not isinstance(output, Node):
         output = Dict(**output)
     output_func = output.compile(inputs=input_nodes, name=func.__name__)
     output_func.function = func # store the original func

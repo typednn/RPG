@@ -1,7 +1,3 @@
-# computation node
-# TODO: structured node (DictNode)
-# TODO: ArrowNode -> generate (and init) operator if necessary
-
 import abc
 import inspect
 import typing
@@ -15,15 +11,27 @@ def nodes_to_metatype(nodes):
     nodes: typing.List[Node]
     return [i._meta_type for i in nodes]
 
-
-# global NODEID
 NODEID = 0
 
+class Node(abc.ABC): # compile a static type tree based on meta type 
+    trace_key = None
 
-class NodeBase(abc.ABC):
+    def __init__(self, meta_type, name=None, trace=None) -> None:
+        from .context import get_context
+        self.context = get_context() # store where the node is created
+
+        if self.trace_key is not None:
+            self._name, self.trace = self.find_caller(self.trace_key, trace)
+        else:
+            self._name, self.trace = name, trace
+        self._meta_type = meta_type
+        global NODEID
+        self._id = NODEID
+        NODEID += 1
+
     @classmethod
     def from_val(cls, val):
-        if isinstance(val, NodeBase):
+        if isinstance(val, Node):
             return val
 
         from .operator import Code
@@ -33,25 +41,15 @@ class NodeBase(abc.ABC):
             #return ValNode(val)
             raise NotImplementedError(f"not supported input type for Node: {type(val)}")
 
-    @abc.abstractmethod
-    def get_type(self, context=None):
-        pass
-
-    def __init__(self, name=None) -> None:
-        super().__init__()
-        self._name = name
-        self._meta_type = None
-
-        global NODEID
-        self._id = NODEID
-        NODEID += 1
+    def get_type(self):
+        return self.context.type[self]
 
     def get_parents(self):
         # find all nodes that are connected to this node
         return []
 
     def __str__(self) -> str:
-        return f'{self.__class__.__name__}({self.get_type("default")})'
+        return f'{self.__class__.__name__}({self.get_type()})'
 
     def __hash__(self) -> int:
         return hash(f'THISISANODEWITHID:{self._id}')
@@ -72,38 +70,23 @@ class NodeBase(abc.ABC):
         NODEID += 1
         return node
 
-    @abc.abstractmethod
-    def evaluate(self, context):
-        pass
-
-
-class Node(NodeBase): # compile a static type tree based on meta type 
-    trace_key = None
-
-    def __init__(self, meta_type, name=None, trace=None, **kwargs) -> None:
-        if self.trace_key is not None:
-            call_frame = self.find_caller(self.trace_key)
-            frame = call_frame[0]
-            code = inspect.getframeinfo(frame).code_context[0].strip()
-            if code.startswith('return '):
-                name = 'return'
-            else:
-                name = code.split("=")[0].strip()
-            self.trace = ('\n' + trace if trace is not None else '') + '\n\ninit at\n' + exception_with_traceback(frame) 
-        else:
-            self.trace = trace
-        super().__init__(name=name, **kwargs)
-        self._meta_type = meta_type
 
     def myassert(self, cond, msg='', errorType=ValueError):
         #frame_assert(cond, msg, self.get_trace, errorType)
         frame_assert(cond, msg, lambda: self.trace or '', errorType)
 
-    def find_caller(self, key):
+    def find_caller(self, key, trace):
         key = key or 'OPERATORS'
         for frame in inspect.stack():
             if (key in frame[4][0]):
-                return frame
+                frame = frame[0]
+                code = inspect.getframeinfo(frame).code_context[0].strip()
+                if code.startswith('return '):
+                    name = 'return'
+                else:
+                    name = code.split("=")[0].strip()
+                trace = ('\n' + trace if trace is not None else '') + '\n\ninit at\n' + exception_with_traceback(frame) 
+                return name, trace
         raise ValueError("cannot find the caller of this function")
 
     @abc.abstractmethod
@@ -114,6 +97,12 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def print_line(self):
         pass
 
+    def _get_config(self, *args, context=None): # by default we don't config this ..
+        return None
+
+    def _get_module(self, *args, context=None):
+        return None
+
     @abc.abstractmethod
     def _get_type(self, *args, context=None):
         pass
@@ -122,11 +111,6 @@ class Node(NodeBase): # compile a static type tree based on meta type
     def _get_evaluate(self, *args, context=None):
         pass
 
-    def _get_config(self, *args, context=None): # by default we don't config this ..
-        return None
-
-    def _get_module(self, *args, context=None):
-        return None
 
     def __iter__(self):
         if not isinstance(self._meta_type, TupleType):
@@ -139,20 +123,17 @@ class Node(NodeBase): # compile a static type tree based on meta type
                 name = self._name + f'.{i}'
             yield IndexNode(self._meta_type[i], self, index=i, name=name)
             
-    def __getattr__(self, key) -> str:
-        if not isinstance(self._meta_type, AttrType):
-            raise RuntimeError(f"Missing key {key}: notice that only AttrType or its subclass can have attributes, but get {self._meta_type}.")
-        if not hasattr(self._meta_type, key):
-            raise RuntimeError(f"{self} does not have attribute {key}.")
-        return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
+    # def __getattr__(self, key) -> str:
+    #     if not isinstance(self._meta_type, AttrType):
+    #         raise RuntimeError(f"Missing key {key}: notice that only AttrType or its subclass can have attributes, but get {self._meta_type}.")
+    #     if not hasattr(self._meta_type, key):
+    #         raise RuntimeError(f"{self} does not have attribute {key}.")
+    #     return AttrNode(getattr(self._meta_type, key), self, key=key, name=self._name + f".{key}", )
 
     def compile(self, *args, **kwargs):
         from .abstraction import abstract
         return abstract(self, *args, **kwargs)
 
-    def call_partial(self, *args, **kwargs):
-        #raise NotIM
-        raise NotImplementedError
 
 class InputNode(Node):
     # TODO: remove input node ...
@@ -188,11 +169,11 @@ class IndexNode(Node):
     def get_parents(self):
         return [self.parent]
 
-    def _get_evaluate(self, context):
-        return self.parent.evaluate(context)[self.index]
+    def _get_evaluate(self, parent, context):
+        return parent[self.index]
 
-    def _get_type(self, context):
-        return self.parent.get_type(context)[self.index]
+    def _get_type(self, parent, context):
+        return parent[self.index]
 
     def print_line(self):
         return str(self.parent._name) + '[' + str(self.index) + ']'
@@ -207,11 +188,11 @@ class AttrNode(Node):
     def get_parents(self):
         return [self.parent]
     
-    def _get_evaluate(self, context):
-        return getattr(self.parent.evaluate(context), self.key)
+    def _get_evaluate(self, parent, context):
+        return parent[self.key]
 
-    def _get_type(self, context):
-        return getattr(self.parent.get_type(context), self.key)
+    def _get_type(self, parent, context):
+        return getattr(parent, self.key)
 
     def print_line(self):
         return str(self.parent._name) + '.' + str(self.key)
