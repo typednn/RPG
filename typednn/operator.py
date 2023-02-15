@@ -107,12 +107,12 @@ class Code(ArrowNode):
 
     def _get_evaluate(self, *parents_callable, context):
         assert len(parents_callable) is 0
-        return self._get_module(context)
+        self._context = context
+        return self.forward
 
     def _type_inference(self, *input_types, context: Context) -> Type:
         from .unification import TypeInferenceFailure
-        if self._module is not None and self.INFER_SHAPE_BY_FORWARD:
-            input_types = input_types
+        if context is not None and self.INFER_SHAPE_BY_FORWARD:
             shapes = [arg.sample() if isinstance(arg, Type) else arg for arg in input_types]
             output = self._get_module(context)(*shapes)
             inp = input_types[0]
@@ -122,15 +122,14 @@ class Code(ArrowNode):
     """ build and handle modules """
     def _get_module(self, context: Context):
         if self._module is None:
-            #return None
-            input_types = [
-                context.type[i] for i in context.applications[self][0].input_nodes
-            ]
-            self._module = self.build_model(*input_types)
+            self._module = self.build_model(*[context.type[i] for i in self._input_nodes])
         return self._module
 
     def build_model(self, *args):
-        raise NotImplementedError
+        return torch.nn.Identity()
+
+    def forward(self, *args, **kwargs):
+        return self._get_module(self._context)(*args, **kwargs)
 
     def new(cls, name=None):
         op = super().__new__(cls)

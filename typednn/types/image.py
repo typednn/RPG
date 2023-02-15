@@ -23,14 +23,13 @@ class ConvNet(Code):
         )
 
     def _type_inference(self, input_types, context) -> Type:
-        if not context.initialized(self):
+        if context is None:
             assert isinstance(input_types, TensorType)
-            config = context.config[self]
-            return TensorType(*input_types.batch_shape(), config.out_dim, 'N', 'M', data_dims=3)
+            return TensorType(*input_types.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
         else:
-            return super()._type_inference(input_types, context)
+            return super()._type_inference(input_types, context=context)
 
-    def build_model(self, inp_type: "ImageType", config):
+    def build_model(self, inp_type: "ImageType"):
         try:
             int(inp_type.data_shape().total())
         except TypeError:
@@ -38,6 +37,7 @@ class ConvNet(Code):
         assert inp_type.data_dims is 3
         C = inp_type.channel_dim
 
+        config = self.config
         num_channels = config.hidden
         return nn.Sequential(
             nn.Conv2d(C, num_channels, 7, stride=2), nn.ReLU(),
@@ -68,6 +68,8 @@ def test_conv():
 
     out = Tuple(linear, linear2)
     graph = out.compile(config=dict(Linear=dict(dim=36)))
+    print(graph)
+    exit(0)
 
     #seq = Seq(flattenb, conv, flatten, linear, linear2)
 

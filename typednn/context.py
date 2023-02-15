@@ -48,17 +48,22 @@ class Context:
         self.evaluate = Visitor('evaluate', self) # evaluated value of the node
 
         self.name = name
-        self.applications = {}
+        # self.applications = {}
         self.children = []
+
+        self._trace = [] # record the node calling
 
         global ContextID
         self.ID = ContextID
         ContextID += 1
 
-    def store_application(self, caller):
-        out = self.applications.get(caller.op, [])
-        out.append(caller)
-        self.applications[caller.op] = out
+    def get_inputs(self):
+        return self._trace[-1].input_nodes, self._trace[-1].input_keys
+
+    # def store_application(self, caller):
+    #     out = self.applications.get(caller.op, [])
+    #     out.append(caller)
+    #     self.applications[caller.op] = out
 
     def add_subcontext(self, context):
         self.children.append(context)

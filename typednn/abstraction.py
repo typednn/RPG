@@ -2,7 +2,8 @@ import torch
 
 from .node import Node, InputNode, CallNode #, ArrowNode
 from .basetypes import Arrow
-from .operator import Code
+from .operator import Code, ArrowNode
+from .context import Context
 from omegaconf import OmegaConf as C
 
 
@@ -58,15 +59,17 @@ class Function(Code):
         return self._output_node
 
     def __call__(self, *args, key=None, **kwargs):
-        return self.NODE_MAP(self, *args, key=key or self._name, reconfig=False, **kwargs)
+        return self.NODE_MAP(self, *args, key=key or self._name, **kwargs)
 
-    def as_node(self):
-        return self(*self.named_input.values(), key='as_node')
+    # def as_node(self):
+    #     return self(*self.named_input.values(), key='as_node')
+    # def build_model(self, *input_types):
+    #     #self.output_node.get_type() # this will directly get the output ..
+    #     self.type_inference(*input_types, init=True)
+    #     self.main = torch.nn.ModuleDict(self.operators)
 
-    def build_modules(self, *input_types):
-        #self.output_node.get_type() # this will directly get the output ..
-        self.type_inference(*input_types, init=True)
-        self.main = torch.nn.ModuleDict(self.operators)
+    def _get_module(self, context: Context):
+        return super()._get_module(context)
 
     def type_inference(self, *input_types, init=False):
         context = {
@@ -159,23 +162,18 @@ def abstract(
 
     if isinstance(node, InputNode) or (inputs is not None and node in inputs):
         context['inputs'][node] = node
-
-    if isinstance(node, Node):
+    else:
         context['nodes'][node] = node
 
-        if isinstance(node, CallNode):
+        if isinstance(node, Code):
             # when op is a module
-            code = node.op
+            code = node
             if code not in context['submodules']:
-                # remove duplicated name
                 name = code._name
-                #if name in context['opname_count']:
-
                 val_count = context['opname_count'].get(name, 0) + 1
                 context['opname_count'][name] = val_count
                 if val_count > 1:
                     name = name+ '_' + str(val_count)
-
                 code.reconfig(**config.get(name, {}))
                 context['submodules'][code] = name
 

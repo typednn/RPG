@@ -7,7 +7,8 @@ from ..types.tensor import TensorType, Arrow, TupleType, Type, VariableArgs
 
 class FlattenBatch(Code):
     def forward(self, x):
-        return x.reshape(-1, *self._input_nodes[0].get_type().data_shape().as_int())
+        input_nodes = self._context.get_inputs()[0]
+        return x.reshape(-1, *input_nodes[0].get_type().data_shape().as_int())
 
     def _type_inference(self, inp_type, context):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
@@ -15,7 +16,9 @@ class FlattenBatch(Code):
 
 class Flatten(Code):
     def forward(self, x):
-        dims = self._input_nodes[0].get_type().data_dims
+        input_nodes = self._context.get_inputs()[0]
+
+        dims = input_nodes[0].get_type().data_dims
         return x.reshape(*x.shape[:-dims], -1)
 
     def _type_inference(self, inp_type, context):
@@ -63,16 +66,13 @@ class Linear(Code):
             dim=256,
         )
 
-    def build_model(self, inp_type, config):
+    def build_model(self, inp_type):
         assert isinstance(inp_type, TensorType), "Linear only support TensorType but got: " + str(inp_type)
         assert inp_type.data_dims == 1, "Linear only support 1D TensorType but got: " + str(inp_type)
-        return nn.Linear(inp_type.channel_dim, config.dim).to(inp_type.device)
+        return nn.Linear(inp_type.channel_dim, self.config.dim).to(inp_type.device)
     
     def _type_inference(self, inp_type, context):
-        return inp_type.new(*inp_type.batch_shape(), context.config[self].dim)
-
-    def forward(self, *args, **kwargs):
-        return self.main(*args, **kwargs)
+        return inp_type.new(*inp_type.batch_shape(), self.config.dim)
 
 
 if __name__ == '__main__':

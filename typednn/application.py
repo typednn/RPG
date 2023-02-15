@@ -26,7 +26,11 @@ class CallNode(Node):
         # context is None
         self._meta_type = op._type_inference(*[
             i._meta_type for i in self.input_nodes], context=None)
-        self.default_context.store_application(self)
+        # self.default_context.store_application(self)
+
+    def sync(self):
+        self.op._input_keys = self.input_keys
+        self.op._input_nodes = self.input_nodes
 
     def get_parents(self):
         return [self.op] + list(self.input_nodes)
@@ -35,7 +39,8 @@ class CallNode(Node):
         return self.op._name + '(' +  ', '.join([j._name if j._name else str(j) for j in self.input_nodes]) + ')'
 
     def _get_type(self, op_type, *inp_types, context):
-        return self.op._type_inference(*inp_types, context)
+        self.sync()
+        return self.op._type_inference(*inp_types, context=context)
 
     def match_input(self, *args, **kwargs):
         inps = list(args)
@@ -51,6 +56,9 @@ class CallNode(Node):
         return inps
 
     def _get_evaluate(self, op, *args, context=None, **kwargs):
+        from .context import Context
+        context: Context = context
+
         inps = self.match_input(*args, **kwargs)
         for node, input in zip(self.input_nodes, inps):
             type = context.type[node]
@@ -58,7 +66,10 @@ class CallNode(Node):
                 info = '\n' + str(self)
                 info = info.replace('\n', '\n' + '>' * 10)
                 self.myassert(False, f"input {input} does not match the required input type {type} {info}", TypeError)
+
+        self.sync()
         out = op(*inps)
+
         out_type = context.type[self]
         assert out_type.instance(out) is not None, f"output {out} does not match the required output type {out_type}"
         return out
@@ -67,7 +78,8 @@ class CallNode(Node):
         return self.op.reuse(*args, key=self._name, **kwargs)
 
     def eval(self, *args, **kwargs):
-        return self._get_evaluate(self.default_context.evaluate[self.op], *args, context=self.default_context, **kwargs)
+        return self._get_evaluate(
+            self.default_context.evaluate[self.op], *args, context=self.default_context, **kwargs)
 
 
 class DataNode(CallNode):
