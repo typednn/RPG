@@ -2,6 +2,7 @@ from torch import nn
 import termcolor
 
 import torch
+from ..context import Context
 from ..operator import Code
 from .tensor import TensorType, VariableArgs, Type
 from ..node import Node
@@ -21,14 +22,15 @@ class ConvNet(Code):
             out_dim=32,
         )
 
-    def _type_inference(self, input_types) -> Type:
-        if not self._initialized:
+    def _type_inference(self, input_types, context) -> Type:
+        if not context.initialized(self):
             assert isinstance(input_types, TensorType)
-            return TensorType(*input_types.batch_shape(), self.config.out_dim, 'N', 'M', data_dims=3)
+            config = context.config[self]
+            return TensorType(*input_types.batch_shape(), config.out_dim, 'N', 'M', data_dims=3)
         else:
-            return super()._type_inference(input_types)
+            return super()._type_inference(input_types, context)
 
-    def build_modules(self, inp_type: "ImageType"):
+    def build_model(self, inp_type: "ImageType", config):
         try:
             int(inp_type.data_shape().total())
         except TypeError:
@@ -36,13 +38,13 @@ class ConvNet(Code):
         assert inp_type.data_dims is 3
         C = inp_type.channel_dim
 
-        num_channels = self.config.hidden
-        self.main = nn.Sequential(
+        num_channels = config.hidden
+        return nn.Sequential(
             nn.Conv2d(C, num_channels, 7, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 5, stride=2), nn.ReLU(),
             nn.Conv2d(num_channels, num_channels, 3, stride=2), nn.ReLU(),
-            *sum([[nn.Conv2d(num_channels, num_channels, 3, 2), nn.ReLU()] for _ in range(max(self.config.layer-4, 0))], []),
-            nn.Conv2d(num_channels, self.config.out_dim, 3, stride=2), nn.ReLU()
+            *sum([[nn.Conv2d(num_channels, num_channels, 3, 2), nn.ReLU()] for _ in range(max(config.layer-4, 0))], []),
+            nn.Conv2d(num_channels, config.out_dim, 3, stride=2), nn.ReLU()
         ).to(inp_type.device)
 
 

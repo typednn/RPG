@@ -99,23 +99,22 @@ class MLP(Code):
 
     def _type_inference(self, input_types, context) -> Type:
         assert input_types.data_dims == 1, "MLP only support 1D data"
-        if not context.initialized(self):
-            return TensorType(*input_types.batch_shape(), context.config[self].out_dim)
+        if context is None:
+            return TensorType(*input_types.batch_shape(), self.config.out_dim)
         else:
-            return super()._type_inference(input_types, context)
+            return super()._type_inference(input_types, context=context)
 
-    def _get_module(self, inp_type, context):
+    def build_model(self, inp_type):
         assert inp_type.data_dims == 1, "MLP only support 1D data"
         C = inp_type.channel_dim
-        config = context.config[self]
-        act_fn = config['act_fn'] or nn.ELU()
-        hidden_dim = config.hidden
+        act_fn = self.config['act_fn'] or nn.ELU()
+        hidden_dim = self.config.hidden
 
         return torch.nn.Sequential(
             torch.nn.Linear(C, hidden_dim), act_fn,
             *sum([[torch.nn.Linear(hidden_dim, hidden_dim), act_fn] 
-                  for _ in range(config.layer-2)], []),
-            torch.nn.Linear(hidden_dim, config.out_dim)).to(inp_type.device)
+                  for _ in range(self.config.layer-2)], []),
+            torch.nn.Linear(hidden_dim, self.config.out_dim)).to(inp_type.device)
         
 
 def test():
@@ -155,10 +154,10 @@ def test():
 def test_mlp():
     inp = TensorType(3, 4, 5, data_dims=1)
     mlp = MLP(inp, layer=5, hidden=512, out_dim=55)
-    print(mlp)
     out = mlp.eval(inp.sample())
-    print(mlp.code)
-    print(mlp.code.pretty_config)
+    print('mlp', mlp)
+    print(mlp.op)
+    print(mlp.op.pretty_config)
     assert out.shape == (3, 4, 55), out.shape
         
 if __name__ == '__main__':

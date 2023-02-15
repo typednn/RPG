@@ -9,7 +9,7 @@ class FlattenBatch(Code):
     def forward(self, x):
         return x.reshape(-1, *self._input_nodes[0].get_type().data_shape().as_int())
 
-    def _type_inference(self, inp_type):
+    def _type_inference(self, inp_type, context):
         return inp_type.new(inp_type.batch_shape().total(), *inp_type.data_shape())
     
 
@@ -18,7 +18,7 @@ class Flatten(Code):
         dims = self._input_nodes[0].get_type().data_dims
         return x.reshape(*x.shape[:-dims], -1)
 
-    def _type_inference(self, inp_type):
+    def _type_inference(self, inp_type, context):
         # print(inp_type.data_shape())
         return inp_type.new(*inp_type.batch_shape(), inp_type.data_shape().total(), data_dims=1)
 
@@ -28,7 +28,7 @@ class Concat(Code):
         import torch
         return torch.cat(args, dim=self.dim)
 
-    def _type_inference(self, *args, **kwargs):
+    def _type_inference(self, *args, context):
         assert len(args) > 1
         out = args[0]
         for i in args[1:]:
@@ -41,7 +41,7 @@ class Tuple(Code):
     def forward(self, *args):
         return args
 
-    def _type_inference(self, *input_types):
+    def _type_inference(self, *input_types, context):
         from ..basetypes import TupleType, Type
         return TupleType(*input_types)
 
@@ -51,7 +51,7 @@ class Dict(Code):
         from ..attrdict import AttrDict
         return AttrDict(**{k:v for k, v in zip(self._input_keys, args)})
 
-    def _type_inference(self, *input_types):
+    def _type_inference(self, *input_types, context):
         from ..types import AttrType
         return AttrType(**{k:input_types[i] for i, k in enumerate(self._input_keys)})
 
@@ -63,13 +63,13 @@ class Linear(Code):
             dim=256,
         )
 
-    def build_modules(self, inp_type):
+    def build_model(self, inp_type, config):
         assert isinstance(inp_type, TensorType), "Linear only support TensorType but got: " + str(inp_type)
         assert inp_type.data_dims == 1, "Linear only support 1D TensorType but got: " + str(inp_type)
-        self.main = nn.Linear(inp_type.channel_dim, self.config.dim).to(inp_type.device)
+        return nn.Linear(inp_type.channel_dim, config.dim).to(inp_type.device)
     
-    def _type_inference(self, inp_type):
-        return inp_type.new(*inp_type.batch_shape(), self.config.dim)
+    def _type_inference(self, inp_type, context):
+        return inp_type.new(*inp_type.batch_shape(), context.config[self].dim)
 
     def forward(self, *args, **kwargs):
         return self.main(*args, **kwargs)

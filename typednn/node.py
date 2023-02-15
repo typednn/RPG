@@ -1,15 +1,9 @@
 import abc
 import inspect
-import typing
 import copy
 from .utils import frame_assert, exception_with_traceback
-from .basetypes import Type, TupleType, AttrType, Arrow
+from .basetypes import Type, TupleType, AttrType
 
-
-def nodes_to_metatype(nodes):
-    from .node import Node
-    nodes: typing.List[Node]
-    return [i._meta_type for i in nodes]
 
 NODEID = 0
 
@@ -18,13 +12,15 @@ class Node(abc.ABC): # compile a static type tree based on meta type
 
     def __init__(self, meta_type, name=None, trace=None) -> None:
         from .context import get_context
-        self.context = get_context() # store where the node is created
+        self.default_context = get_context()
+
 
         if self.trace_key is not None:
             self._name, self.trace = self.find_caller(self.trace_key, trace)
         else:
             self._name, self.trace = name, trace
         self._meta_type = meta_type
+
         global NODEID
         self._id = NODEID
         NODEID += 1
@@ -33,16 +29,13 @@ class Node(abc.ABC): # compile a static type tree based on meta type
     def from_val(cls, val):
         if isinstance(val, Node):
             return val
-
-        from .operator import Code
-        if isinstance(val, Type):
+        elif isinstance(val, Type):
             return InputNode(val)
         else:
-            #return ValNode(val)
             raise NotImplementedError(f"not supported input type for Node: {type(val)}")
 
     def get_type(self):
-        return self.context.type[self]
+        return self.default_context.type[self] 
 
     def get_parents(self):
         # find all nodes that are connected to this node
@@ -97,12 +90,11 @@ class Node(abc.ABC): # compile a static type tree based on meta type
     def print_line(self):
         pass
 
-    def _get_config(self, *args, context=None): # by default we don't config this ..
+    @property
+    def config(self):
         return None
 
-    def _get_module(self, *args, context=None):
-        return None
-
+    # managed by context 
     @abc.abstractmethod
     def _get_type(self, *args, context=None):
         pass

@@ -1,3 +1,19 @@
+"""
+We use context and visitor to store the execution results of the nodes. 
+It includes:
+    - config
+    - module 
+    are the attributes of the node.
+
+    - type
+    - evaluation results 
+    are the results of the node.
+
+Context unifies the code for all attributes.
+
+Each node has only one context.
+However, each context can have multiple subcontexts for functions reused at different places.
+"""
 from .node import Node
 
 
@@ -16,28 +32,42 @@ class Visitor:
             outs.append(self[p])
         out = getattr(node, f'_get_{self.key}')(
             *outs, context=self.context)
-        if self.key == 'config':
-            print(node._name, out)
         self.dict[node] = out
         return out
 
     def __getitem__(self, node: Node):
         return self.visit(node)
 
+ContextID = 0
 
 class Context:
     def __init__(self, name=None) -> None:
-        self.config = Visitor('config', self) # configuration of the node
-        self.module = Visitor('module', self) # callable pytorch modules
+        #self.config = Visitor('config', self) # configuration of the node
+        #self.module = Visitor('module', self) # callable pytorch modules
         self.type = Visitor('type', self) # type of the node
         self.evaluate = Visitor('evaluate', self) # evaluated value of the node
+
+        self.name = name
+        self.applications = {}
         self.children = []
+
+        global ContextID
+        self.ID = ContextID
+        ContextID += 1
+
+    def store_application(self, caller):
+        out = self.applications.get(caller.op, [])
+        out.append(caller)
+        self.applications[caller.op] = out
 
     def add_subcontext(self, context):
         self.children.append(context)
 
     def initialized(self, node):
         return node in self.module.dict
+
+    def __hash__(self) -> int:
+        return hash(f'THISISACONTEXTWITHID:{self.ID}')
 
 
 #TODO: add context manager/scope

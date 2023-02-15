@@ -165,7 +165,7 @@ def abstract(
 
         if isinstance(node, CallNode):
             # when op is a module
-            code = node.code
+            code = node.op
             if code not in context['submodules']:
                 # remove duplicated name
                 name = code._name
