@@ -1,4 +1,6 @@
 from typednn import Class
+from typednn.types import TensorType
+from .camera import Camera
 
 class MultiViewImages(Class):
     image: TensorType('...', 3, 'H', 'W')

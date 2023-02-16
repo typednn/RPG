@@ -54,12 +54,13 @@ def test_camera():
     data = load_single_image_dataset('lego')
     for i in data:
         print(i, data[i].shape)
+        data[i] = data[i].cuda()
 
     c2w = data['poses'][..., :3, :]
     intrinsic = data['intrinsic'][None,:].expand(len(c2w), -1, -1)
     all_ray = data['rays'].reshape(len(c2w), -1, 6)
 
-    iid = torch.zeros(len(c2w), 1, dtype=torch.long)
+    iid = torch.zeros(len(c2w), 1, dtype=torch.long).cuda()
     camera = camera_class.new(c2w, intrinsic, iid)
     #print(camera.shape, camera._base_type)
 
@@ -70,13 +71,11 @@ def test_camera():
 
     from kornia import create_meshgrid
     # try the first camera only
-    grid = create_meshgrid(int(h), int(w), normalized_coordinates=False)[0] + 0.5
-    cam_id = torch.zeros(*grid.shape[:2], 1, dtype=torch.long)
+    grid = create_meshgrid(int(h), int(w), normalized_coordinates=False)[0].cuda() + 0.5
+    cam_id = torch.zeros(*grid.shape[:2], 1, dtype=torch.long).cuda()
 
     grid = grid.reshape(-1, 2)
     cam_id = cam_id.reshape(-1, 1)
-    #out_ray = camera_class.ray.method.func(camera, cam_id, grid)
-
 
     node = camera_class.ray(ray_class.index, ray_class.pixels)
     out_ray = node.eval(camera, cam_id, grid)
@@ -84,6 +83,25 @@ def test_camera():
     assert torch.allclose(out_ray.origin, all_ray[0][:, :3])
     assert torch.allclose(out_ray.dir, all_ray[0][:, 3:], rtol=1e-3, atol=1e-7)
     print(all_ray[0][:, 3:])
+
+    # test the whole ray
+    grid = grid[None, :].expand(20, -1, -1)
+    cam_id = cam_id[None, :].expand(20, -1, -1)
+    cam_id = cam_id + torch.arange(20, dtype=torch.long)[:, None, None].cuda()
+
+    grid = grid.reshape(-1, 2)
+    cam_id = cam_id.reshape(-1, 1)
+
+    out_ray = node.eval(camera, cam_id, grid)
+    print(out_ray.origin.shape)
+    print(out_ray.dir.shape)
+    print(grid.shape)
+    print(all_ray[:20, :, :3].shape)
+    N = 20
+
+    assert torch.allclose(out_ray.origin, all_ray[:N, :, :3].reshape(-1, 3))
+    assert torch.allclose(out_ray.dir, all_ray[:N, :, 3:].reshape(-1, 3), rtol=1e-3, atol=1e-7)
+    
 
     
 

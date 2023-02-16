@@ -86,6 +86,7 @@ class CallNode(Node):
         return self.op.reuse(*args, key=self._name, **kwargs)
 
     def eval(self, *args, **kwargs):
+        self.default_context.evaluate.dict.clear()
         return self._get_evaluate(
             self.default_context.evaluate[self.op], *args, context=self.default_context, **kwargs)
 
