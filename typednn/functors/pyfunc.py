@@ -1,31 +1,40 @@
 # define pytorch wrapper for TensorTypes; not recommended actually ..
 from ..types import TensorType, VariableArgs, Arrow
-from ..operator import Code
+from ..operator import ArrowNode
 from ..application import CallNode
 
 
 # something like a pytorch wrapper 
-class PyOp(Code):
+class PyOp(ArrowNode):
     func = None
     def __new__(cls, *args, **kwargs):
         return object.__new__(cls)
     
     def __init__(self, function, method=False) -> None:
-        super().__init__()
-        self._name = function.__name__
         self.func = function
         self._is_method = method
 
+        import copy
         annotation = function.__annotations__
         assert 'return' in annotation, 'return type annotation is required'
-
         self.arrow = Arrow(**annotation)
-
-    def __call__(self, *args, **kwargs):
-        return self.reuse(*args, key=self._name, **kwargs)
+        super().__init__()
+        self._name = function.__name__
 
     def forward(self, *args, **kwargs):
         return self.func(*args, **kwargs)
+
+    def _type_inference(self, *input_types, context) :
+        return self.arrow.unify(*input_types)[-1]
+
+    def _get_type(self, *args, context):
+        return super()._get_type(*args, context=context)
+
+    def __call__(self, *args, **kwargs):
+        return CallNode(self, *args, key=self._name, **kwargs)
+
+    def _get_evaluate(self, *parents_callable, context=None):
+        return self.func
 
     def __str__(self) -> str:
         return super().__str__() + f'({self.func})'

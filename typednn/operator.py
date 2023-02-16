@@ -16,12 +16,10 @@ class ConfigurableBase:
     def default_config(cls) -> C:
         return C.create()
 
-class ArrowNode(Node, ConfigurableBase, Module):
+class ArrowNode(Node, ConfigurableBase):
     arrow = None
 
     def __init__(self, *parents, **kwargs) -> None:
-        Module.__init__(self)
-
         self.parents = list(parents)
         meta_type = self._get_meta_type(*parents)
         self._init_kwargs = C.create()
@@ -32,7 +30,7 @@ class ArrowNode(Node, ConfigurableBase, Module):
         return self.arrow
 
     def _type_inference(self, *input_types, context) -> Type:
-        return context[self].unify(*input_types)[-1]
+        raise NotImplementedError(f"type inference is not supported for {self.__class__.__name__}")
 
     # Node interface 
     def get_parents(self):
@@ -71,7 +69,7 @@ class ArrowNode(Node, ConfigurableBase, Module):
             cls._new_config()
         )
 
-class Code(ArrowNode):
+class Code(ArrowNode, Module):
     """
     Modify pytorch module into an arrow node
     The module will be initialized once we want to infer the type of the node for the first time
@@ -99,7 +97,8 @@ class Code(ArrowNode):
         return self.NODE_MAP(self, *args, **kwargs)
 
     def __init__(self) -> None: 
-        super().__init__()
+        Module.__init__(self)
+        ArrowNode.__init__(self)
         self._name = self.__class__.__name__
 
         self._config = None

@@ -75,12 +75,15 @@ def test_camera():
 
     grid = grid.reshape(-1, 2)
     cam_id = cam_id.reshape(-1, 1)
-    #print(camera_class.ray)
     out_ray = camera_class.ray.func(camera, cam_id, grid)
 
     assert torch.allclose(out_ray.origin, all_ray[0][:, :3])
     assert torch.allclose(out_ray.dir, all_ray[0][:, 3:], rtol=1e-3, atol=1e-7)
     print(all_ray[0][:, 3:])
+
+    
+    camera_class.ray(cam_id, grid)
+
     
 
 if __name__ == '__main__':
