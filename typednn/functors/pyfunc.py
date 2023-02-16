@@ -2,6 +2,7 @@
 from ..types import TensorType, VariableArgs, Arrow, Type
 from ..operator import ArrowNode
 from ..application import CallNode
+from omegaconf import OmegaConf as C
 
 
 # something like a pytorch wrapper 
@@ -10,7 +11,7 @@ class PyOp(ArrowNode):
     def __new__(cls, *args, **kwargs):
         return object.__new__(cls)
     
-    def __init__(self, function, annotation) -> None:
+    def __init__(self, function, annotation, **kwargs) -> None:
         self.func = function
 
         import copy
@@ -20,6 +21,8 @@ class PyOp(ArrowNode):
         self.arrow = Arrow(**annotation)
         super().__init__()
         self._name = function.__name__
+
+        self._init_kwargs = C.create(kwargs)
 
     def forward(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -41,9 +44,9 @@ class PyOp(ArrowNode):
         return super().__str__() + f'({self.func})'
 
 
-def torchop(func, annotation=None):
+def torchop(func, annotation=None, **kwargs):
     # TODO: allow to specify configs here
-    return PyOp(function=func, annotation=annotation)
+    return PyOp(function=func, annotation=annotation, **kwargs)
 
     
 def test():

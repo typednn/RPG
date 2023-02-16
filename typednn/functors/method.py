@@ -22,14 +22,18 @@ def get_class_that_defined_method(cls, methname):
 
 
 class Method:
-    def __init__(self, name, func, is_module=True) -> None:
+    def __init__(self, name, func, is_module=True, **kwargs) -> None:
         super().__init__()
         self.name = name
         self.func = func
         self.annotation = func.__annotations__
         self.is_module = is_module
 
+        if 'config' in self.annotation:
+            self.annotation.pop('config')
+
         self.factory = {}
+        self.kwargs = kwargs
 
     def __call__(self, *args, **kwargs):
         # TODO: by default we will
@@ -37,8 +41,11 @@ class Method:
         if not self.is_module:
             if not hasattr(self, '_pyop'):
                 annotation = {'_self': inp_type, **self.func.__annotations__}
-                self._pyop = torchop(self.func, annotation=annotation)
-            return self._pyop(*args, **kwargs)
+                self._pyop = torchop(self.func, annotation=annotation, **self.kwargs)
+            _config = {}
+            if self._pyop.config is not None:
+                _config = {'config': self._pyop.config} 
+            return self._pyop(*args, **kwargs, **_config)
 
         inp_type_class = str(inp_type.__class__.__name__)
         if inp_type_class not in self.factory:
@@ -59,15 +66,17 @@ def asmodule(func) -> "Code":
     wrapper.method = method
     return wrapper
 
-def torchmethod(func) -> "Code":
-    name = func.__name__
-    method = Method(name, func, is_module=False)
+def torchmethod(**config) -> "Code":
+    def F(func):
+        name = func.__name__
+        method = Method(name, func, is_module=False, **config)
 
-    def wrapper(*args, **kwargs):
-        return method(*args, **kwargs)
+        def wrapper(*args, **kwargs):
+            return method(*args, **kwargs)
 
-    wrapper.method = method
-    return wrapper
+        wrapper.method = method
+        return wrapper
+    return F
 
 class Class(AttrType):
     def new(self, *args, **kwds):

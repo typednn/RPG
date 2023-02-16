@@ -27,11 +27,11 @@ class TensorF(Field):
     line_coef: TensorType('...', 3, _config['app_n_comp'] + _config['density_n_comp'], '1')
     basis_mat: TensorType('...', _config['app_n_comp'] * 3, _config['app_dim'])
 
-    @asmethod
+    #@asmethod
     def encode(self, coords: TensorType('...', 'N', 3)) -> TensorType('...', 'N', 3):
         return super().encode(coords)
 
         
-    @pyfunc
+    #@pyfunc
     def additional_losses() -> TensorType('...'):
         pass
