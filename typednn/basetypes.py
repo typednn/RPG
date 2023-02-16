@@ -462,16 +462,22 @@ class AttrType(Type):
         if len(args) > 0:
             assert len(args)  == len(annotations)
             kwargs = dict(zip(annotations, args))
+            
         if len(kwargs) == 0:
             kwargs = annotations
 
         if len(annotations) > 0:
-            assert len(annotations) == len(kwargs)
+            #assert len(annotations) == len(kwargs)
             from .unification import unify
-            right = list(annotations.values())
-            left = list(kwargs.values())
-            left, _, _ = unify(left, right, None)
-            kwargs = dict(zip(annotations.keys(), left))
+            #right = list(annotations.values())
+            #left = list(kwargs.values())
+            left = []
+            right = []
+            for kk in kwargs:
+                left.append(kwargs[kk])
+                right.append(annotations[kk])
+            _, _, out = unify(left, right, list(annotations.values()))
+            kwargs = dict(zip(annotations.keys(), out))
 
         self.kwargs = kwargs
 

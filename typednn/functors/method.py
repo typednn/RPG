@@ -10,6 +10,7 @@ import inspect
 from ..abstraction import Function
 from ..basetypes import AttrType
 from .funcdef import asfunc
+from .pyfunc import torchop
 from ..operator import Code
 
 
@@ -53,55 +54,69 @@ def asmethod(func) -> "Code":
     return wrapper
 
 
-from ..types import TensorType, MLP, PointDict
-class NewType(AttrType):
-    a: TensorType('B', 'N')
+class Class(AttrType):
+    def new(self, *args, **kwds):
+        raise NotImplementedError("change the way")
+        out = self.sample()
+        out.update(kwds)
+        return out
 
-    @asmethod
-    def encode(self):
-        return MLP(self.a)
+
+def test():
+
+    from ..types import TensorType, MLP, PointDict
+    class NewType(AttrType):
+        a: TensorType('B', 'N')
+
+        @asmethod
+        def encode(self):
+            return MLP(self.a)
 
 
-class NewType2(NewType):
-    a: TensorType("B", 100)
+    class NewType2(NewType):
+        a: TensorType("B", 100)
 
-class NewType3(NewType2):
-    a: TensorType(300, 100)
+    class NewType3(NewType2):
+        a: TensorType(300, 100)
 
-    @asmethod
-    def encode(self):
-        return MLP(self.a, out_dim=10)
+        @asmethod
+        def encode(self):
+            return MLP(self.a, out_dim=10)
 
-class NewType4(NewType):
-    a: TensorType(300, 100)
+    class NewType4(NewType):
+        a: TensorType(300, 100)
 
-    @asmethod
-    def encode(self):
-        return MLP(self.a, out_dim=10)
+        @asmethod
+        def encode(self):
+            return MLP(self.a, out_dim=10)
 
-new_type1 = NewType()
-new_type2 = NewType2()
-new_type3 = NewType2()
-new_type4 = NewType3()
-assert new_type1.encode.method is new_type2.encode.method
-assert new_type3.encode.method is new_type2.encode.method and new_type3.encode.method is NewType.encode.method
-assert NewType3.encode.method is not NewType2.encode.method
+    new_type1 = NewType()
+    new_type2 = NewType2()
+    new_type3 = NewType2()
+    new_type4 = NewType3()
+    assert new_type1.encode.method is new_type2.encode.method
+    assert new_type3.encode.method is new_type2.encode.method and new_type3.encode.method is NewType.encode.method
+    assert NewType3.encode.method is not NewType2.encode.method
 
-inp = NewType2(a=TensorType(512, 100)).sample()
+    inp = NewType2(a=TensorType(512, 100)).sample()
 
-#print(inp.encode())
-# new_type1.encode()
+    #print(inp.encode())
+    # new_type1.encode()
 
-out = new_type2.encode()
-inp = NewType3().sample()
-x1 = out.eval(inp)
-print(x1.shape)
+    out = new_type2.encode()
+    inp = NewType3().sample()
+    x1 = out.eval(inp)
+    print(x1.shape)
 
-out2 = new_type3.encode()
-x2 = out2.eval(inp)
-import torch
-assert torch.allclose(x1, x2)
-print(x2.shape)
+    out2 = new_type3.encode()
+    x2 = out2.eval(inp)
+    import torch
+    assert torch.allclose(x1, x2)
+    print(x2.shape)
 
-x3 = new_type4.encode().eval(inp)
-assert x3.shape[-1] == 10
+    x3 = new_type4.encode().eval(inp)
+    assert x3.shape[-1] == 10
+
+    
+if __name__ == '__main__':
+    test()

@@ -10,10 +10,11 @@ class PyOp(Code):
     def __new__(cls, *args, **kwargs):
         return object.__new__(cls)
     
-    def __init__(self, function) -> None:
+    def __init__(self, function, method=False) -> None:
         super().__init__()
         self._name = function.__name__
         self.func = function
+        self._is_method = method
 
         annotation = function.__annotations__
         assert 'return' in annotation, 'return type annotation is required'
@@ -30,6 +31,9 @@ class PyOp(Code):
 def torchop(func):
     # TODO: allow to specify configs here
     return PyOp(function=func)
+
+def torchmethod(func):
+    return PyOp(function=func, method=True)
 
     
 def test():
