@@ -1,5 +1,5 @@
 # define pytorch wrapper for TensorTypes; not recommended actually ..
-from ..types import TensorType, VariableArgs, Arrow
+from ..types import TensorType, VariableArgs, Arrow, Type
 from ..operator import ArrowNode
 from ..application import CallNode
 
@@ -10,12 +10,12 @@ class PyOp(ArrowNode):
     def __new__(cls, *args, **kwargs):
         return object.__new__(cls)
     
-    def __init__(self, function, method=False) -> None:
+    def __init__(self, function, annotation) -> None:
         self.func = function
-        self._is_method = method
 
         import copy
-        annotation = function.__annotations__
+        if annotation is None:
+            annotation = function.__annotations__
         assert 'return' in annotation, 'return type annotation is required'
         self.arrow = Arrow(**annotation)
         super().__init__()
@@ -25,7 +25,8 @@ class PyOp(ArrowNode):
         return self.func(*args, **kwargs)
 
     def _type_inference(self, *input_types, context) :
-        return self.arrow.unify(*input_types)[-1]
+        out = self.arrow.unify(*input_types)[-1]
+        return out
 
     def _get_type(self, *args, context):
         return super()._get_type(*args, context=context)
@@ -40,12 +41,9 @@ class PyOp(ArrowNode):
         return super().__str__() + f'({self.func})'
 
 
-def torchop(func):
+def torchop(func, annotation=None):
     # TODO: allow to specify configs here
-    return PyOp(function=func)
-
-def torchmethod(func):
-    return PyOp(function=func, method=True)
+    return PyOp(function=func, annotation=annotation)
 
     
 def test():
