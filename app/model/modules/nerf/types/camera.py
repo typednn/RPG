@@ -9,7 +9,7 @@ from typednn import Class
 class Ray(Class):
     origin: TensorType('B:ray',  3)
     dir: TensorType('B:ray', 3)
-    index: TensorType('B:ray', 1, dtype=torch.long) # return which camera comes from
+    camid: TensorType('B:ray', 1, dtype=torch.long) # return which camera comes from
     pixels: TensorType('B:ray',  2)
 
 
@@ -77,7 +77,7 @@ def test_camera():
     grid = grid.reshape(-1, 2)
     cam_id = cam_id.reshape(-1, 1)
 
-    node = camera_class.ray(ray_class.index, ray_class.pixels)
+    node = camera_class.ray(ray_class.camid, ray_class.pixels)
     out_ray = node.eval(camera, cam_id, grid)
 
     assert torch.allclose(out_ray.origin, all_ray[0][:, :3])
