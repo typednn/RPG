@@ -14,3 +14,22 @@ class AttrDict(dict):
     def __str__(self) -> str:
         out = super().__str__()
         return out
+
+    def visit(self, func):
+        out = {}
+        for key, val in self.items():
+            if isinstance(val, AttrDict):
+                v = val.visit(func)
+            else:
+                v = func(val)
+            out[key] = v
+        return out
+
+    @property
+    def shape(self):
+        import torch
+        def get_shape(x):
+            if isinstance(x, torch.Tensor):
+                return x.shape
+            return None
+        return self.visit(get_shape)

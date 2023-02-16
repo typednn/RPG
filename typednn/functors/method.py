@@ -56,9 +56,17 @@ def asmethod(func) -> "Code":
 
 class Class(AttrType):
     def new(self, *args, **kwds):
-        raise NotImplementedError("change the way")
-        out = self.sample()
-        out.update(kwds)
+        from ..attrdict import AttrDict 
+        for val, key in zip(args, self.kwargs):
+            if key in kwds:
+                raise TypeError("Multiple values for argument '%s'" % key)
+            kwds[key] = val
+        assert len(kwds) == len(self.kwargs), "Missing arguments: %s" % (set(self.kwargs) - set(kwds))
+
+        out = AttrDict(**kwds)
+        new_type = self.instance(AttrDict(**kwds))
+        out._base_type = new_type
+        assert new_type is not None, "type mismatch for creating a new instance of %s" % self.__class__.__name__ + " shape? %s" % str(out.shape)
         return out
 
 

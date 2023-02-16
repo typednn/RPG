@@ -7,36 +7,42 @@ from typednn import Class
 # Training data, scene
 
 class Ray(Class):
-    origin: TensorType('...',  3)
-    dir: TensorType('...',  3)
-    index: TensorType('...',  1, dtype=torch.long) # return which camera comes from
-    pixels: TensorType('...',  2)
+    origin: TensorType('B:ray',  3)
+    dir: TensorType('B:ray', 3)
+    index: TensorType('B:ray', 1, dtype=torch.long) # return which camera comes from
+    pixels: TensorType('B:ray',  2)
 
-    # @torchmethod
-    # def sample():
-    #     pass
 
-    # @torchmethod
-    # def integration(self, ) -> TensorType('...', 3):
-    #     pass
-
+ray_class = Ray()
 
 class Camera(Class):
-     """
-     c2w is the pose in TensorF implementation
-     intrinsic: must be [[focal, 0, w/], [0, focal, h/], [0, 0, 1]]
-     """
-     c2w: TensorType('...cam', 3, 4)
-     intrinsic: TensorType('...cam', 3, 3)
-     imageid: TensorType('...cam', 1, dtype=torch.long)
+    """
+    c2w is the pose in TensorF implementation
+    intrinsic: must be [[focal, 0, w/], [0, focal, h/], [0, 0, 1]]
+    """
+    c2w: TensorType('B:cam', 3, 4, data_dims=2)
+    intrinsic: TensorType('B:cam', 3, 3, data_dims=2)
+    imageid: TensorType('B:cam', 1, dtype=torch.long)
+    inv_intrinsic: TensorType('B:cam', 3, 3, data_dims=2)
 
-     @torchmethod
-     def ray(self, camid: TensorType('...', 1), pixels: TensorType('...', 2)) -> Ray():
-         intrinsic = torch.gather(self.intrinsic, 0, camid.unsqueeze(-1)) 
-         c2w = torch.gather(self.c2w, 0, camid.unsqueeze(-1))
-         dir = intrinsic @ pixels
-         dir = c2w @ (dir / torch.norm(dir, dim=-1, keepdim=True))
-         return Ray.new(self.c2w[..., :3, 3], dir, camid, pixels)
+    @torchmethod
+    def ray(self, camid: TensorType('B:ray', 1), pixels: TensorType('B:ray', 2)) -> ray_class:
+        camid = camid[:, 0]
+        inv_intrinsic = self.inv_intrinsic[camid]
+        c2w = self.c2w[camid]
+        dir = torch.cat([pixels, torch.ones_like(pixels[:, :1])], dim=-1)
+        dir = inv_intrinsic @ dir[..., None].double()
+        dir = dir / torch.norm(dir, dim=-2, keepdim=True)
+        dir = c2w[..., :3, :3].double() @ dir
+        return ray_class.new(c2w[..., :3, 3], dir[..., 0].float(), camid[..., None], pixels)
+
+    def new(self, c2w, intrinsic, imageid, inv_intrinsic=None):
+        if inv_intrinsic is None:
+            inv_intrinsic = torch.inverse(intrinsic.double())
+        return super().new(c2w, intrinsic, imageid, inv_intrinsic)
+         
+
+camera_class = Camera()
 
 
 def test_ray():
@@ -49,11 +55,33 @@ def test_camera():
     for i in data:
         print(i, data[i].shape)
 
-    Camera.new(
-        data['c2w'],
-        data['intrinsic'][None,:].repeat(),
-        data['imageid']
-    )
+    c2w = data['poses'][..., :3, :]
+    intrinsic = data['intrinsic'][None,:].expand(len(c2w), -1, -1)
+    all_ray = data['rays'].reshape(len(c2w), -1, 6)
+
+    iid = torch.zeros(len(c2w), 1, dtype=torch.long)
+    camera = camera_class.new(c2w, intrinsic, iid)
+    #print(camera.shape, camera._base_type)
+
+    #node = camera_class.ray()
+    print(data['intrinsic'].shape)
+    w, h =  data['intrinsic'][:2, 2] * 2
+    print(w, h)
+
+    from kornia import create_meshgrid
+    # try the first camera only
+    grid = create_meshgrid(int(h), int(w), normalized_coordinates=False)[0] + 0.5
+    cam_id = torch.zeros(*grid.shape[:2], 1, dtype=torch.long)
+
+    grid = grid.reshape(-1, 2)
+    cam_id = cam_id.reshape(-1, 1)
+    #print(camera_class.ray)
+    out_ray = camera_class.ray.func(camera, cam_id, grid)
+
+    assert torch.allclose(out_ray.origin, all_ray[0][:, :3])
+    assert torch.allclose(out_ray.dir, all_ray[0][:, 3:], rtol=1e-3, atol=1e-7)
+    print(all_ray[0][:, 3:])
+    
 
 if __name__ == '__main__':
     # python3 -m app.model.modules.nerf.types.camera

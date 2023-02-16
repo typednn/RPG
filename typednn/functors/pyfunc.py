@@ -27,6 +27,9 @@ class PyOp(Code):
     def forward(self, *args, **kwargs):
         return self.func(*args, **kwargs)
 
+    def __str__(self) -> str:
+        return super().__str__() + f'({self.func})'
+
 
 def torchop(func):
     # TODO: allow to specify configs here
