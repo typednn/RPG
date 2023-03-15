@@ -180,7 +180,7 @@ class ExtendedTimeStepWrapper(dm_env.Environment):
 
 
 class TimeStepToGymWrapper(object):
-    def __init__(self, env, domain, task, cfg):
+    def __init__(self, env, domain, task, ep_len):
         obs_shp = env.observation_spec().shape
         act_shp = env.action_spec().shape
         self.observation_space = gym.spaces.Box(
@@ -198,7 +198,7 @@ class TimeStepToGymWrapper(object):
         self.env = env
         self.domain = domain
         self.task = task
-        self.ep_len = cfg.episode_length
+        self.ep_len = ep_len
         self.t = 0
 
     @property
@@ -275,3 +275,45 @@ def make_dmcontrol_env(cfg):
     env = TimeStepToGymWrapper(env, domain, task, cfg)
 
     return env
+
+
+
+def make(env_name):
+    #raise NotImplementedError 
+    env_name = env_name[2:].split('-v')[0]
+    print(env_name)
+
+    domain, task = env_name.replace("-", "_").split("_", 1)
+    domain = dict(cup="ball_in_cup").get(domain, domain)
+    env = suite.load(
+        domain, task, task_kwargs={"random": 0}, visualize_reward=False
+    )
+    env = ActionDTypeWrapper(env, np.float32)
+    env = ActionRepeatWrapper(env, 2)
+    env = action_scale.Wrapper(env, minimum=-1.0, maximum=+1.0)
+    state_dim = get_state_dim(env)
+
+    camera_id = dict(quadruped=2).get(domain, 0)
+    render_kwargs = dict(height=224, width=225, camera_id=camera_id)
+    env = pixels.Wrapper(env, pixels_only=True, render_kwargs=render_kwargs)
+    env = FrameStackWrapper(env, 2) # frame_stack=2
+    env = ExtendedTimeStepWrapper(env)
+    env = TimeStepToGymWrapper(env, domain, task, ep_len=500)
+
+    return env
+
+if __name__ == '__main__':
+    env = make('DMcartpole_swingup')
+    #print(env.observation_space)
+    #print(env.action_space)
+
+    env.reset()
+    images = []
+    while True:
+        _, _, done, _ = env.step(env.action_space.sample())
+        images.append(env.render('rgb_array'))
+        if done:
+            break
+
+    from tools.utils import animate
+    animate(images)

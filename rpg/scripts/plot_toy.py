@@ -71,7 +71,7 @@ def plot_maze():
         for i in y:
             now = max(now, i)
             ys.append(now)
-        print(ys)
+        print(np.log(ys))
         return x, ys
 
 
